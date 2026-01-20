@@ -1,0 +1,7 @@
+name = "gestao-pedidos"
+compatibility_date = "2024-09-23"
+
+# Configuração para servir arquivos estáticos (Frontend Vite)
+[assets]
+directory = "./dist"
+binding = "ASSETS"
