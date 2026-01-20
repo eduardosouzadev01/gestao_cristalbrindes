@@ -4,4 +4,4 @@ compatibility_date = "2024-09-23"
 # Configuração para servir arquivos estáticos (Frontend Vite)
 [assets]
 directory = "./dist"
-binding = "ASSETS"
+# binding = "ASSETS"  <-- Removido conforme mensagem de erro: "Cannot use assets with a binding in an assets-only Worker"
