@@ -1,12 +1,13 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../lib/auth';
 
 const RegistrationList: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'CLIENTE' | 'FORNECEDOR'>('CLIENTE');
   const [partners, setPartners] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { hasPermission } = useAuth();
 
   useEffect(() => {
     fetchPartners();
@@ -105,7 +106,9 @@ const RegistrationList: React.FC = () => {
                   <td className="px-6 py-4 text-sm text-gray-500">{c.email || '-'}</td>
                   <td className="px-6 py-4 text-right text-sm font-medium">
                     <button className="text-blue-500 hover:text-blue-700 mx-2"><span className="material-icons-outlined">edit</span></button>
-                    <button className="text-gray-400 hover:text-red-600 mx-2"><span className="material-icons-outlined">delete</span></button>
+                    {hasPermission('canDelete') && (
+                      <button className="text-gray-400 hover:text-red-600 mx-2"><span className="material-icons-outlined">delete</span></button>
+                    )}
                   </td>
                 </tr>
               )))}

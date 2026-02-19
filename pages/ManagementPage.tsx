@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../lib/auth';
 const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 import { formatDate } from '../src/utils/dateUtils';
 import { maskPhone, maskCpfCnpj } from '../src/utils/maskUtils';
@@ -28,6 +29,7 @@ interface Lead {
 const ManagementPage: React.FC = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
+    const { hasPermission } = useAuth();
 
     const initialLeadState: Partial<Lead> = {
         status: 'NOVO',
@@ -646,20 +648,24 @@ const ManagementPage: React.FC = () => {
                             <span className="material-icons-outlined text-sm">view_kanban</span>
                             Atendimentos
                         </button>
-                        <button
-                            onClick={() => setActiveTab('PERFORMANCE')}
-                            className={`px-4 py-2 rounded-md text-xs font-bold uppercase transition-all flex items-center gap-2 ${activeTab === 'PERFORMANCE' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
-                        >
-                            <span className="material-icons-outlined text-sm">insert_chart</span>
-                            Performance
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('FINANCEIRO')}
-                            className={`px-4 py-2 rounded-md text-xs font-bold uppercase transition-all flex items-center gap-2 ${activeTab === 'FINANCEIRO' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
-                        >
-                            <span className="material-icons-outlined text-sm">payments</span>
-                            Financeiro
-                        </button>
+                        {hasPermission('crm.performance') && (
+                            <button
+                                onClick={() => setActiveTab('PERFORMANCE')}
+                                className={`px-4 py-2 rounded-md text-xs font-bold uppercase transition-all flex items-center gap-2 ${activeTab === 'PERFORMANCE' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                            >
+                                <span className="material-icons-outlined text-sm">insert_chart</span>
+                                Performance
+                            </button>
+                        )}
+                        {hasPermission('crm.financeiro') && (
+                            <button
+                                onClick={() => setActiveTab('FINANCEIRO')}
+                                className={`px-4 py-2 rounded-md text-xs font-bold uppercase transition-all flex items-center gap-2 ${activeTab === 'FINANCEIRO' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                            >
+                                <span className="material-icons-outlined text-sm">payments</span>
+                                Financeiro
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>

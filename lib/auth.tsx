@@ -7,6 +7,10 @@ export interface UserPermissions {
   viewAllOrders: boolean;
   viewOwnOrdersOnly: boolean;
   cadastros: boolean;
+  produtos: boolean;
+  canDelete: boolean;
+  crmPerformance: boolean;
+  crmFinanceiro: boolean;
   financeiro: {
     contasReceber: boolean;
     contasPagar: boolean;
@@ -33,6 +37,10 @@ const PREDEFINED_USERS: Record<string, AppUser> = {
       viewAllOrders: true,
       viewOwnOrdersOnly: false,
       cadastros: true,
+      produtos: true,
+      canDelete: true,
+      crmPerformance: true,
+      crmFinanceiro: true,
       financeiro: {
         contasReceber: true,
         contasPagar: true,
@@ -50,6 +58,10 @@ const PREDEFINED_USERS: Record<string, AppUser> = {
       viewAllOrders: true,
       viewOwnOrdersOnly: false,
       cadastros: true,
+      produtos: true,
+      canDelete: true,
+      crmPerformance: true,
+      crmFinanceiro: false,
       financeiro: {
         contasReceber: true,
         contasPagar: false,
@@ -67,7 +79,11 @@ const PREDEFINED_USERS: Record<string, AppUser> = {
       fullAccess: false,
       viewAllOrders: false,
       viewOwnOrdersOnly: true,
-      cadastros: false,
+      cadastros: true,
+      produtos: true,
+      canDelete: false,
+      crmPerformance: false,
+      crmFinanceiro: false,
       financeiro: {
         contasReceber: false,
         contasPagar: false,
@@ -85,7 +101,11 @@ const PREDEFINED_USERS: Record<string, AppUser> = {
       fullAccess: false,
       viewAllOrders: false,
       viewOwnOrdersOnly: true,
-      cadastros: false,
+      cadastros: true,
+      produtos: true,
+      canDelete: false,
+      crmPerformance: false,
+      crmFinanceiro: false,
       financeiro: {
         contasReceber: false,
         contasPagar: false,
@@ -103,7 +123,11 @@ const PREDEFINED_USERS: Record<string, AppUser> = {
       fullAccess: false,
       viewAllOrders: false,
       viewOwnOrdersOnly: true,
-      cadastros: false,
+      cadastros: true,
+      produtos: true,
+      canDelete: false,
+      crmPerformance: false,
+      crmFinanceiro: false,
       financeiro: {
         contasReceber: false,
         contasPagar: false,
@@ -121,7 +145,11 @@ const PREDEFINED_USERS: Record<string, AppUser> = {
       fullAccess: false,
       viewAllOrders: false,
       viewOwnOrdersOnly: true,
-      cadastros: false,
+      cadastros: true,
+      produtos: true,
+      canDelete: false,
+      crmPerformance: false,
+      crmFinanceiro: false,
       financeiro: {
         contasReceber: false,
         contasPagar: false,
@@ -139,7 +167,11 @@ const PREDEFINED_USERS: Record<string, AppUser> = {
       fullAccess: false,
       viewAllOrders: false,
       viewOwnOrdersOnly: true,
-      cadastros: false,
+      cadastros: true,
+      produtos: true,
+      canDelete: false,
+      crmPerformance: false,
+      crmFinanceiro: false,
       financeiro: {
         contasReceber: false,
         contasPagar: false,
@@ -254,6 +286,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return appUser.permissions.viewAllOrders;
       case 'cadastros':
         return appUser.permissions.cadastros;
+      case 'produtos':
+        return appUser.permissions.produtos;
+      case 'canDelete':
+        return appUser.permissions.canDelete;
+      case 'crm.performance':
+        return appUser.permissions.crmPerformance;
+      case 'crm.financeiro':
+        return appUser.permissions.crmFinanceiro;
       case 'financeiro':
         return appUser.permissions.financeiro.contasReceber || appUser.permissions.financeiro.contasPagar;
       case 'financeiro.receber':
