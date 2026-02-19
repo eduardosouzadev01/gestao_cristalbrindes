@@ -2,20 +2,20 @@
 import type { Product } from '@/types/product';
 
 // API Configurations
+// API Configurations
 const API_CONFIG = {
     xbz: {
         baseUrl: 'https://api.minhaxbz.com.br:5001/api/clientes/GetListaDeProdutos',
-        cnpj: '08769700000157',
-        token: 'XCDFF6B22B',
+        cnpj: import.meta.env.VITE_XBZ_CNPJ || '',
+        token: import.meta.env.VITE_XBZ_TOKEN || '',
     },
     asia: {
         baseUrl: 'https://api.asiaimport.com.br/',
-        apiKey: 'e58cc5ca94270acaceed13bc82dfedf7',
-        secretKey:
-            'Rxwtufk7tEN2Wp2xUsB8Ga83rqH1LbyvxF5j4tl4Q6Zu6cegKQeYFISWRyNgsQjzayvwx0mC7FQ4p2MKsbxaXRfTAhbONncGTg3N8Q0m9mABiSdeKok0KozzBFODSr0',
+        apiKey: import.meta.env.VITE_ASIA_API_KEY || '',
+        secretKey: import.meta.env.VITE_ASIA_SECRET_KEY || '',
     },
     spot: {
-        accessKey: 'ZxCtBjjag6wEiUkS',
+        accessKey: import.meta.env.VITE_SPOT_ACCESS_KEY || '',
         baseUrl: 'https://ws.spotgifts.com.br/downloads/v1SSL/file',
     },
 };
