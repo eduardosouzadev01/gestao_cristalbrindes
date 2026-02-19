@@ -56,22 +56,22 @@ const RegistrationList: React.FC = () => {
       <div className="bg-white shadow-lg rounded-xl overflow-hidden border border-gray-100">
         <div className="border-b border-gray-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <nav className="flex space-x-6">
-            <button 
+            <button
               onClick={() => setActiveTab('CLIENTE')}
               className={`${activeTab === 'CLIENTE' ? 'border-blue-500 text-blue-500' : 'border-transparent text-gray-500'} border-b-2 font-bold text-sm flex items-center gap-2 pb-2 transition-all`}
             >
-              Clientes <span className={`py-0.5 px-2.5 rounded-full text-xs ${activeTab === 'CLIENTE' ? 'bg-blue-100 text-blue-500' : 'bg-gray-100 text-gray-500'}`}>128</span>
+              Clientes <span className={`py-0.5 px-2.5 rounded-full text-xs ${activeTab === 'CLIENTE' ? 'bg-blue-100 text-blue-500' : 'bg-gray-100 text-gray-500'}`}>{partners.filter(p => p.type === 'CLIENTE').length}</span>
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('FORNECEDOR')}
               className={`${activeTab === 'FORNECEDOR' ? 'border-blue-500 text-blue-500' : 'border-transparent text-gray-500'} border-b-2 font-bold text-sm flex items-center gap-2 pb-2 transition-all`}
             >
-              Fornecedores <span className={`py-0.5 px-2.5 rounded-full text-xs ${activeTab === 'FORNECEDOR' ? 'bg-blue-100 text-blue-500' : 'bg-gray-100 text-gray-500'}`}>42</span>
+              Fornecedores <span className={`py-0.5 px-2.5 rounded-full text-xs ${activeTab === 'FORNECEDOR' ? 'bg-blue-100 text-blue-500' : 'bg-gray-100 text-gray-500'}`}>{partners.filter(p => p.type === 'FORNECEDOR').length}</span>
             </button>
           </nav>
           <div className="relative max-w-xs w-full">
-             <span className="absolute left-3 top-1/2 -translate-y-1/2 material-icons-outlined text-gray-400 text-sm">filter_list</span>
-             <input type="text" placeholder="Filtrar por nome, CNPJ..." className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 material-icons-outlined text-gray-400 text-sm">filter_list</span>
+            <input type="text" placeholder="Filtrar por nome, CNPJ..." className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm" />
           </div>
         </div>
 
@@ -85,33 +85,33 @@ const RegistrationList: React.FC = () => {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-               <tr><td colSpan={5} className="p-10 text-center text-gray-500">Carregando parceiros...</td></tr>
+              <tr><td colSpan={5} className="p-10 text-center text-gray-500">Carregando parceiros...</td></tr>
             ) : currentData.length === 0 ? (
-               <tr><td colSpan={5} className="p-10 text-center text-gray-500">Nenhum registro encontrado.</td></tr>
+              <tr><td colSpan={5} className="p-10 text-center text-gray-500">Nenhum registro encontrado.</td></tr>
             ) : (
-            currentData.map((c, i) => (
-              <tr key={i} className="hover:bg-gray-50 transition-colors">
-                <td className="px-6 py-4">
-                  <div className="flex items-center">
-                    <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm ${c.color}`}>{c.initials}</div>
-                    <div className="ml-4">
-                      <div className="text-sm font-semibold text-gray-900">{c.name}</div>
-                      <div className="text-xs text-gray-500">{c.type}</div>
+              currentData.map((c, i) => (
+                <tr key={i} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center">
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm ${c.color}`}>{c.initials}</div>
+                      <div className="ml-4">
+                        <div className="text-sm font-semibold text-gray-900">{c.name}</div>
+                        <div className="text-xs text-gray-500">{c.type}</div>
+                      </div>
                     </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-900">{c.doc || '-'}</td>
-                <td className="px-6 py-4 text-sm text-gray-900">{c.phone || '-'}</td>
-                <td className="px-6 py-4 text-sm text-gray-500">{c.email || '-'}</td>
-                <td className="px-6 py-4 text-right text-sm font-medium">
-                  <button className="text-blue-500 hover:text-blue-700 mx-2"><span className="material-icons-outlined">edit</span></button>
-                  <button className="text-gray-400 hover:text-red-600 mx-2"><span className="material-icons-outlined">delete</span></button>
-                </td>
-              </tr>
-            )))}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-900">{c.doc || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900">{c.phone || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{c.email || '-'}</td>
+                  <td className="px-6 py-4 text-right text-sm font-medium">
+                    <button className="text-blue-500 hover:text-blue-700 mx-2"><span className="material-icons-outlined">edit</span></button>
+                    <button className="text-gray-400 hover:text-red-600 mx-2"><span className="material-icons-outlined">delete</span></button>
+                  </td>
+                </tr>
+              )))}
           </tbody>
         </table>
-        
+
         <div className="bg-white px-6 py-3 border-t border-gray-200 flex items-center justify-between">
           <p className="text-sm text-gray-700">
             Mostrando <span className="font-medium">{currentData.length > 0 ? 1 : 0}</span> a <span className="font-medium">{currentData.length}</span> de <span className="font-medium">{activeTab === 'CLIENTE' ? partners.filter(p => p.type === 'CLIENTE').length : partners.filter(p => p.type === 'FORNECEDOR').length}</span> resultados

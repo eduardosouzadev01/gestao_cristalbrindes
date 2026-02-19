@@ -1,0 +1,73 @@
+version: "2"
+type: frontend
+tech_stack:
+  - TypeScript
+  - React
+  - Vite
+  - TailwindCSS
+  - Supabase
+routes:
+  - path: /login
+    file: pages/LoginPage.tsx
+    auth_required: false
+    description: User login page with email/password
+  - path: /
+    file: pages/OrderList.tsx
+    auth_required: true
+    description: Dashboard and list of orders
+  - path: /pedido/novo
+    file: pages/OrderForm.tsx
+    auth_required: true
+    description: Create a new order
+  - path: /crm
+    file: pages/ManagementPage.tsx
+    auth_required: true
+    description: CRM, Performance stats and Financial overview
+  - path: /orcamentos
+    file: pages/BudgetList.tsx
+    auth_required: true
+    description: List of budgets/quotes
+  - path: /receivables
+    file: pages/ReceivablesPage.tsx
+    auth_required: true
+    description: Accounts receivable management
+  - path: /payables
+    file: pages/PayablesPage.tsx
+    auth_required: true
+    description: Accounts payable management
+features:
+  - name: User Authentication
+    description: Login system using Supabase Auth or custom auth context
+    files:
+      - pages/LoginPage.tsx
+      - lib/auth.tsx
+    entry_route: /login
+    user_interactions:
+      - Enter email and password
+      - Click Login
+      - Redirect to Dashboard upon success
+    auth_required: false
+  - name: Order Management
+    description: Create, view, and manage customer orders
+    files:
+      - pages/OrderList.tsx
+      - pages/OrderForm.tsx
+    entry_route: /
+    user_interactions:
+      - View list of orders
+      - Filter orders by status
+      - Click 'New Order' to create
+      - Fill order details (client, products, values)
+      - Save order
+    auth_required: true
+  - name: CRM & Financial Dashboard
+    description: Integrated view for Leads (Kanban), Performance charts, and Financial stats
+    files:
+      - pages/ManagementPage.tsx
+    entry_route: /crm
+    user_interactions:
+      - Drag and drop leads in Kanban
+      - View sales performance charts
+      - Filter financial data by date/salesperson
+    auth_required: true
+known_limitations: []

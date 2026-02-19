@@ -1,0 +1,19 @@
+{
+  "status": "commited",
+  "type": "frontend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:3000",
+  "loginUser": "cristalbrindes@cristalbrindes.com.br",
+  "loginPassword": "@SucessoCristal09!",
+  "executionArgs": {
+    "projectName": "Gestão_Pedidos V01",
+    "projectPath": "c:\\Users\\eduardosouza\\Desktop\\Gestão de Pedidos\\Gestão_Pedidos V01",
+    "testIds": [],
+    "additionalInstruction": "",
+    "envs": {
+      "API_KEY": "sk-user-IfcP7iZLOpJgHqy1IXNFN3CZwtv_XvzE9UPMXZWNVffz5g43kW_G8nU8CgFJEKW2gtXlUgFvgKoqxkgcRK6Uu-qHS4_7U9nM6mBu6tZgayiXF3gvbQsFG37UdNjskx96Kzg"
+    }
+  },
+  "serverPort": 49674,
+  "proxy": "http://15dd0ace-25fe-457f-8807-b33162cec1e4:Zz45svtT14t3SRvGd25op5PPY7XWbSby@tun.testsprite.com:8080"
+}

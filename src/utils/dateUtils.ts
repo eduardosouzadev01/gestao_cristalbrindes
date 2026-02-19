@@ -11,7 +11,7 @@ export const formatDate = (dateValue: string | Date | null | undefined): string 
 
   try {
     const date = new Date(dateValue);
-    
+
     // Verifica se a data é válida
     if (isNaN(date.getTime())) return '-';
 
@@ -20,7 +20,7 @@ export const formatDate = (dateValue: string | Date | null | undefined): string 
     // Mas strings YYYY-MM-DD são interpretadas como UTC no construtor Date(), 
     // enquanto new Date(Y, M, D) é local.
     // Para simplificar e evitar erros de -1 dia: vamos tratar a string ISO manualmente se possível
-    
+
     if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
       const [year, month, day] = dateValue.split('-');
       return `${day}/${month}/${year}`;
@@ -56,7 +56,12 @@ export const getTodayISO = (): string => {
 /**
  * Formata mês e ano para exibição (ex: JANEIRO de 2024)
  */
-export const formatMonthYear = (month: number, year: number): string => {
-  const date = new Date(year, month - 1, 1);
+export const formatMonthYear = (arg1: number | string, arg2?: number): string => {
+  if (typeof arg1 === 'string') {
+    const [year, month] = arg1.split('-').map(Number);
+    const date = new Date(year, month - 1, 1);
+    return date.toLocaleString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase();
+  }
+  const date = new Date(arg2!, arg1 - 1, 1);
   return date.toLocaleString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase();
 };

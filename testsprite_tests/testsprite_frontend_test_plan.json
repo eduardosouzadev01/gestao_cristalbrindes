@@ -1,0 +1,3276 @@
+[
+  {
+    "id": "TC001",
+    "title": "Create a new order from the order list and verify it appears in the list",
+    "description": "Verifies a user can start from the dashboard, create a new order, save it, and then see it listed.",
+    "category": "Order Management",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"New Order\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/pedido/novo\""
+      },
+      {
+        "type": "action",
+        "description": "Fill \"Client\" with \"Cliente Teste E2E\""
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Complete new order form and save successfully",
+    "description": "Verifies saving a fully completed order shows a visible success state on the UI.",
+    "category": "Order Management",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"New Order\""
+      },
+      {
+        "type": "action",
+        "description": "Fill \"Products\" with \"Caneta personalizada\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Save\""
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "After saving, verify the created order is visible in the order list",
+    "description": "Verifies that after saving an order, the user can see the new order entry in the orders list.",
+    "category": "Order Management",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"New Order\""
+      },
+      {
+        "type": "action",
+        "description": "Fill \"Client\" with \"Cliente Teste Lista\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Save\""
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Validate required client field when saving a new order",
+    "description": "Verifies the form blocks saving and shows a required-field validation message when client is missing.",
+    "category": "Order Management",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"New Order\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Save\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Client\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Filter orders by status from the order list",
+    "description": "Verifies the status filter updates the visible list to show only matching orders.",
+    "category": "Order Management",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Select \"Paid\" from the status filter dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the order list to update"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Paid\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Change status filter and verify results change accordingly",
+    "description": "Verifies switching the status filter produces a different visible state than the previous filter.",
+    "category": "Order Management",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Select \"Pending\" from the status filter dropdown"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Pending\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Select \"Paid\" from the status filter dropdown"
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Access CRM dashboard and view sales performance charts",
+    "description": "Verifies that an authenticated user can open the CRM page and see the sales performance charts.",
+    "category": "CRM & Financial Dashboard",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"CRM\" menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/crm\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Performance\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Filter financial dashboard by date range and salesperson and see charts update",
+    "description": "Verifies that applying date and salesperson filters updates the financial/sales charts on the CRM dashboard.",
+    "category": "CRM & Financial Dashboard",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"CRM\" menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/crm\""
+      },
+      {
+        "type": "action",
+        "description": "Select an option from the salesperson dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Click on the start date field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"2026-01-01\" into the start date field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the end date field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"2026-01-31\" into the end date field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Apply\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"2026-01-01\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"2026-01-31\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Invalid date range shows validation error when applying financial filter",
+    "description": "Verifies that selecting an end date earlier than the start date shows a visible validation error.",
+    "category": "CRM & Financial Dashboard",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"CRM\" menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/crm\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the start date field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"2026-02-10\" into the start date field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the end date field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"2026-02-01\" into the end date field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Apply\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Invalid date range\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Attempt to apply filter with missing date fields and see validation feedback",
+    "description": "Verifies that the CRM financial filters provide visible feedback when required date inputs are missing.",
+    "category": "CRM & Financial Dashboard",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"CRM\" menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/crm\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Apply\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"date\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Sales performance section remains visible after applying filters",
+    "description": "Verifies that applying financial filters does not remove or hide the sales performance charts section.",
+    "category": "CRM & Financial Dashboard",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"CRM\" menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/crm\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Performance\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on the start date field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"2026-01-01\" into the start date field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the end date field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"2026-01-31\" into the end date field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Apply\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Performance\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "View budgets list from Orçamentos page",
+    "description": "Verifies that an authenticated user can open the Orçamentos page and see a list of budgets/quotes.",
+    "category": "Budgets / Quotes (Orçamentos)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Entrar\" (Login) button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Orçamentos\" menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/orcamentos\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Budgets list\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Open a budget from the list and view budget details",
+    "description": "Verifies that a user can open a budget item from the list and see its details screen/panel.",
+    "category": "Budgets / Quotes (Orçamentos)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Entrar\" (Login) button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Orçamentos\" menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/orcamentos\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first budget item in the list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Budget details\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Budget details show key information fields",
+    "description": "Verifies that when a budget is opened, key details are visibly present (at least one identifier and one value/status field).",
+    "category": "Budgets / Quotes (Orçamentos)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Entrar\" (Login) button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Orçamentos\" menu item"
+      },
+      {
+        "type": "action",
+        "description": "Click on the first budget item in the list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Orçamento\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Budget status\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Apply a filter that returns no results shows empty state message",
+    "description": "Verifies that filtering budgets to an empty result set shows a clear 'No budgets found' message.",
+    "category": "Budgets / Quotes (Orçamentos)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Entrar\" (Login) button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Orçamentos\" menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/orcamentos\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"zzzzzz-no-results\" into the budgets search/filter field"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"No budgets found\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "Clearing the filter restores results after an empty search",
+    "description": "Verifies that after a no-results filter, clearing the filter returns the budgets list to a non-empty state (if data exists).",
+    "category": "Budgets / Quotes (Orçamentos)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Entrar\" (Login) button"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Orçamentos\" menu item"
+      },
+      {
+        "type": "action",
+        "description": "Type \"zzzzzz-no-results\" into the budgets search/filter field"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"No budgets found\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Clear the budgets search/filter field"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Budgets list\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "Filter input accepts special characters without breaking the page",
+    "description": "Verifies that entering special characters into the budgets filter does not break rendering and shows either results or an empty state.",
+    "category": "Budgets / Quotes (Orçamentos)",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Entrar\" (Login) button"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Orçamentos\" menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/orcamentos\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"!@#$%¨&*()_+\" into the budgets search/filter field"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Budgets list\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC018",
+    "title": "Orçamentos page remains accessible from another authenticated section",
+    "description": "Verifies that a logged-in user can navigate from another authenticated page (e.g., CRM) to Orçamentos using in-app navigation.",
+    "category": "Budgets / Quotes (Orçamentos)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Entrar\" (Login) button"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"CRM\" menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/crm\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Orçamentos\" menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/orcamentos\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Budgets list\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC019",
+    "title": "Mark a receivable as paid from details and verify status updates to PAID",
+    "description": "Verifies a user can open a receivable, mark it as paid, and see the status updated to PAID.",
+    "category": "Receivables Management (Contas a Receber)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Receivables\" in the main navigation menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/receivables"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Contas a Receber\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC020",
+    "title": "Open receivables list and view receivable details page/section",
+    "description": "Verifies the receivables list is accessible and a receivable can be opened to view its details.",
+    "category": "Receivables Management (Contas a Receber)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Receivables\" in the main navigation menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/receivables"
+      },
+      {
+        "type": "action",
+        "description": "Click on the first receivable item in the list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Detalhes\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC021",
+    "title": "Mark a receivable as paid and verify a confirmation modal appears",
+    "description": "Verifies that initiating payment confirmation prompts the user with a confirmation modal before completion.",
+    "category": "Receivables Management (Contas a Receber)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Receivables\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Click on the first receivable item in the list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Mark as paid\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Confirm\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC022",
+    "title": "Payment processing fails after confirmation and shows error message",
+    "description": "Verifies the UI displays the error message 'Payment confirmation failed' when payment confirmation fails.",
+    "category": "Receivables Management (Contas a Receber)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Receivables\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Click on the first receivable item in the list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Mark as paid\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Confirm\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Payment confirmation failed\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC023",
+    "title": "After payment failure, receivable status remains unchanged (not PAID)",
+    "description": "Verifies that when payment confirmation fails, the receivable does not incorrectly display a PAID status.",
+    "category": "Receivables Management (Contas a Receber)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Receivables\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Click on the first receivable item in the list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Mark as paid\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Confirm\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"PAID\" is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC024",
+    "title": "Cancel payment confirmation modal and verify no status change occurs",
+    "description": "Verifies that canceling the confirmation modal does not mark the receivable as paid.",
+    "category": "Receivables Management (Contas a Receber)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Receivables\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Click on the first receivable item in the list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Mark as paid\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Cancel\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"PAID\" is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC025",
+    "title": "Mark as paid successfully and verify paid status is visible in details view",
+    "description": "Verifies that after a successful payment confirmation, the details view clearly shows PAID status.",
+    "category": "Receivables Management (Contas a Receber)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Receivables\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Click on the first receivable item in the list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Mark as paid\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Confirm\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"PAID\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC026",
+    "title": "Receivables list loads and shows at least one row/item",
+    "description": "Verifies the receivables page renders a visible list area and at least one receivable item is displayed.",
+    "category": "Receivables Management (Contas a Receber)",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Receivables\" in the main navigation menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/receivables"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Receivables list\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Receivable item\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC027",
+    "title": "View payables list from Payables page",
+    "description": "Verifies that an authenticated user can open the Payables page and see the list of payables.",
+    "category": "Payables Management (Contas a Pagar)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Contas a Pagar\" or \"Payables\" menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/payables\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Contas a Pagar\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC028",
+    "title": "Open payable details by clicking a payable item",
+    "description": "Verifies that a user can open an individual payable and view its details.",
+    "category": "Payables Management (Contas a Pagar)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Contas a Pagar\" or \"Payables\" menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/payables\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first payable item in the list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Detalhes\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC029",
+    "title": "Payables list shows key columns/fields for each payable",
+    "description": "Verifies that the payables list presents essential information needed to track due dates and payment status.",
+    "category": "Payables Management (Contas a Pagar)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Contas a Pagar\" or \"Payables\" menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/payables\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Vencimento\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC030",
+    "title": "Payables details view shows payable status and amount",
+    "description": "Verifies that the payable details view displays the payable\u0019s status and monetary amount.",
+    "category": "Payables Management (Contas a Pagar)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Contas a Pagar\" or \"Payables\" menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/payables\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first payable item in the list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Status\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC031",
+    "title": "Attempt to mark a payable as paid and confirm payment (happy-path UI flow)",
+    "description": "Verifies the UI flow to initiate marking a payable as paid and confirming the action.",
+    "category": "Payables Management (Contas a Pagar)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Contas a Pagar\" or \"Payables\" menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/payables\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first payable item in the list"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Marcar como pago\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Confirmar pagamento\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC032",
+    "title": "Cancel payment confirmation does not mark payable as paid",
+    "description": "Verifies that dismissing the confirmation keeps the payable unchanged and returns to the details view without an update.",
+    "category": "Payables Management (Contas a Pagar)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Contas a Pagar\" or \"Payables\" menu item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/payables\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first payable item in the list"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Marcar como pago\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Cancelar\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Confirmar pagamento\" is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC033",
+    "title": "Create a new CLIENTE partner and see it in the partners list",
+    "description": "Verifies that a user can create a new partner classified as CLIENTE and that it appears in the list after saving.",
+    "category": "Partners Management (Clientes / Fornecedores)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Partners\" menu item"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"New Partner\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"New Partner\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Cliente E2E Teste\" into the \"Name\" field"
+      },
+      {
+        "type": "action",
+        "description": "Select \"CLIENTE\" from the \"Classification\" dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Type \"123.456.789-09\" into the \"Document (CPF/CNPJ)\" field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"(11) 99999-0000\" into the \"Contact\" field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"financeiro.cliente.teste@example.com\" into the \"Email Financeiro\" field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Cliente E2E Teste\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC034",
+    "title": "Create a new FORNECEDOR partner and see it in the partners list",
+    "description": "Verifies that a user can create a new partner classified as FORNECEDOR and that it appears in the list after saving.",
+    "category": "Partners Management (Clientes / Fornecedores)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Partners\" menu item"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"New Partner\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"New Partner\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Fornecedor E2E Teste\" into the \"Name\" field"
+      },
+      {
+        "type": "action",
+        "description": "Select \"FORNECEDOR\" from the \"Classification\" dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Type \"12.345.678/0001-95\" into the \"Document (CPF/CNPJ)\" field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"(21) 98888-1111\" into the \"Contact\" field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"financeiro.fornecedor.teste@example.com\" into the \"Email Financeiro\" field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Fornecedor E2E Teste\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC035",
+    "title": "Validate CPF/CNPJ field shows error for invalid document on save",
+    "description": "Verifies that the system blocks saving when CPF/CNPJ is invalid and shows the validation message \"Invalid CPF/CNPJ\".",
+    "category": "Partners Management (Clientes / Fornecedores)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Partners\" menu item"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"New Partner\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Parceiro Doc Invalido\" into the \"Name\" field"
+      },
+      {
+        "type": "action",
+        "description": "Select \"CLIENTE\" from the \"Classification\" dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Type \"111.111.111-11\" into the \"Document (CPF/CNPJ)\" field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Invalid CPF/CNPJ\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC036",
+    "title": "Required field validation: attempt to save partner with empty Name",
+    "description": "Verifies that the system prevents saving when the Name field is empty and shows a visible required-field validation message.",
+    "category": "Partners Management (Clientes / Fornecedores)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Partners\" menu item"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"New Partner\" button"
+      },
+      {
+        "type": "action",
+        "description": "Select \"FORNECEDOR\" from the \"Classification\" dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Type \"12.345.678/0001-95\" into the \"Document (CPF/CNPJ)\" field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Name\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"required\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC037",
+    "title": "Required field validation: attempt to save partner with empty Document",
+    "description": "Verifies that the system prevents saving when the CPF/CNPJ document field is empty and shows a visible validation message.",
+    "category": "Partners Management (Clientes / Fornecedores)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Partners\" menu item"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"New Partner\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Parceiro Sem Documento\" into the \"Name\" field"
+      },
+      {
+        "type": "action",
+        "description": "Select \"CLIENTE\" from the \"Classification\" dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Document\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"required\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC038",
+    "title": "Email Financeiro validation: invalid email format is rejected",
+    "description": "Verifies that an invalid financial email format is not accepted and an email validation message is shown.",
+    "category": "Partners Management (Clientes / Fornecedores)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Partners\" menu item"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"New Partner\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Parceiro Email Invalido\" into the \"Name\" field"
+      },
+      {
+        "type": "action",
+        "description": "Select \"CLIENTE\" from the \"Classification\" dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Type \"12.345.678/0001-95\" into the \"Document (CPF/CNPJ)\" field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"email-invalido\" into the \"Email Financeiro\" field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"invalid email\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC039",
+    "title": "Cancel creating a partner does not add it to the list",
+    "description": "Verifies that canceling out of the New Partner form returns to the list without creating the partner.",
+    "category": "Partners Management (Clientes / Fornecedores)",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Partners\" menu item"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"New Partner\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Parceiro Cancelado\" into the \"Name\" field"
+      },
+      {
+        "type": "action",
+        "description": "Select \"FORNECEDOR\" from the \"Classification\" dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Cancel\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Partners\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Parceiro Cancelado\" is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC040",
+    "title": "Create a new product and confirm it appears in the catalog",
+    "description": "Verifies a user can create a product with name, description, and unit price and then see it listed in the product catalog.",
+    "category": "Product Catalog",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Products\" menu"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"New Product\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Produto Catálogo E2E 01\" into the \"Name\" field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Produto para validação de criação no catálogo.\" into the \"Description\" field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"12.50\" into the \"Price Unit\" field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Produto Catálogo E2E 01\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC041",
+    "title": "Prevent saving a duplicate product name and show \"Product already exists\"",
+    "description": "Verifies the catalog blocks duplicate product names and shows a clear validation error message.",
+    "category": "Product Catalog",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Products\" menu"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"New Product\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Produto Duplicado E2E\" into the \"Name\" field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Primeira criação do produto duplicado.\" into the \"Description\" field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"9.99\" into the \"Price Unit\" field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Produto Duplicado E2E\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"New Product\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Produto Duplicado E2E\" into the \"Name\" field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Tentativa de duplicar o mesmo nome.\" into the \"Description\" field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"10.99\" into the \"Price Unit\" field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Product already exists\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC042",
+    "title": "Validate required field: block save when Name is empty",
+    "description": "Verifies the product cannot be saved when the Name field is left empty and a required-field message is shown.",
+    "category": "Product Catalog",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Products\" menu"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"New Product\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Produto sem nome\" into the \"Description\" field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"5.00\" into the \"Price Unit\" field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Name\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"required\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC043",
+    "title": "Validate required field: block save when Price Unit is empty",
+    "description": "Verifies the product cannot be saved when the unit price is missing and a required/validation message is shown.",
+    "category": "Product Catalog",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Products\" menu"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"New Product\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Produto sem preço E2E\" into the \"Name\" field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Produto para validar preço obrigatório.\" into the \"Description\" field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Price Unit\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"required\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC044",
+    "title": "Validate numeric input: reject non-numeric unit price",
+    "description": "Verifies the unit price field rejects invalid (non-numeric) values and shows a validation message.",
+    "category": "Product Catalog",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Products\" menu"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"New Product\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Produto preço inválido E2E\" into the \"Name\" field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Produto para validar preço com letras.\" into the \"Description\" field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"abc\" into the \"Price Unit\" field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Price\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"invalid\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC045",
+    "title": "Validate business rule: reject negative unit price",
+    "description": "Verifies the catalog blocks saving a product with a negative unit price and shows an error.",
+    "category": "Product Catalog",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Products\" menu"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"New Product\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Produto preço negativo E2E\" into the \"Name\" field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Produto para validar regra de preço >= 0.\" into the \"Description\" field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"-1\" into the \"Price Unit\" field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Price\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"must\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC046",
+    "title": "Cancel new product creation returns to catalog without saving",
+    "description": "Verifies the user can cancel out of the New Product form and the product is not created.",
+    "category": "Product Catalog",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Products\" menu"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"New Product\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Produto cancelado E2E\" into the \"Name\" field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Cancel\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"New Product\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Produto cancelado E2E\" is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC047",
+    "title": "Generate commission record after confirming entry payment (happy path)",
+    "description": "Verifies that confirming an order's entry payment creates a PENDING commission record linked to the order.",
+    "category": "Commissions System",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first order in the orders list"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Confirm entry payment\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"PENDING\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC048",
+    "title": "Commission amount reflects 1% rule after entry payment confirmation",
+    "description": "Verifies the commission record generated for entry payment shows an amount consistent with 1% of the order total.",
+    "category": "Commissions System",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first order in the orders list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Total\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"1%\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC049",
+    "title": "Generate commission record after confirming remaining payment (happy path)",
+    "description": "Verifies that confirming an order's remaining payment creates a PENDING commission record linked to the order.",
+    "category": "Commissions System",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first order in the orders list"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Confirm remaining payment\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"PENDING\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC050",
+    "title": "Commission record is visibly linked to the current order",
+    "description": "Verifies that the commission created after payment confirmation is displayed within the opened order context (linked association).",
+    "category": "Commissions System",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first order in the orders list"
+      },
+      {
+        "type": "action",
+        "description": "Scroll to the \"Commissions\" section"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Commissions\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC051",
+    "title": "Commission generation failure shows alert for entry payment flow",
+    "description": "Verifies that when commission generation fails after confirming entry payment, the user sees the specified failure alert.",
+    "category": "Commissions System",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first order in the orders list"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Confirm entry payment\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Commission generation failed\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC052",
+    "title": "Prevent duplicate commission creation on repeated entry payment confirmation",
+    "description": "Verifies that clicking entry payment confirmation again does not create an additional duplicate PENDING commission record.",
+    "category": "Commissions System",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first order in the orders list"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Confirm entry payment\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Commission\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC053",
+    "title": "Commission remains PENDING immediately after generation",
+    "description": "Verifies that immediately after generating a commission (either payment confirmation), the status shown is PENDING (not auto-settled).",
+    "category": "Commissions System",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first order in the orders list"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Confirm remaining payment\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"PENDING\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC054",
+    "title": "Update tax rate factor and see success confirmation",
+    "description": "Verifies that a user can update the default tax rate factor and gets a visible success confirmation.",
+    "category": "Calculation Factors (Configurações)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Settings\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Calculation Factors\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"15\" into the tax rate field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Factors updated\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC055",
+    "title": "Update multiple factors (tax, margin, contingency) and save successfully",
+    "description": "Verifies that editing all calculation factors at once can be saved and a success confirmation is shown.",
+    "category": "Calculation Factors (Configurações)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Settings\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Calculation Factors\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"12\" into the tax rate field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"25\" into the margin field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"5\" into the contingency field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Factors updated\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC056",
+    "title": "Invalid margin value shows validation error and prevents saving",
+    "description": "Verifies that an invalid margin value triggers a visible validation message and does not show the success confirmation.",
+    "category": "Calculation Factors (Configurações)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Settings\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Calculation Factors\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"-10\" into the margin field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Invalid margin\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC057",
+    "title": "Non-numeric margin value shows validation error",
+    "description": "Verifies that entering a non-numeric margin value shows a visible validation error.",
+    "category": "Calculation Factors (Configurações)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Settings\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Calculation Factors\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"abc\" into the margin field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Invalid margin\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC058",
+    "title": "Required field empty shows validation error",
+    "description": "Verifies that clearing a required factor field and saving shows a visible required/validation error.",
+    "category": "Calculation Factors (Configurações)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Settings\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Calculation Factors\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"\" into the tax rate field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Tax rate is required\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC059",
+    "title": "Saved factors persist after leaving and returning to Calculation Factors",
+    "description": "Verifies that after saving factors, the values remain visible when navigating away and returning to the settings screen.",
+    "category": "Calculation Factors (Configurações)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Settings\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Calculation Factors\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"11\" into the tax rate field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Factors updated\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click \"CRM\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/crm\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Settings\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Calculation Factors\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"11\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC060",
+    "title": "Cancel/close without saving does not show success confirmation",
+    "description": "Verifies that leaving the Calculation Factors screen without saving does not show a success confirmation.",
+    "category": "Calculation Factors (Configurações)",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Settings\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Calculation Factors\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"20\" into the margin field"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Orders\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Factors updated\" is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC061",
+    "title": "Enter extremely large tax rate value shows validation error",
+    "description": "Verifies that an out-of-range tax rate value triggers a visible validation message.",
+    "category": "Calculation Factors (Configurações)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Settings\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Calculation Factors\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"9999\" into the tax rate field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Invalid tax rate\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC062",
+    "title": "Create an audit log entry when changing an order status",
+    "description": "Verifies that changing an order status and saving creates a visible new audit log entry describing the change.",
+    "category": "Audit Logs",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first order in the orders list"
+      },
+      {
+        "type": "action",
+        "description": "Select a different option from the order \"Status\" dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Save\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Order Logs\" (or \"Audit Logs\") in the order details view"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Status\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC063",
+    "title": "Audit log shows the latest status change entry at the top of the list",
+    "description": "Verifies that after saving a status change, the newest log entry appears first in the audit log list.",
+    "category": "Audit Logs",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first order in the orders list"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Order Logs\" (or \"Audit Logs\") in the order details view"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Audit log list\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Back\" (or \"Orders\") to return to the orders list"
+      },
+      {
+        "type": "action",
+        "description": "Click on the same order in the orders list"
+      },
+      {
+        "type": "action",
+        "description": "Select a different option from the order \"Status\" dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Save\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Order Logs\" (or \"Audit Logs\") in the order details view"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Status\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC064",
+    "title": "Create an audit log entry when changing an order value/amount",
+    "description": "Verifies that changing an order monetary value and saving creates a visible audit log entry describing the value change.",
+    "category": "Audit Logs",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first order in the orders list"
+      },
+      {
+        "type": "action",
+        "description": "Scroll to the pricing/values section in the order details"
+      },
+      {
+        "type": "action",
+        "description": "Fill \"1234,56\" into the order \"Total\" (or \"Valor\") field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Save\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Order Logs\" (or \"Audit Logs\") in the order details view"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Valor\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC065",
+    "title": "Audit logs remain visible after a page reload of the order details",
+    "description": "Verifies that audit logs can still be opened and viewed after re-opening the same order, indicating persistence.",
+    "category": "Audit Logs",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first order in the orders list"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Order Logs\" (or \"Audit Logs\") in the order details view"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Audit log list\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Back\" (or \"Orders\") to return to the orders list"
+      },
+      {
+        "type": "action",
+        "description": "Click on the same order in the orders list"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Order Logs\" (or \"Audit Logs\") in the order details view"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Audit log list\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC066",
+    "title": "Audit logs panel can be opened and closed without changing data",
+    "description": "Verifies that users can open the audit logs view and return to order details without making changes.",
+    "category": "Audit Logs",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first order in the orders list"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Order Logs\" (or \"Audit Logs\") in the order details view"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Audit log list\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Close\" (or \"Back\") in the logs view"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Order details\" is visible"
+      }
+    ]
+  }
+]

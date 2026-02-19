@@ -1,24 +1,50 @@
+
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { formatDate } from '../src/utils/dateUtils';
+import { useAuth } from '../lib/auth';
 
 const OrderList: React.FC = () => {
   const navigate = useNavigate();
-  const [vendedorFilter, setVendedorFilter] = useState('Todos os Vendedores');
-  const [statusFilter, setStatusFilter] = useState('Todos');
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  const { appUser } = useAuth();
+
+  // States
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
+    if (location.state?.clientName) {
+      setSearchTerm(location.state.clientName);
+    }
+  }, [location.state]);
+  const [vendedorFilter, setVendedorFilter] = useState('Todos os Vendedores');
+  const [statusFilter, setStatusFilter] = useState('Todos');
+  const [limitDateFilter, setLimitDateFilter] = useState('');
+  const [supplierDateFilter, setSupplierDateFilter] = useState('');
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [pageSize] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
+
+  // Initialize Vendedor Filter based on Auth
+  useEffect(() => {
+    if (appUser?.salesperson) {
+      setVendedorFilter(appUser.salesperson);
+    }
+  }, [appUser]);
+
+  // Fetch Orders
+  useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [appUser]); // Re-fetch if auth loads
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
       // Fetch orders with client name (join)
-      const { data, error } = await supabase
+      let query = supabase
         .from('orders')
         .select(`
           id, 
@@ -26,30 +52,72 @@ const OrderList: React.FC = () => {
           status, 
           order_date, 
           total_amount, 
+          entry_amount,
+          remaining_amount,
           salesperson,
+          payment_due_date,
+          supplier_departure_date,
           partners (name, doc)
-        `)
-        .order('created_at', { ascending: false });
+        `, { count: 'exact' });
+
+      // Search
+      if (searchTerm) {
+        query = query.or(`order_number.ilike.%${searchTerm}%,partners.name.ilike.%${searchTerm}%`);
+      }
+
+      // Filters
+      if (vendedorFilter !== 'Todos os Vendedores') {
+        query = query.eq('salesperson', vendedorFilter);
+      }
+      if (statusFilter !== 'Todos') {
+        query = query.eq('status', statusFilter);
+      }
+
+      // Range for Pagination
+      query = query
+        .order('created_at', { ascending: false })
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+
+      // If user can only view own orders, filter by salesperson
+      if (appUser?.permissions?.viewOwnOrdersOnly && appUser?.salesperson) {
+        query = query.eq('salesperson', appUser.salesperson);
+      }
+
+      const { data, error, count } = await query;
 
       if (error) throw error;
+      setTotalCount(count || 0);
 
       if (data) {
         const formatted = data.map((o: any) => ({
           id_original: o.id,
-          id: o.order_number || o.id.substring(0,8),
+          id: o.order_number || o.id.substring(0, 8),
           status: o.status,
           client: o.partners?.name || 'Cliente Removido',
           vendedor: o.salesperson,
           cnpj: o.partners?.doc || '-',
           date: formatDate(o.order_date),
           total: o.total_amount ? o.total_amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ 0,00',
+          limitDate: o.payment_due_date,
+          supplierDate: o.supplier_departure_date,
+
+          // Raw values for search
+          total_raw: o.total_amount || 0,
+          entry_amount: o.entry_amount || 0,
+          remaining_amount: o.remaining_amount || 0,
+
           statusColor: getStatusColor(o.status),
           dotColor: getStatusDotColor(o.status)
         }));
         setOrders(formatted);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao buscar pedidos:', err);
+      if (err.message?.includes('supplier_departure_date')) {
+        // Fallback or alert user
+        // Since I cannot allow fallback easily without duplicate code, I will warn the user
+        alert('AVISO: O banco de dados precisa ser atualizado. Execute o script de migração no Supabase.');
+      }
     } finally {
       setLoading(false);
     }
@@ -76,13 +144,53 @@ const OrderList: React.FC = () => {
   const filteredOrders = orders.filter(o => {
     const matchVendedor = vendedorFilter === 'Todos os Vendedores' || o.vendedor === vendedorFilter;
     const matchStatus = statusFilter === 'Todos' || o.status === statusFilter;
-    return matchVendedor && matchStatus;
+    const matchLimitDate = !limitDateFilter || o.limitDate === limitDateFilter;
+    const matchSupplierDate = !supplierDateFilter || o.supplierDate === supplierDateFilter;
+
+    let matchSearch = true;
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+
+      // Check if term is a specific numeric value for price search
+      // Remove R$, dots, replace comma with dot
+      // Examples: "150,00" -> 150.00, "1.500" -> 1500
+      let numericTerm: number | null = null;
+
+      // Simple heuristic: remove everything strictly non-numeric except , and .
+      const cleanTerm = term.replace(/[^\d,.-]/g, '');
+      if (cleanTerm) {
+        // Replace comma with dot for parsing
+        const normalized = cleanTerm.replace(',', '.');
+        if (!isNaN(parseFloat(normalized))) {
+          numericTerm = parseFloat(normalized);
+        }
+      }
+
+      const matchText =
+        o.id.toString().toLowerCase().includes(term) ||
+        o.client.toLowerCase().includes(term) ||
+        o.cnpj.includes(term);
+
+      let matchValue = false;
+      if (numericTerm !== null) {
+        // Allow margin of error
+        const epsilon = 0.5;
+        matchValue =
+          Math.abs(o.total_raw - numericTerm) < epsilon ||
+          Math.abs(o.entry_amount - numericTerm) < epsilon ||
+          Math.abs(o.remaining_amount - numericTerm) < epsilon;
+      }
+
+      matchSearch = matchText || matchValue;
+    }
+
+    return matchVendedor && matchStatus && matchSearch && matchLimitDate && matchSupplierDate;
   });
 
   const statusOptions = [
     'Todos',
-    'EM ABERTO', 'EM PRODUÇÃO', 'AGUARDANDO APROVAÇÃO', 
-    'AGUARDANDO NF', 'AGUARDANDO PAGAMENTO', 
+    'EM ABERTO', 'EM PRODUÇÃO', 'AGUARDANDO APROVAÇÃO',
+    'AGUARDANDO NF', 'AGUARDANDO PAGAMENTO',
     'AGUARDANDO PERSONALIZAÇÃO', 'FINALIZADO'
   ];
 
@@ -97,13 +205,7 @@ const OrderList: React.FC = () => {
           <p className="mt-1 text-sm text-gray-500">Gerencie e filtre todos os pedidos de venda em um único lugar.</p>
         </div>
         <div className="mt-4 flex md:mt-0 md:ml-4">
-          <Link
-            to="/pedido/novo"
-            className="ml-3 inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 transition-colors"
-          >
-            <span className="material-icons-outlined mr-2">add_circle</span>
-            Novo Pedido
-          </Link>
+          {/* Novo Pedido button removed as requested */}
         </div>
       </div>
 
@@ -117,15 +219,18 @@ const OrderList: React.FC = () => {
               </span>
               <input
                 type="text"
-                placeholder="ID do Pedido, Cliente ou CNPJ"
+                placeholder="ID, Cliente, CNPJ ou Valor (Total/Parcela)"
                 className="form-input block w-full pl-10 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
           </div>
           <div className="w-full md:w-48">
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Vendedor</label>
-            <select 
-              className="form-select block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10"
+            <select
+              disabled={!!appUser?.salesperson}
+              className={`form-select block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10 ${appUser?.salesperson ? 'bg-gray-100' : ''}`}
               value={vendedorFilter}
               onChange={(e) => setVendedorFilter(e.target.value)}
             >
@@ -134,11 +239,12 @@ const OrderList: React.FC = () => {
               <option>VENDAS 02</option>
               <option>VENDAS 03</option>
               <option>VENDAS 04</option>
+              <option>VENDAS 05</option>
             </select>
           </div>
           <div className="w-full md:w-48">
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Status</label>
-            <select 
+            <select
               className="form-select block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -152,6 +258,29 @@ const OrderList: React.FC = () => {
             <span className="material-icons-outlined mr-2 text-blue-500">filter_list</span>
             Filtros
           </button>
+        </div>
+
+
+        {/* Date Filters Row */}
+        <div className="flex flex-col md:flex-row gap-4 mt-4 pt-4 border-t border-gray-100">
+          <div className="w-full md:w-auto">
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Data Limite Recebimento</label>
+            <input
+              type="date"
+              className="form-input block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10"
+              value={limitDateFilter}
+              onChange={(e) => setLimitDateFilter(e.target.value)}
+            />
+          </div>
+          <div className="w-full md:w-auto">
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Data Saída Fornecedor</label>
+            <input
+              type="date"
+              className="form-input block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10"
+              value={supplierDateFilter}
+              onChange={(e) => setSupplierDateFilter(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
@@ -181,10 +310,10 @@ const OrderList: React.FC = () => {
                 </tr>
               ) : (
                 filteredOrders.map((order, i) => (
-                  <tr 
-                    key={i} 
+                  <tr
+                    key={i}
                     onClick={() => navigate(`/pedido/${order.id_original}?mode=view`)}
-                    className="hover:bg-gray-50 transition-colors cursor-pointer"
+                    className="hover:bg-blue-50 transition-colors cursor-pointer odd:bg-white even:bg-gray-50"
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-500">{order.id}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -212,19 +341,39 @@ const OrderList: React.FC = () => {
             </tbody>
           </table>
         )}
-        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-          <p className="text-sm text-gray-700">
-            Mostrando <span className="font-medium">1</span> a <span className="font-medium">{filteredOrders.length}</span> de <span className="font-medium">{filteredOrders.length}</span> resultados
-          </p>
-          <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-            <button className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-              <span className="material-icons-outlined text-sm">chevron_left</span>
-            </button>
-            <button className="z-10 bg-blue-500 border-blue-500 text-white relative inline-flex items-center px-4 py-2 border text-sm font-medium">1</button>
-            <button className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-              <span className="material-icons-outlined text-sm">chevron_right</span>
-            </button>
-          </nav>
+
+        {/* Pagination Controls */}
+        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 rounded-b-xl shadow-sm">
+          <div className="flex-1 flex justify-between sm:hidden">
+            <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50">Anterior</button>
+            <button onClick={() => setPage(p => p + 1)} disabled={(page + 1) * pageSize >= totalCount} className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50">Próximo</button>
+          </div>
+          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-gray-700">
+                Mostrando <span className="font-medium">{page * pageSize + 1}</span> até <span className="font-medium">{Math.min((page + 1) * pageSize, totalCount)}</span> de <span className="font-medium">{totalCount}</span> resultados
+              </p>
+            </div>
+            <div>
+              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50">
+                  <span className="material-icons-outlined">chevron_left</span>
+                </button>
+                {[...Array(Math.ceil(totalCount / pageSize))].map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setPage(i)}
+                    className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${page === i ? 'z-10 bg-blue-50 border-blue-500 text-blue-600' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'}`}
+                  >
+                    {i + 1}
+                  </button>
+                )).slice(Math.max(0, page - 2), Math.min(Math.ceil(totalCount / pageSize), page + 3))}
+                <button onClick={() => setPage(p => p + 1)} disabled={(page + 1) * pageSize >= totalCount} className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50">
+                  <span className="material-icons-outlined">chevron_right</span>
+                </button>
+              </nav>
+            </div>
+          </div>
         </div>
       </div>
     </div>
