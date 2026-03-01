@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth';
 const ClientList: React.FC = () => {
   const [partners, setPartners] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
   const { hasPermission } = useAuth();
 
   useEffect(() => {
@@ -32,7 +33,26 @@ const ClientList: React.FC = () => {
     }
   };
 
-  const currentData = partners;
+  const filteredPartners = React.useMemo(() => {
+    const s = searchTerm.toLowerCase().trim();
+    if (!s) return partners;
+
+    return partners.filter(p => {
+      const name = (p.name || '').toLowerCase();
+      const doc = (p.doc || '').toLowerCase();
+      const phone = (p.phone || '').toLowerCase();
+      const email = (p.email || '').toLowerCase();
+      const salesperson = (p.salesperson || '').toLowerCase();
+
+      return name.includes(s) ||
+        doc.includes(s) ||
+        phone.includes(s) ||
+        email.includes(s) ||
+        salesperson.includes(s);
+    });
+  }, [partners, searchTerm]);
+
+  const currentData = filteredPartners;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -57,8 +77,14 @@ const ClientList: React.FC = () => {
         <div className="border-b border-gray-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h3 className="font-bold text-gray-700">Todos os Clientes <span className="ml-2 font-normal text-gray-400 text-xs bg-gray-100 px-2 py-1 rounded-full">{partners.length}</span></h3>
           <div className="relative max-w-xs w-full">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 material-icons-outlined text-gray-400 text-sm">filter_list</span>
-            <input type="text" placeholder="Filtrar por nome, CNPJ..." className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 material-icons-outlined text-gray-400 text-sm">search</span>
+            <input
+              type="text"
+              placeholder="Nome, Empresa, Tel ou E-mail..."
+              className="block w-full pl-10 pr-3 py-2 border border-blue-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg text-sm bg-blue-50/30 transition-all shadow-sm"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
           </div>
         </div>
 
