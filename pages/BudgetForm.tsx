@@ -264,7 +264,7 @@ const BudgetForm: React.FC = () => {
         setSuppliersList(suppliers);
         // Organizar fatores conforme solicitado: Mínimo no topo, depois Ideal, Médio, Prazos
         let sortedFactors = f || [];
-        const factorOrder = ["mínimo", "minimo", "ideal", "médio", "médio", "7/15", "21/30"];
+        const factorOrder = ["ideal", "médio", "médio", "mínimo", "minimo"];
         sortedFactors.sort((a, b) => {
             const nameA = a.name.toLowerCase();
             const nameB = b.name.toLowerCase();
@@ -282,6 +282,12 @@ const BudgetForm: React.FC = () => {
             const isPlainB = !nameB.includes('-') && !nameB.includes('prazo');
             if (isPlainA && !isPlainB) return -1;
             if (!isPlainA && isPlainB) return 1;
+
+            // Priorizar prazo 7/15 sobre 21/30
+            const has715A = nameA.includes('7/15');
+            const has715B = nameB.includes('7/15');
+            if (has715A && !has715B) return -1;
+            if (!has715A && has715B) return 1;
 
             return nameA.localeCompare(nameB);
         });

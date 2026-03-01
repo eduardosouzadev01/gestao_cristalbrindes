@@ -376,7 +376,7 @@ const OrderForm: React.FC = () => {
       if (!errProd && products) setProductsList(products);
       const { data: factors } = await supabase.from('calculation_factors').select('*');
       if (factors) {
-        const factorOrder = ["mínimo", "minimo", "ideal", "médio", "médio", "7/15", "21/30"];
+        const factorOrder = ["ideal", "médio", "médio", "mínimo", "minimo"];
         const sorted = [...factors].sort((a, b) => {
           const nameA = a.name.toLowerCase();
           const nameB = b.name.toLowerCase();
@@ -394,6 +394,12 @@ const OrderForm: React.FC = () => {
           const isPlainB = !nameB.includes('-') && !nameB.includes('prazo');
           if (isPlainA && !isPlainB) return -1;
           if (!isPlainA && isPlainB) return 1;
+
+          // Priorizar prazo 7/15 sobre 21/30
+          const has715A = nameA.includes('7/15');
+          const has715B = nameB.includes('7/15');
+          if (has715A && !has715B) return -1;
+          if (!has715A && has715B) return 1;
 
           return nameA.localeCompare(nameB);
         });
