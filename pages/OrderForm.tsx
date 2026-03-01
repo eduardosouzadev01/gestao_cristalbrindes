@@ -1073,7 +1073,7 @@ const OrderForm: React.FC = () => {
         </div>
         {!isReadOnly && (
           <button onClick={validate} disabled={isSaving} className="ml-3 px-6 py-3 rounded-lg shadow-sm text-sm font-bold text-white bg-blue-500 hover:bg-blue-600 transition-all active:scale-95 uppercase disabled:opacity-50 disabled:cursor-not-allowed">
-            {isSaving ? 'SALVANDO...' : 'FINALIZAR ABERTURA'}
+            {isSaving ? 'SALVANDO...' : (!!location.state?.fromBudget ? 'CRIAR PEDIDO' : 'FINALIZAR ABERTURA')}
           </button>
         )}
       </div>
