@@ -23,9 +23,18 @@
 - **Fluxo Orçamento -> Pedido:** O número do pedido herdará automaticamente o número do orçamento de origem (ex: Orçamento `0005` gera Pedido `0005`), garantindo rastreabilidade.
 - **Navegação Financeira:** Clicar em uma linha na tabela de "Contas a Receber" agora redireciona diretamente para o Pedido correspondente.
 
+## 4. Melhorias de Fluxo e CRM (Semana 4 - Fev 2026)
+- **Redirecionamento Inteligente:** Vendedores agora são redirecionados automaticamente para o **Kanban (CRM)** ao abrir o sistema ou fazer login, agilizando o início do atendimento.
+- **Busca de Orçamentos:** Filtro de busca expandido para identificar clientes por **E-mail, CPF/CNPJ ou Telefone**, além do Nome.
+- **Fluxo de Atendimento Facilitado:**
+  - Novos atendimentos agora iniciam com status **"NOVO"** por padrão (primeira coluna do Kanban).
+  - Campos de "Vendedor" e "Status" ocultos na criação de novos leads para simplificar o formulário inicial.
+- **Cadastro de Fornecedores:** Adicionada máscara de entrada para **CNPJ / CPF** e **Telefone** no formulário de "Novo Fornecedor Rápido" do orçamento.
+
 ## Notas Técnicas (Banco de Dados)
 Foi criada uma sequence para gerenciar a numeração dos orçamentos. Caso seja necessário reiniciar a contagem, use o comando SQL:
 ```sql
 ALTER SEQUENCE global_budget_seq RESTART WITH 1;
 ```
 A função `get_next_budget_number` garante o formato com zeros à esquerda (4 dígitos).
+Se houver problemas com a coluna `supplier_category` (mesmo após migração), recarregue o as definições da API no painel do Supabase (**Schema Cache -> Reload**).

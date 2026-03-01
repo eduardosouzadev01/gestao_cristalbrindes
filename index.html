@@ -13,6 +13,9 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
+            color: #323130;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         /* Custom Scrollbar */
@@ -36,36 +39,37 @@
 
         /* Design System CSS Variables */
         :root {
-            /* Primary Colors (Slate) */
-            --color-primary-900: #0F172A;
-            --color-primary-800: #1E293B;
-            --color-primary-700: #334155;
-            --color-primary-500: #64748B;
+            /* Primary Colors (Fluent Blue Theme) */
+            --color-primary-900: #004578;
+            --color-primary-800: #005A9E;
+            --color-primary-700: #0078D4;
+            /* Fluent Accent */
+            --color-primary-500: #2B88D8;
 
             /* Accent Color (Blue) */
-            --color-accent-600: #2563EB;
-            --color-accent-500: #3B82F6;
-            --color-accent-50: #EFF6FF;
+            --color-accent-600: #0078D4;
+            --color-accent-500: #2B88D8;
+            --color-accent-50: #EFF6FC;
 
             /* Semantic Colors */
-            --color-success-500: #10B981;
-            --color-success-50: #ECFDF5;
-            --color-warning-500: #F59E0B;
-            --color-warning-50: #FFFBEB;
-            --color-danger-500: #EF4444;
-            --color-danger-50: #FEF2F2;
+            --color-success-500: #107C10;
+            --color-success-50: #F3F9F4;
+            --color-warning-500: #D83B01;
+            --color-warning-50: #FFF4CE;
+            --color-danger-500: #A4262C;
+            --color-danger-50: #FDF3F4;
 
-            /* Neutrals */
-            --color-gray-50: #F8FAFC;
-            --color-gray-100: #F1F5F9;
-            --color-gray-200: #E2E8F0;
-            --color-gray-500: #64748B;
-            --color-gray-700: #334155;
-            --color-gray-900: #0F172A;
+            /* Neutrals (Fluent Grays) */
+            --color-gray-50: #FAF9F8;
+            --color-gray-100: #F3F2F1;
+            --color-gray-200: #EDEBE9;
+            --color-gray-500: #8A8886;
+            --color-gray-700: #323130;
+            --color-gray-900: #201F1E;
 
             /* Backgrounds */
             --bg-primary: #FFFFFF;
-            --bg-secondary: #F8FAFC;
+            --bg-secondary: #FFFFFF;
         }
 
         #global-error {
@@ -81,6 +85,117 @@
             z-index: 9999;
             overflow: auto;
             font-family: monospace;
+        }
+
+        /* ========================================
+           GLOBAL CONTRAST ENHANCEMENT SYSTEM
+           Inspired by well-defined light theme UIs
+           ======================================== */
+
+        /* INPUTS: Stronger borders, crisp appearance */
+        input[type="text"],
+        input[type="number"],
+        input[type="email"],
+        input[type="password"],
+        input[type="tel"],
+        input[type="url"],
+        input[type="date"],
+        input[type="search"],
+        select,
+        textarea,
+        .form-input,
+        .form-select,
+        .form-textarea,
+        [type="text"]:focus,
+        [type="number"]:focus,
+        [type="email"]:focus,
+        [type="password"]:focus,
+        select:focus,
+        textarea:focus {
+            border-color: #C8C6C4 !important;
+            color: #323130 !important;
+            background-color: #FFFFFF !important;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        [type="text"]:focus,
+        [type="number"]:focus,
+        [type="email"]:focus,
+        [type="password"]:focus,
+        select:focus,
+        textarea:focus {
+            border-color: #0078D4 !important;
+            box-shadow: 0 0 0 1px #0078D4 !important;
+            outline: none !important;
+        }
+
+        /* Placeholder text – visible but not dominant */
+        ::placeholder {
+            color: #A19F9D !important;
+            opacity: 1;
+        }
+
+        /* LABELS: Slightly darker for readability */
+        label {
+            color: #605E5C;
+            font-weight: 600;
+        }
+
+        /* TABLES: Defined header + row borders */
+        table thead th {
+            background-color: #FAF9F8 !important;
+            color: #605E5C !important;
+            font-weight: 700 !important;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.04em;
+            border-bottom: 2px solid #EDEBE9 !important;
+        }
+
+        table tbody td {
+            border-bottom: 1px solid #EDEBE9 !important;
+            color: #323130;
+            font-size: 13px;
+        }
+
+        table tbody tr:hover {
+            background-color: #F3F2F1 !important;
+        }
+
+        /* CARDS & PANELS: Defined borders, subtle shadow */
+        .bg-white {
+            border-color: #E1DFDD;
+        }
+
+        /* HEADINGS: Darker for hierarchy */
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            color: #201F1E;
+        }
+
+        /* BADGES & PILLS: Ensure contrast */
+        .rounded-full {
+            font-weight: 600;
+        }
+
+        /* BUTTONS: Stronger presence */
+        button {
+            font-weight: 600;
+        }
+
+        /* Scrollbar refinement */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #C8C6C4;
+            border-radius: 3px;
         }
     </style>
     <script>
@@ -106,7 +221,7 @@
     </script>
 </head>
 
-<body class="bg-gray-50 text-gray-700 min-h-screen">
+<body class="bg-white text-[#323130] min-h-screen">
     <div id="global-error">
         <h1 class="text-2xl font-bold mb-4 text-black">Ops! Algo deu errado ao carregar.</h1>
         <p class="text-gray-600 mb-4">Por favor, envie um print desta tela para o suporte.</p>

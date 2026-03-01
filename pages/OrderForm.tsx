@@ -137,12 +137,12 @@ const OrderForm: React.FC = () => {
   const location = useLocation();
   const isReadOnly = new URLSearchParams(location.search).get('mode') === 'view';
   const isNewOrder = !id || id === 'novo';
+  const canEditPayment = !isReadOnly || appUser?.email === 'cristalbrindes@cristalbrindes.com.br' || appUser?.email === 'cristalbrindes@cristalbrindes';
 
   // Constants
   const statusOptions = [
-    'EM ABERTO', 'EM PRODUÇÃO', 'AGUARDANDO APROVAÇÃO',
-    'AGUARDANDO NF', 'AGUARDANDO PAGAMENTO',
-    'AGUARDANDO PERSONALIZAÇÃO', 'FINALIZADO', 'ENTRE FINALIZADO'
+    'AGUARDANDO PAGAMENTO ENTRADA', 'EM PRODUÇÃO', 'EM TRANSPORTE', 'EM CONFERÊNCIA',
+    'AGUARDANDO PAGAMENTO 2 PARCELA', 'ENTREGUE', 'AGUARDANDO PAGAMENTO FATURAMENTO', 'FINALIZADO'
   ];
 
   // States
@@ -165,13 +165,14 @@ const OrderForm: React.FC = () => {
   // Form State
   const [orderNumber, setOrderNumber] = useState('');
   const [vendedor, setVendedor] = useState('');
-  const [status, setStatus] = useState('EM ABERTO');
-  const [dataOrcamento, setDataOrcamento] = useState('');
+  const [status, setStatus] = useState('AGUARDANDO PAGAMENTO ENTRADA');
+  const [dataOrcamento, setDataOrcamento] = useState(getTodayISO());
   const [dataPedido, setDataPedido] = useState(getTodayISO());
   const [dataLimite, setDataLimite] = useState('');
   const [modalidade, setModalidade] = useState('');
   const [opcaoPagamento, setOpcaoPagamento] = useState('');
   const [layout, setLayout] = useState('');
+  const [observacoes, setObservacoes] = useState('');
   const [supplierDepartureDate, setSupplierDepartureDate] = useState('');
   const [clientData, setClientData] = useState({ id: '', name: '', doc: '', phone: '', email: '', emailFin: '' });
   const [recebimentoEntrada, setRecebimentoEntrada] = useState('R$ 0,00');
@@ -180,6 +181,7 @@ const OrderForm: React.FC = () => {
   const [dataRestante, setDataRestante] = useState('');
   const [entradaConfirmed, setEntradaConfirmed] = useState(false);
   const [restanteConfirmed, setRestanteConfirmed] = useState(false);
+  const [invoiceNumber, setInvoiceNumber] = useState('');
 
   const [adjustPriceModal, setAdjustPriceModal] = useState<{ itemId: string | number, type: 'unit' | 'total', currentVal: number } | null>(null);
   const [adjustComment, setAdjustComment] = useState('');
@@ -295,8 +297,30 @@ const OrderForm: React.FC = () => {
           transpFornecedorPaid: false,
           transpClientePaid: false,
           despesaExtraPaid: false,
-          layoutCostPaid: false
+          layoutCostPaid: false,
+          supplier_payment_date: it.supplier_payment_date || (location.state.commercialData ? location.state.commercialData.supplier_payment_dates[it.supplier_id] : null) || null,
+          customization_payment_date: it.customization_payment_date || (location.state.commercialData && it.customization_supplier_id ? location.state.commercialData.supplier_payment_dates[it.customization_supplier_id] : null) || null,
+          transport_payment_date: it.transport_payment_date || (location.state.commercialData && it.transport_supplier_id ? location.state.commercialData.supplier_payment_dates[it.transport_supplier_id] : null) || null,
+          layout_payment_date: it.layout_payment_date || (location.state.commercialData && it.layout_supplier_id ? location.state.commercialData.supplier_payment_dates[it.layout_supplier_id] : null) || null,
+          extra_payment_date: it.extra_payment_date || (location.state.commercialData && it.extra_supplier_id ? location.state.commercialData.supplier_payment_dates[it.extra_supplier_id] : null) || null,
+          customization_supplier_id: it.customization_supplier_id || '',
+          transport_supplier_id: it.transport_supplier_id || '',
+          client_transport_supplier_id: it.client_transport_supplier_id || '',
+          layout_supplier_id: it.layout_supplier_id || '',
+          extra_supplier_id: it.extra_supplier_id || ''
         })));
+      }
+
+      if (location.state.commercialData) {
+        const cd = location.state.commercialData;
+        setModalidade(cd.payment_term || '');
+        setSupplierDepartureDate(cd.supplier_deadline || '');
+        setDataLimite(cd.shipping_deadline || '');
+        setInvoiceNumber(cd.invoice_number || '');
+        setPurchaseOrder(cd.purchase_order || '');
+        if (cd.layout_info) setObservacoes(prev => (prev ? prev + '\n\n' : '') + 'Layout Info: ' + cd.layout_info);
+        setDataEntrada(cd.entry_forecast_date || '');
+        setDataRestante(cd.remaining_forecast_date || '');
       }
     }
   }, [id, location.state]);
@@ -350,6 +374,7 @@ const OrderForm: React.FC = () => {
       setOpcaoPagamento(order.payment_method || '');
       setDataLimite(order.payment_due_date || '');
       setSupplierDepartureDate(order.supplier_departure_date || '');
+      setObservacoes(order.observations || '');
       setRecebimentoEntrada(formatCurrency(order.entry_amount || 0));
       setDataEntrada(order.entry_date || '');
       setEntradaConfirmed(order.entry_confirmed || false);
@@ -357,6 +382,8 @@ const OrderForm: React.FC = () => {
       setDataRestante(order.remaining_date || '');
       setRestanteConfirmed(order.remaining_confirmed || false);
       setPurchaseOrder(order.purchase_order || '');
+      setLayout(order.layout_info || '');
+      setInvoiceNumber(order.invoice_number || '');
 
       if (order.client_id) {
         const { data: client } = await supabase.from('partners').select('*').eq('id', order.client_id).single();
@@ -385,6 +412,7 @@ const OrderForm: React.FC = () => {
           layoutCost: item.layout_cost || 0,
           fator: item.calculation_factor || 1.35,
           bvPct: item.bv_pct || 0,
+          extraPct: item.extra_pct || 0,
           taxPct: item.tax_pct || 0,
           unforeseenPct: item.unforeseen_pct || 0,
           marginPct: item.margin_pct || 0,
@@ -399,7 +427,17 @@ const OrderForm: React.FC = () => {
           transpFornecedorPaid: item.supplier_transport_paid || false,
           transpClientePaid: item.client_transport_paid || false,
           despesaExtraPaid: item.extra_expense_paid || false,
-          layoutCostPaid: item.layout_paid || false
+          layoutCostPaid: item.layout_paid || false,
+          supplier_payment_date: item.supplier_payment_date || null,
+          customization_payment_date: item.customization_payment_date || null,
+          transport_payment_date: item.transport_payment_date || null,
+          layout_payment_date: item.layout_payment_date || null,
+          extra_payment_date: item.extra_payment_date || null,
+          customization_supplier_id: item.customization_supplier_id || '',
+          transport_supplier_id: item.transport_supplier_id || '',
+          client_transport_supplier_id: item.client_transport_supplier_id || '',
+          layout_supplier_id: item.layout_supplier_id || '',
+          extra_supplier_id: item.extra_supplier_id || ''
         })));
       }
 
@@ -544,7 +582,12 @@ const OrderForm: React.FC = () => {
         supplier_transport_paid: item.transpFornecedorPaid,
         client_transport_paid: item.transpClientePaid,
         extra_expense_paid: item.despesaExtraPaid,
-        layout_paid: item.layoutCostPaid
+        layout_paid: item.layoutCostPaid,
+        supplier_payment_date: item.supplier_payment_date || null,
+        customization_payment_date: item.customization_payment_date || null,
+        transport_payment_date: item.transport_payment_date || null,
+        layout_payment_date: item.layout_payment_date || null,
+        extra_payment_date: item.extra_payment_date || null
       }));
 
       const { error } = await supabase.rpc('save_order', {
@@ -630,12 +673,12 @@ const OrderForm: React.FC = () => {
       real_client_transport_cost: item.realTranspCliente,
       real_extra_expense: item.realDespesaExtra,
       real_layout_cost: item.realLayoutCost,
-      unit_price_paid: item.priceUnitPaid, // Note: using item here might be old state? No, we use updatedItems map
-      customization_paid: item.custoPersonalizacaoPaid,
-      supplier_transport_paid: item.transpFornecedorPaid,
-      client_transport_paid: item.transpClientePaid,
-      extra_expense_paid: item.despesaExtraPaid,
       layout_paid: item.layoutCostPaid,
+      supplier_payment_date: item.supplier_payment_date || null,
+      customization_payment_date: item.customization_payment_date || null,
+      transport_payment_date: item.transport_payment_date || null,
+      layout_payment_date: item.layout_payment_date || null,
+      extra_payment_date: item.extra_payment_date || null,
 
       // Override the specific field for the target item
       ...(item.id === itemId ? {
@@ -812,15 +855,13 @@ const OrderForm: React.FC = () => {
         order_number: orderNumber,
         salesperson: vendedor,
         status: status,
-        budget_date: dataOrcamento,
-        order_date: dataPedido,
+        budget_date: dataOrcamento || null,
+        order_date: dataPedido || null,
         client_id: clientData.id,
         issuer: emitente,
         billing_type: modalidade,
         payment_method: opcaoPagamento,
-        payment_due_date: dataLimite,
-        supplier_departure_date: supplierDepartureDate,
-        invoice_number: null,
+        payment_due_date: dataLimite || null,
         total_amount: totalPedido,
         entry_amount: parseCurrencyToNumber(recebimentoEntrada),
         entry_date: dataEntrada || null,
@@ -828,7 +869,11 @@ const OrderForm: React.FC = () => {
         remaining_amount: parseCurrencyToNumber(recebimentoRestante),
         remaining_date: dataRestante || null,
         remaining_confirmed: restanteConfirmed,
-        purchase_order: purchaseOrder
+        purchase_order: purchaseOrder,
+        layout_info: layout,
+        supplier_departure_date: supplierDepartureDate || null,
+        invoice_number: invoiceNumber,
+        observations: observacoes
       };
 
       // Construct Order Items Payload
@@ -845,6 +890,7 @@ const OrderForm: React.FC = () => {
         calculation_factor: item.fator,
 
         bv_pct: item.bvPct,
+        extra_pct: item.extraPct,
         total_item_value: calculateItemTotal(item),
 
         tax_pct: item.taxPct,
@@ -863,7 +909,17 @@ const OrderForm: React.FC = () => {
         supplier_transport_paid: item.transpFornecedorPaid,
         client_transport_paid: item.transpClientePaid,
         extra_expense_paid: item.despesaExtraPaid,
-        layout_paid: item.layoutCostPaid
+        layout_paid: item.layoutCostPaid,
+        supplier_payment_date: item.supplier_payment_date || null,
+        customization_payment_date: item.customization_payment_date || null,
+        transport_payment_date: item.transport_payment_date || null,
+        layout_payment_date: item.layout_payment_date || null,
+        extra_payment_date: item.extra_payment_date || null,
+        customization_supplier_id: item.customization_supplier_id || null,
+        transport_supplier_id: item.transport_supplier_id || null,
+        client_transport_supplier_id: item.client_transport_supplier_id || null,
+        layout_supplier_id: item.layout_supplier_id || null,
+        extra_supplier_id: item.extra_supplier_id || null
       }));
 
       // Call RPC
@@ -874,8 +930,12 @@ const OrderForm: React.FC = () => {
 
       if (error) throw error;
 
+      if (id === 'novo' && location.state?.fromBudget?.budgetId) {
+        await supabase.from('budgets').update({ status: 'PROPOSTA ACEITA' }).eq('id', location.state.fromBudget.budgetId);
+      }
+
       toast.success('Pedido salvo com sucesso! ID: ' + data);
-      navigate('/');
+      navigate('/pedidos');
 
     } catch (err: any) {
       console.error('Erro ao salvar pedido:', err);
@@ -1018,6 +1078,74 @@ const OrderForm: React.FC = () => {
         )}
       </div>
 
+      {/* Status Stepper */}
+      {!isNewOrder && (
+        <div className="mb-8 bg-white shadow-sm rounded-xl border border-gray-200 p-6 overflow-x-auto">
+          <div className="flex items-center justify-between min-w-[800px]">
+            {(() => {
+              const stepperConfig = [
+                { label: 'AGUARDANDO PAGAMENTO ENTRADA', icon: 'payments', short: 'Pag. Entrada' },
+                { label: 'EM PRODUÇÃO', icon: 'precision_manufacturing', short: 'Produção' },
+                { label: 'EM TRANSPORTE', icon: 'local_shipping', short: 'Transporte' },
+                { label: 'EM CONFERÊNCIA', icon: 'fact_check', short: 'Conferência' },
+                { label: 'AGUARDANDO PAGAMENTO 2 PARCELA', icon: 'account_balance_wallet', short: 'Pag. 2ª Parcela' },
+                { label: 'ENTREGUE', icon: 'inventory_2', short: 'Entregue' },
+                { label: 'AGUARDANDO PAGAMENTO FATURAMENTO', icon: 'receipt_long', short: 'Faturamento' },
+                { label: 'FINALIZADO', icon: 'check_circle', short: 'Finalizado' }
+              ];
+              const currentIdx = stepperConfig.findIndex(s => s.label === status);
+              return stepperConfig.map((step, idx) => {
+                const isCompleted = idx < currentIdx;
+                const isCurrent = idx === currentIdx;
+                const isFuture = idx > currentIdx;
+                return (
+                  <React.Fragment key={step.label}>
+                    <div className="flex flex-col items-center relative group flex-shrink-0">
+                      <div
+                        onClick={() => {
+                          if (!isReadOnly || (!isNewOrder && isReadOnly)) {
+                            const newStatus = step.label;
+                            if (newStatus === 'FINALIZADO') {
+                              const isAdmin = appUser?.email?.includes('admin') || appUser?.permissions?.fullAccess;
+                              if (!isAdmin) {
+                                toast.error('Apenas administradores podem finalizar.');
+                                return;
+                              }
+                            }
+                            setStatus(newStatus);
+                            if (isReadOnly && !isNewOrder) {
+                              atomicUpdateStatus(newStatus);
+                            }
+                          }
+                        }}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer
+                          ${isCompleted ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : ''}
+                          ${isCurrent ? 'bg-blue-600 text-white ring-4 ring-blue-200 shadow-lg shadow-blue-300 scale-110' : ''}
+                          ${isFuture ? 'bg-gray-100 text-gray-400 hover:bg-gray-200' : ''}
+                        `}
+                        title={step.label}
+                      >
+                        <span className="material-icons-outlined text-lg">
+                          {isCompleted ? 'check' : step.icon}
+                        </span>
+                      </div>
+                      <p className={`text-[9px] font-bold mt-2 text-center w-20 leading-tight uppercase
+                        ${isCurrent ? 'text-blue-600' : isCompleted ? 'text-blue-400' : 'text-gray-400'}
+                      `}>{step.short}</p>
+                    </div>
+                    {idx < stepperConfig.length - 1 && (
+                      <div className={`flex-1 h-1 rounded-full mx-1 transition-all duration-300 min-w-[20px]
+                        ${idx < currentIdx ? 'bg-blue-500' : 'bg-gray-200'}
+                      `} />
+                    )}
+                  </React.Fragment>
+                );
+              });
+            })()}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative">
         <div className="lg:col-span-8 space-y-6">
           <section className="bg-white shadow-sm rounded-xl border border-gray-200 p-6">
@@ -1062,7 +1190,7 @@ const OrderForm: React.FC = () => {
                     value={status}
                     onChange={(e) => {
                       const val = e.target.value;
-                      if (val === 'ENTRE FINALIZADO') {
+                      if (val === 'FINALIZADO') {
                         // Simulação de verificação de Admin
                         const isAdmin = appUser?.email?.includes('admin') || appUser?.permissions?.fullAccess;
                         if (!isAdmin) {
@@ -1185,6 +1313,7 @@ const OrderForm: React.FC = () => {
                   error={errors.includes(`productName-${index}`)}
                   disabled={isReadOnly}
                   onSearch={searchProducts}
+                  placeholder={item.productName || "Selecione..."}
                 />
               </div>
 
@@ -1226,52 +1355,53 @@ const OrderForm: React.FC = () => {
 
                   {/* Real Unit Price Management */}
                   {!isNewOrder && (
-                    <div className="col-span-12 mt-4 bg-gradient-to-br from-slate-50 to-slate-100 border-2 border-slate-200 rounded-xl p-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="material-icons-outlined text-slate-600 text-sm">payments</span>
-                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">Gestão de Custos Reais</label>
-                      </div>
-                      <div className="bg-white rounded-lg p-4 border border-slate-200">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-[10px] font-semibold text-gray-600 uppercase mb-2">Valor Real Unitário</label>
-                            <div className="flex gap-2 items-center">
-                              <input
-                                disabled={item.priceUnitPaid}
-                                className={`form-input w-full text-sm py-2.5 rounded-lg text-right font-bold ${item.priceUnitPaid ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}`}
-                                placeholder="R$ 0,00"
-                                value={formatCurrency(item.realPriceUnit)}
-                                onChange={(e) => updateItem(item.id, 'realPriceUnit', parseCurrencyToNumber(e.target.value))}
-                              />
-                              <button
-                                onClick={() => {
-                                  if (!item.priceUnitPaid) {
-                                    setConfirmCostPaymentModal({
-                                      itemId: item.id,
-                                      field: 'priceUnit',
-                                      label: 'Preço Unitário do Produto',
-                                      amount: item.realPriceUnit
-                                    });
-                                  }
-                                }}
-                                disabled={item.priceUnitPaid}
-                                className={`p-3 rounded-lg transition-all flex items-center justify-center ${item.priceUnitPaid ? 'bg-emerald-500 text-white shadow-md' : 'bg-blue-500 text-white hover:bg-blue-600 shadow-sm'}`}
-                                title={item.priceUnitPaid ? "Pagamento Confirmado" : "Confirmar Pagamento"}
-                              >
-                                <span className="material-icons-outlined text-lg">{item.priceUnitPaid ? 'check_circle' : 'check'}</span>
-                              </button>
-                            </div>
-                            {item.priceUnitPaid && (
-                              <p className="text-[10px] text-emerald-600 font-semibold mt-2 flex items-center gap-1">
-                                <span className="material-icons-outlined text-xs">verified</span>
-                                Pagamento confirmado
-                              </p>
-                            )}
+                    <div className="col-span-12 mt-4 pt-4 border-t border-gray-200">
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                        <div className="col-span-12 md:col-span-5">
+                          <div className="flex items-center gap-2">
+                            <span className="material-icons-outlined text-gray-400 text-sm">payments</span>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase">Valor Real Unitário</label>
                           </div>
-                          <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-                            <p className="text-[10px] font-semibold text-gray-600 uppercase mb-2">Custo Total Real</p>
-                            <p className="text-2xl font-bold text-slate-700">{formatCurrency((item.realPriceUnit || 0) * item.quantity)}</p>
-                            <p className="text-[10px] text-gray-500 mt-1">{item.quantity} unidades × {formatCurrency(item.realPriceUnit || 0)}</p>
+                          {item.supplier_payment_date && (
+                            <div className="mt-1 flex items-center gap-1 text-[9px] text-blue-500 font-bold bg-blue-50 px-2 py-0.5 rounded-full w-fit border border-blue-100 uppercase tracking-tighter">
+                              <span className="material-icons-outlined text-[10px]">event</span>
+                              Previsão de pagamento Pgto: {formatDate(item.supplier_payment_date)}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="col-span-6 md:col-span-3 flex gap-2 items-center">
+                          <input
+                            disabled={item.priceUnitPaid}
+                            className={`form-input w-full text-sm py-1.5 rounded-lg text-right font-bold ${item.priceUnitPaid ? 'bg-green-50 text-green-700 border-green-200' : 'border-gray-300'}`}
+                            placeholder="R$ 0,00"
+                            value={formatCurrency(item.realPriceUnit)}
+                            onChange={(e) => updateItem(item.id, 'realPriceUnit', parseCurrencyToNumber(e.target.value))}
+                          />
+                          <button
+                            onClick={() => {
+                              if (!item.priceUnitPaid) {
+                                setConfirmCostPaymentModal({
+                                  itemId: item.id,
+                                  field: 'priceUnit',
+                                  label: 'Preço Unitário do Produto',
+                                  amount: item.realPriceUnit
+                                });
+                              }
+                            }}
+                            disabled={item.priceUnitPaid}
+                            className={`p-2 rounded-lg transition-all ${item.priceUnitPaid ? 'bg-green-500 text-white shadow-sm' : 'bg-gray-200 text-gray-400 hover:bg-blue-500 hover:text-white'}`}
+                            title={item.priceUnitPaid ? "Pago" : "Confirmar Pagamento"}
+                          >
+                            <span className="material-icons-outlined text-base">check</span>
+                          </button>
+                        </div>
+
+                        <div className="col-span-6 md:col-span-4 pl-3 border-l border-gray-100">
+                          <p className="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Custo Total Real</p>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-sm font-bold text-gray-700">{formatCurrency((item.realPriceUnit || 0) * item.quantity)}</span>
+                            <span className="text-[9px] text-gray-400">({item.quantity} un × {formatCurrency(item.realPriceUnit || 0)})</span>
                           </div>
                         </div>
                       </div>
@@ -1302,7 +1432,16 @@ const OrderForm: React.FC = () => {
                     layoutCost: 'layoutCostPaid'
                   };
 
+                  const supplierFieldMap: any = {
+                    custoPersonalizacao: 'customization_supplier_id',
+                    transpFornecedor: 'transport_supplier_id',
+                    transpCliente: 'client_transport_supplier_id',
+                    despesaExtra: 'extra_supplier_id',
+                    layoutCost: 'layout_supplier_id'
+                  };
+
                   const isPaid = (item as any)[paidFieldMap[f]];
+                  const supplierId = (item as any)[supplierFieldMap[f]];
 
                   return (
                     <div key={f} className="grid grid-cols-1 md:grid-cols-12 bg-gray-50 p-3 rounded-xl border border-gray-100 gap-3 items-center">
@@ -1310,7 +1449,8 @@ const OrderForm: React.FC = () => {
                         <CustomSelect
                           label={labelMap[f].toUpperCase()}
                           options={suppliersList}
-                          onSelect={() => { }}
+                          onSelect={(s) => updateItem(item.id, supplierFieldMap[f], s.id)}
+                          value={suppliersList.find(s => s.id === supplierId)?.name || ''}
                           onAdd={() => setActiveModal('FORNECEDOR')}
                           disabled={isReadOnly}
                         />
@@ -1337,6 +1477,12 @@ const OrderForm: React.FC = () => {
                               value={formatCurrency((item as any)[realFieldMap[f]])}
                               onChange={(e) => updateItem(item.id, realFieldMap[f], parseCurrencyToNumber(e.target.value))}
                             />
+                            {(item as any)[`${f.replace('custo', 'customization').replace('transp', 'transport').replace('layoutCost', 'layout').replace('despesaExtra', 'extra')}_payment_date`] && (
+                              <div className="mt-1 flex items-center gap-1 text-[9px] text-blue-500 font-bold bg-blue-50 px-2 py-0.5 rounded-full w-fit border border-blue-100 uppercase tracking-tighter">
+                                <span className="material-icons-outlined text-[10px]">event</span>
+                                Previsão de pagamento Pgto: {formatDate((item as any)[`${f.replace('custo', 'customization').replace('transp', 'transport').replace('layoutCost', 'layout').replace('despesaExtra', 'extra')}_payment_date`])}
+                              </div>
+                            )}
                           </div>
                           <div className="pt-4">
                             <button
@@ -1383,10 +1529,10 @@ const OrderForm: React.FC = () => {
                 </div>
               </div>
 
-              <div className="mt-6 flex flex-col md:flex-row gap-6 items-center bg-gray-900 rounded-xl p-6 text-white overflow-hidden relative">
-                <div className="flex-1 w-full border-r border-gray-700 pr-6 mr-6">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Fator de Cálculo</p>
-                  <select disabled={isReadOnly} className="form-select bg-gray-800 border-gray-700 text-blue-400 font-bold rounded-lg w-full" value={item.fator} onChange={(e) => updateItem(item.id, 'fator', parseFloat(e.target.value))}>
+              <div className="mt-6 flex flex-col md:flex-row gap-4 items-center bg-gray-50 rounded-xl p-6 border border-gray-200 overflow-hidden relative">
+                <div className="flex-1 w-full border-b md:border-b-0 md:border-r border-gray-200 pb-4 md:pb-0 md:pr-4">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Fator de Cálculo</p>
+                  <select disabled={isReadOnly} className="form-select bg-white border-gray-300 text-gray-700 font-bold rounded-lg w-full text-sm" value={item.fator} onChange={(e) => updateItem(item.id, 'fator', parseFloat(e.target.value))}>
                     {factorsList.length > 0 ? (
                       factorsList.map(f => {
                         const multiplier = 1 + (f.tax_percent + f.contingency_percent + f.margin_percent) / 100;
@@ -1398,43 +1544,72 @@ const OrderForm: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="flex-1 w-full border-r border-gray-700 pr-6 mr-6">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">BV (%)</p>
-                  <input
-                    type="number"
-                    disabled={isReadOnly}
-                    className="form-input bg-gray-800 border-gray-700 text-green-400 font-bold rounded-lg w-full text-center"
-                    placeholder="0%"
-                    value={item.bvPct}
-                    onChange={(e) => updateItem(item.id, 'bvPct', parseFloat(e.target.value) || 0)}
-                  />
+                <div className="flex-1 w-full border-b md:border-b-0 md:border-r border-gray-200 pb-4 md:pb-0 md:pr-4">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">BV (%)</p>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      disabled={isReadOnly}
+                      className="form-input bg-white border-gray-300 text-gray-700 font-bold rounded-lg w-full text-right pr-8 text-sm"
+                      placeholder="0%"
+                      value={item.bvPct}
+                      onChange={(e) => updateItem(item.id, 'bvPct', parseFloat(e.target.value) || 0)}
+                    />
+                    <span className="absolute right-3 top-2 text-gray-400 text-sm">%</span>
+                  </div>
                   {item.bvPct > 0 && (
-                    <p className="text-[10px] text-green-500 font-bold mt-2 text-center">
-                      + {formatCurrency(calculateItemTotal(item) * (item.bvPct / 100))}
-                    </p>
+                    <div className="mt-1 flex justify-end items-center gap-1">
+                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Valor BV:</span>
+                      <span className="text-[11px] font-black text-blue-600">
+                        {formatCurrency(calculateItemTotal(item) * (item.bvPct / 100))}
+                      </span>
+                    </div>
                   )}
                 </div>
 
-                <div className="flex items-center gap-6 text-left w-full md:w-auto">
+                <div className="flex-1 w-full border-b md:border-b-0 md:border-r border-gray-200 pb-4 md:pb-0 md:pr-4">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Saldo Extra (%)</p>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      disabled={isReadOnly}
+                      className="form-input bg-white border-gray-300 text-gray-700 font-bold rounded-lg w-full text-right pr-8 text-sm"
+                      placeholder="0%"
+                      value={item.extraPct}
+                      onChange={(e) => updateItem(item.id, 'extraPct', parseFloat(e.target.value) || 0)}
+                    />
+                    <span className="absolute right-3 top-2 text-gray-400 text-sm">%</span>
+                  </div>
+                  {item.extraPct > 0 && (
+                    <div className="mt-1 flex justify-end items-center gap-1">
+                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Valor Extra:</span>
+                      <span className="text-[11px] font-black text-blue-600">
+                        {formatCurrency(calculateItemTotal(item) * (item.extraPct / 100))}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-3 text-right w-full md:w-auto md:pl-4">
                   <div
                     onClick={() => openPriceAdjustment(item.id, 'unit', calculateItemTotal(item) / (item.quantity || 1))}
-                    className={`cursor-pointer hover:bg-gray-800 p-2 rounded-lg transition-colors group relative ${isReadOnly ? 'pointer-events-none' : ''}`}
+                    className={`cursor-pointer hover:bg-white p-2 rounded-lg transition-colors group relative border border-transparent hover:border-blue-100 ${isReadOnly ? 'pointer-events-none' : ''}`}
                   >
-                    {!isReadOnly && <span className="material-icons-outlined absolute -top-2 -right-2 text-gray-500 opacity-0 group-hover:opacity-100 bg-gray-900 rounded-full p-1 text-xs shadow-sm">edit</span>}
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Valor Venda UNT.</p>
-                    <p className="text-2xl font-extrabold text-white decoration-dashed underline underline-offset-4 decoration-gray-600 group-hover:decoration-blue-500">
-                      {formatCurrency(calculateItemTotal(item) / (item.quantity || 1))}
-                    </p>
+                    {!isReadOnly && <span className="material-icons-outlined absolute -top-2 -left-2 text-blue-500 opacity-0 group-hover:opacity-100 bg-white border border-blue-200 rounded-full p-0.5 text-[10px] shadow-sm">edit</span>}
+                    <div className="flex justify-between items-center text-gray-500 gap-4">
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Venda Unitária</span>
+                      <span className="text-lg font-bold text-gray-800 decoration-dashed underline underline-offset-4 decoration-gray-300 group-hover:decoration-blue-500">{formatCurrency(calculateItemTotal(item) / (item.quantity || 1))}</span>
+                    </div>
                   </div>
                   <div
                     onClick={() => openPriceAdjustment(item.id, 'total', calculateItemTotal(item))}
-                    className={`text-right cursor-pointer hover:bg-gray-800 p-2 rounded-lg transition-colors group relative ${isReadOnly ? 'pointer-events-none' : ''}`}
+                    className={`cursor-pointer hover:bg-white p-3 rounded-lg transition-colors group relative border border-transparent hover:border-blue-100 ${isReadOnly ? 'pointer-events-none' : ''}`}
                   >
-                    {!isReadOnly && <span className="material-icons-outlined absolute -top-2 -right-2 text-gray-500 opacity-0 group-hover:opacity-100 bg-gray-900 rounded-full p-1 text-xs shadow-sm">edit</span>}
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Venda Total do Item</p>
-                    <p className="text-3xl font-extrabold text-blue-500 decoration-dashed underline underline-offset-4 decoration-blue-900 group-hover:decoration-blue-500">
-                      {formatCurrency(calculateItemTotal(item))}
-                    </p>
+                    {!isReadOnly && <span className="material-icons-outlined absolute -top-2 -left-2 text-blue-500 opacity-0 group-hover:opacity-100 bg-white border border-blue-200 rounded-full p-0.5 text-[10px] shadow-sm">edit</span>}
+                    <div className="flex justify-between items-end gap-6">
+                      <span className="text-[11px] font-black uppercase text-gray-800">Total Venda do Item</span>
+                      <span className="text-3xl font-black text-blue-600 leading-none decoration-dashed underline underline-offset-4 decoration-blue-200 group-hover:decoration-blue-500">{formatCurrency(calculateItemTotal(item))}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1447,7 +1622,7 @@ const OrderForm: React.FC = () => {
             </button>
           )}
 
-          {!isNewOrder && (
+          {!isNewOrder && !appUser?.salesperson && (
             <section className="bg-white shadow-sm rounded-xl border border-gray-200 p-6 mt-6">
               <div className="flex items-center gap-2 mb-6 border-b border-gray-100 pb-4">
                 <span className="material-icons-outlined text-green-500">account_balance_wallet</span>
@@ -1457,7 +1632,7 @@ const OrderForm: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Card Saldo Estimado */}
                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                  <p className="text-[10px] font-bold text-blue-400 uppercase mb-2">Saldo Estimado (Entrada + Restante - Custos)</p>
+                  <p className="text-[10px] font-bold text-blue-400 uppercase mb-2">Saldo Estimado (1ª Parcela + 2ª Parcela - Custos)</p>
                   <div className="flex justify-between items-end">
                     <div>
                       <p className="text-xs text-gray-500">Receita: {formatCurrency(totalRecebido)}</p>
@@ -1489,7 +1664,7 @@ const OrderForm: React.FC = () => {
                       <div className="flex items-center gap-3">
                         <span className="material-icons-outlined text-blue-500">payments</span>
                         <div>
-                          <p className="text-xs font-bold text-gray-700 uppercase">Comissão Entrada</p>
+                          <p className="text-xs font-bold text-gray-700 uppercase">Comissão 1ª Parcela</p>
                           <p className="text-[10px] text-gray-400">{formatDate(dataEntrada)}</p>
                         </div>
                       </div>
@@ -1504,7 +1679,7 @@ const OrderForm: React.FC = () => {
                       <div className="flex items-center gap-3">
                         <span className="material-icons-outlined text-blue-500">account_balance</span>
                         <div>
-                          <p className="text-xs font-bold text-gray-700 uppercase">Comissão Restante</p>
+                          <p className="text-xs font-bold text-gray-700 uppercase">Comissão 2ª Parcela</p>
                           <p className="text-[10px] text-gray-400">{formatDate(dataRestante)}</p>
                         </div>
                       </div>
@@ -1529,25 +1704,27 @@ const OrderForm: React.FC = () => {
             <div className="bg-blue-500 shadow-2xl rounded-[1.5rem] overflow-hidden text-white border-none">
               <div className="p-8 text-center bg-transparent">
                 <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] mb-2 opacity-80">Valor Total de Venda</p>
-                <h2 className="text-6xl font-black tracking-tight">{formatCurrency(totalPedido)}</h2>
+                <h2 className="text-6xl font-black tracking-tight text-white">{formatCurrency(totalPedido)}</h2>
+                <p className="text-[11px] font-bold uppercase tracking-widest mt-2 bg-white/20 inline-block px-3 py-1 rounded-full">
+                  A receber: {formatCurrency(totalPedido - parseCurrencyToNumber(recebimentoEntrada) - parseCurrencyToNumber(recebimentoRestante))}
+                </p>
               </div>
 
               <div className="p-6 pt-0 space-y-6 bg-blue-600/90">
-                {/* Recebimento Entrada */}
                 <div className="pt-6">
-                  <label className="block text-[11px] font-black text-blue-50 uppercase tracking-widest mb-3">Recebimento (Entrada)</label>
+                  <label className="block text-[11px] font-black text-blue-50 uppercase tracking-widest mb-3">1ª Parcela</label>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <input
-                        disabled={isReadOnly}
+                        disabled={!canEditPayment}
                         className="form-input w-full bg-white/10 border-white/20 text-white rounded-lg px-3 py-3 font-bold text-base focus:ring-0 focus:border-white/40 placeholder:text-white/40"
                         placeholder="R$ 0,00"
                         value={recebimentoEntrada}
-                        onChange={(e) => setRecebimentoEntrada(formatCurrency(e.target.value))}
+                        onChange={(e) => setRecebimentoEntrada(formatCurrency(parseCurrencyToNumber(e.target.value)))}
                       />
                     </div>
                     <div className="relative w-40">
-                      {isReadOnly ? (
+                      {!canEditPayment ? (
                         <div className="form-input w-full bg-white/10 border-white/20 text-white rounded-lg px-3 py-3 font-bold text-sm">
                           {formatDate(dataEntrada)}
                         </div>
@@ -1574,21 +1751,20 @@ const OrderForm: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Recebimento Restante */}
                 <div>
-                  <label className="block text-[11px] font-black text-blue-50 uppercase tracking-widest mb-3">Recebimento (Restante)</label>
+                  <label className="block text-[11px] font-black text-blue-50 uppercase tracking-widest mb-3">2ª Parcela</label>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <input
-                        disabled={isReadOnly}
+                        disabled={!canEditPayment}
                         className="form-input w-full bg-white/10 border-white/20 text-white rounded-lg px-3 py-3 font-bold text-base focus:ring-0 focus:border-white/40 placeholder:text-white/40"
                         placeholder="R$ 0,00"
                         value={recebimentoRestante}
-                        onChange={(e) => setRecebimentoRestante(formatCurrency(e.target.value))}
+                        onChange={(e) => setRecebimentoRestante(formatCurrency(parseCurrencyToNumber(e.target.value)))}
                       />
                     </div>
                     <div className="relative w-40">
-                      {isReadOnly ? (
+                      {!canEditPayment ? (
                         <div className="form-input w-full bg-white/10 border-white/20 text-white rounded-lg px-3 py-3 font-bold text-sm">
                           {formatDate(dataRestante)}
                         </div>
@@ -1618,11 +1794,30 @@ const OrderForm: React.FC = () => {
             </div>
 
             <div className="bg-white shadow-sm rounded-xl p-6 border border-gray-200">
+              <div className="flex items-center gap-2 mb-4 text-blue-500">
+                <span className="material-icons-outlined">sticky_note_2</span>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Observações</h3>
+              </div>
+              <textarea
+                disabled={isReadOnly}
+                className={`form-textarea w-full rounded-lg border-gray-200 text-xs min-h-[100px] ${isReadOnly ? 'bg-gray-50' : ''}`}
+                placeholder="Notas internas sobre o pedido..."
+                value={observacoes}
+                onChange={(e) => setObservacoes(e.target.value)}
+                onBlur={(e) => {
+                  if (e.target.value && !isReadOnly && id && id !== 'novo') {
+                    addLog(`Observações atualizadas: ${e.target.value.substring(0, 50)}...`);
+                  }
+                }}
+              />
+            </div>
+
+            <div className="bg-white shadow-sm rounded-xl p-6 border border-gray-200">
               <div className="flex items-center gap-2 mb-6 text-blue-500">
                 <span className="material-icons-outlined">history</span>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Histórico</h3>
               </div>
-              <div className="space-y-3 max-h-96 overflow-y-auto mb-4 pr-2">
+              <div className="space-y-3 max-h-[500px] overflow-y-auto mb-4 pr-2">
                 {logs.length === 0 ? (
                   <div className="text-center text-gray-300 py-4"><p className="text-[10px] font-bold uppercase">Sem registros</p></div>
                 ) : (
@@ -1658,7 +1853,7 @@ const OrderForm: React.FC = () => {
                     onChange={(e) => setModalidade(e.target.value)}
                   >
                     <option value="">SELECIONE...</option>
-                    <option>50% ENTRADA E 50% ENTREGA</option>
+                    <option>50% 1ª PARCELA E 50% ENTREGA</option>
                     <option>100% À VISTA</option>
                     <option>7 DIAS FATURAMENTO</option>
                     <option>10 DIAS FATURAMENTO</option>
@@ -1666,15 +1861,7 @@ const OrderForm: React.FC = () => {
                     <option>30 DIAS FATURAMENTO</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Opção de Pagamento</label>
-                  <select disabled={isReadOnly} className={`form-select w-full rounded-lg border-gray-200 text-sm ${isReadOnly ? 'bg-gray-100' : ''}`} value={opcaoPagamento} onChange={(e) => setOpcaoPagamento(e.target.value)}>
-                    <option value="">SELECIONE...</option>
-                    <option>BOLETO</option>
-                    <option>PIX</option>
-                    <option>DEPÓSITO</option>
-                  </select>
-                </div>
+
                 <div>
                   <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Data Saída do Fornecedor *</label>
                   {isReadOnly ? (
@@ -1709,7 +1896,13 @@ const OrderForm: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nº NF</label>
-                  <input disabled={isReadOnly} className={`form-input w-full rounded-lg border-gray-200 text-sm ${isReadOnly ? 'bg-gray-100' : ''}`} placeholder="000.000.000" />
+                  <input
+                    disabled={isReadOnly}
+                    className={`form-input w-full rounded-lg border-gray-200 text-sm ${isReadOnly ? 'bg-gray-100' : ''}`}
+                    placeholder="000.000.000"
+                    value={invoiceNumber}
+                    onChange={(e) => setInvoiceNumber(e.target.value)}
+                  />
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Ordem de Compra</label>

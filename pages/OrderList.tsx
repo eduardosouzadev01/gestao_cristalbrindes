@@ -27,6 +27,8 @@ const OrderList: React.FC = () => {
   const [page, setPage] = useState(0);
   const [pageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
+  const [orderBy, setOrderBy] = useState<string>('created_at');
+  const [orderDirection, setOrderDirection] = useState<'asc' | 'desc'>('desc');
 
   // Initialize Vendedor Filter based on Auth
   useEffect(() => {
@@ -35,10 +37,9 @@ const OrderList: React.FC = () => {
     }
   }, [appUser]);
 
-  // Fetch Orders
   useEffect(() => {
     fetchOrders();
-  }, [appUser]); // Re-fetch if auth loads
+  }, [appUser, page, searchTerm, vendedorFilter, statusFilter, limitDateFilter, supplierDateFilter, orderBy, orderDirection]); // Re-fetch on any filter change
 
   const fetchOrders = async () => {
     try {
@@ -60,28 +61,30 @@ const OrderList: React.FC = () => {
           partners (name, doc)
         `, { count: 'exact' });
 
-      // Search
-      if (searchTerm) {
-        query = query.or(`order_number.ilike.%${searchTerm}%,partners.name.ilike.%${searchTerm}%`);
-      }
-
-      // Filters
-      if (vendedorFilter !== 'Todos os Vendedores') {
+      // If user can only view own orders, force filter by their salesperson
+      if (appUser?.permissions?.viewOwnOrdersOnly && appUser?.salesperson) {
+        query = query.eq('salesperson', appUser.salesperson);
+      } else if (vendedorFilter !== 'Todos os Vendedores') {
+        // Only apply manual vendedor filter if not restricted
         query = query.eq('salesperson', vendedorFilter);
       }
+
       if (statusFilter !== 'Todos') {
         query = query.eq('status', statusFilter);
       }
 
-      // Range for Pagination
-      query = query
-        .order('created_at', { ascending: false })
-        .range(page * pageSize, (page + 1) * pageSize - 1);
-
-      // If user can only view own orders, filter by salesperson
-      if (appUser?.permissions?.viewOwnOrdersOnly && appUser?.salesperson) {
-        query = query.eq('salesperson', appUser.salesperson);
+      // Date Filters - server-side
+      if (limitDateFilter) {
+        query = query.eq('payment_due_date', limitDateFilter);
       }
+      if (supplierDateFilter) {
+        query = query.eq('supplier_departure_date', supplierDateFilter);
+      }
+
+      // Pagination and ordering
+      query = query
+        .order(orderBy, { ascending: orderDirection === 'asc' })
+        .range(page * pageSize, (page + 1) * pageSize - 1);
 
       const { data, error, count } = await query;
 
@@ -125,8 +128,13 @@ const OrderList: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     const map: any = {
-      'EM ABERTO': 'bg-gray-100 text-gray-600',
+      'AGUARDANDO PAGAMENTO ENTRADA': 'bg-yellow-100 text-yellow-700',
       'EM PRODUÇÃO': 'bg-blue-100 text-blue-600',
+      'EM TRANSPORTE': 'bg-purple-100 text-purple-600',
+      'EM CONFERÊNCIA': 'bg-indigo-100 text-indigo-600',
+      'AGUARDANDO PAGAMENTO 2 PARCELA': 'bg-orange-100 text-orange-700',
+      'ENTREGUE': 'bg-emerald-100 text-emerald-700',
+      'AGUARDANDO PAGAMENTO FATURAMENTO': 'bg-cyan-100 text-cyan-700',
       'FINALIZADO': 'bg-green-100 text-green-600'
     };
     return map[status] || 'bg-gray-100 text-gray-600';
@@ -134,32 +142,26 @@ const OrderList: React.FC = () => {
 
   const getStatusDotColor = (status: string) => {
     const map: any = {
-      'EM ABERTO': 'bg-gray-400',
+      'AGUARDANDO PAGAMENTO ENTRADA': 'bg-yellow-500',
       'EM PRODUÇÃO': 'bg-blue-600',
+      'EM TRANSPORTE': 'bg-purple-600',
+      'EM CONFERÊNCIA': 'bg-indigo-600',
+      'AGUARDANDO PAGAMENTO 2 PARCELA': 'bg-orange-500',
+      'ENTREGUE': 'bg-emerald-600',
+      'AGUARDANDO PAGAMENTO FATURAMENTO': 'bg-cyan-500',
       'FINALIZADO': 'bg-green-600'
     };
     return map[status] || 'bg-gray-400';
   };
 
   const filteredOrders = orders.filter(o => {
-    const matchVendedor = vendedorFilter === 'Todos os Vendedores' || o.vendedor === vendedorFilter;
-    const matchStatus = statusFilter === 'Todos' || o.status === statusFilter;
-    const matchLimitDate = !limitDateFilter || o.limitDate === limitDateFilter;
-    const matchSupplierDate = !supplierDateFilter || o.supplierDate === supplierDateFilter;
-
     let matchSearch = true;
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
 
-      // Check if term is a specific numeric value for price search
-      // Remove R$, dots, replace comma with dot
-      // Examples: "150,00" -> 150.00, "1.500" -> 1500
       let numericTerm: number | null = null;
-
-      // Simple heuristic: remove everything strictly non-numeric except , and .
       const cleanTerm = term.replace(/[^\d,.-]/g, '');
       if (cleanTerm) {
-        // Replace comma with dot for parsing
         const normalized = cleanTerm.replace(',', '.');
         if (!isNaN(parseFloat(normalized))) {
           numericTerm = parseFloat(normalized);
@@ -173,7 +175,6 @@ const OrderList: React.FC = () => {
 
       let matchValue = false;
       if (numericTerm !== null) {
-        // Allow margin of error
         const epsilon = 0.5;
         matchValue =
           Math.abs(o.total_raw - numericTerm) < epsilon ||
@@ -184,14 +185,13 @@ const OrderList: React.FC = () => {
       matchSearch = matchText || matchValue;
     }
 
-    return matchVendedor && matchStatus && matchSearch && matchLimitDate && matchSupplierDate;
+    return matchSearch;
   });
 
   const statusOptions = [
     'Todos',
-    'EM ABERTO', 'EM PRODUÇÃO', 'AGUARDANDO APROVAÇÃO',
-    'AGUARDANDO NF', 'AGUARDANDO PAGAMENTO',
-    'AGUARDANDO PERSONALIZAÇÃO', 'FINALIZADO'
+    'AGUARDANDO PAGAMENTO ENTRADA', 'EM PRODUÇÃO', 'EM TRANSPORTE', 'EM CONFERÊNCIA',
+    'AGUARDANDO PAGAMENTO 2 PARCELA', 'ENTREGUE', 'AGUARDANDO PAGAMENTO FATURAMENTO', 'FINALIZADO'
   ];
 
   return (
@@ -239,7 +239,6 @@ const OrderList: React.FC = () => {
               <option>VENDAS 02</option>
               <option>VENDAS 03</option>
               <option>VENDAS 04</option>
-              <option>VENDAS 05</option>
             </select>
           </div>
           <div className="w-full md:w-48">
@@ -291,11 +290,37 @@ const OrderList: React.FC = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {['ID', 'STATUS', 'CLIENTE', 'VENDEDOR', 'DATA', 'VALOR TOTAL', 'AÇÕES'].map((head) => (
-                  <th key={head} className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                {[
+                  { label: 'ID', key: 'order_number' },
+                  { label: 'STATUS', key: 'status' },
+                  { label: 'CLIENTE', key: 'partners.name' },
+                  { label: 'VENDEDOR', key: 'salesperson' },
+                  { label: 'DATA PEDIDO', key: 'order_date' },
+                  { label: 'SAÍDA FORN.', key: 'supplier_departure_date' },
+                  { label: 'VALOR TOTAL', key: 'total_amount' },
+                  { label: 'AÇÕES', key: null }
+                ].map((head) => (
+                  <th
+                    key={head.label}
+                    className={`px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider ${head.key ? 'cursor-pointer hover:bg-gray-100 transition-colors' : ''}`}
+                    onClick={() => {
+                      if (head.key) {
+                        if (orderBy === head.key) {
+                          setOrderDirection(orderDirection === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setOrderBy(head.key);
+                          setOrderDirection('asc');
+                        }
+                      }
+                    }}
+                  >
                     <div className="flex items-center gap-1">
-                      {head}
-                      {head !== 'STATUS' && head !== 'AÇÕES' && <span className="material-icons-outlined text-sm opacity-50">unfold_more</span>}
+                      {head.label}
+                      {head.key && (
+                        <span className={`material-icons-outlined text-sm ${orderBy === head.key ? 'text-blue-500' : 'opacity-20'}`}>
+                          {orderBy === head.key ? (orderDirection === 'asc' ? 'north' : 'south') : 'unfold_more'}
+                        </span>
+                      )}
                     </div>
                   </th>
                 ))}
@@ -329,6 +354,7 @@ const OrderList: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">{order.vendedor}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.date}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-bold">{order.supplierDate ? formatDate(order.supplierDate) : '-'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{order.total}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                       <button className="text-gray-400 hover:text-blue-500" onClick={(e) => { e.stopPropagation(); /* Optional: keep menu working independently */ }}>

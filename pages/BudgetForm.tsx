@@ -6,6 +6,10 @@ import { formatCurrency, parseCurrencyToNumber } from '../src/utils/formatCurren
 import { calculateItemTotal } from '../src/utils/formulas';
 import { useOrderItems } from '../src/hooks/useOrderItems';
 import { getTodayISO } from '../src/utils/dateUtils';
+import { useAuth } from '../lib/auth';
+import { maskPhone, maskCpfCnpj } from '../src/utils/maskUtils';
+import { GenerateOrderModal } from '../src/components/modals/GenerateOrderModal';
+import { QuickSupplierModal, NewSupplierData } from '../src/components/modals/QuickSupplierModal';
 
 
 // --- Custom Select Wrapper ---
@@ -71,7 +75,9 @@ const CustomSelect: React.FC<{
                             </div>
                         ))}
                         {filtered.length === 0 && (
-                            <div className="px-4 py-2 text-xs text-gray-400 italic">Nenhum produto encontrado.</div>
+                            <div className="px-4 py-2 text-xs text-gray-400 italic">
+                                {label === 'Fornecedor' || label === 'Fornecedor *' ? 'Nenhum fornecedor encontrado.' : 'Nenhum item encontrado.'}
+                            </div>
                         )}
                         <div className="px-4 py-2 text-sm text-blue-600 font-bold hover:bg-blue-50 cursor-pointer border-t" onClick={() => { onAdd(); setIsOpen(false); }}>+ CADASTRAR NOVO</div>
                     </div>
@@ -86,10 +92,13 @@ const BudgetForm: React.FC = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
+    const { appUser } = useAuth();
+    const userSalesperson = appUser?.salesperson || '';
+    const isSeller = !!appUser?.salesperson;
 
     // States
     const [budgetNumber, setBudgetNumber] = useState('');
-    const [vendedor, setVendedor] = useState('');
+    const [vendedor, setVendedor] = useState(userSalesperson);
     const [status, setStatus] = useState('EM ABERTO');
     const [dataOrcamento, setDataOrcamento] = useState(getTodayISO());
     const [dataPedido, setDataPedido] = useState(getTodayISO()); // Prediction
@@ -104,6 +113,29 @@ const BudgetForm: React.FC = () => {
 
     const location = useLocation();
     const [isClientLocked, setIsClientLocked] = useState(false);
+
+    // Auto-save states
+    const [isAutoSaving, setIsAutoSaving] = useState(false);
+    const [lastSaved, setLastSaved] = useState<Date | null>(null);
+    const isInitialMount = useRef(true);
+
+    // Commercial data state
+    const [isCommercialModalOpen, setIsCommercialModalOpen] = useState(false);
+    const [commercialData, setCommercialData] = useState({
+        payment_term: '',
+        supplier_deadline: '',
+        shipping_deadline: '',
+        invoice_number: '',
+        purchase_order: '',
+        layout_info: '',
+        entry_forecast_date: '',
+        remaining_forecast_date: '',
+        supplier_payment_dates: {} as Record<string, string>
+    });
+
+    // Supplier modal state
+    const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
+    const [newSupplier, setNewSupplier] = useState({ name: '', doc: '', phone: '', email: '', supplier_category: 'PRODUTOS' });
 
     // --- useOrderItems hook ---
     const {
@@ -125,8 +157,6 @@ const BudgetForm: React.FC = () => {
 
             // Try to find partner ID if missing
             if (!cData.id) {
-                // Async lookup inside useEffect is tricky, reset clientData after async call?
-                // Better to do it in a separate async function called here.
                 findPartnerId(cData).then(foundId => {
                     setClientData({ ...cData, id: foundId || '' });
                 });
@@ -134,7 +164,12 @@ const BudgetForm: React.FC = () => {
                 setClientData(cData);
             }
 
-            if (vend) setVendedor(vend);
+            // For sellers, always use their own vendedor
+            if (isSeller && userSalesperson) {
+                setVendedor(userSalesperson);
+            } else if (vend) {
+                setVendedor(vend);
+            }
             setIsClientLocked(true);
 
             // Auto-number placeholder
@@ -143,6 +178,13 @@ const BudgetForm: React.FC = () => {
             setBudgetNumber('AUTO');
         }
     }, [id, location.state]);
+
+    // Set vendedor from auth when appUser loads
+    useEffect(() => {
+        if (userSalesperson && !vendedor) {
+            setVendedor(userSalesperson);
+        }
+    }, [userSalesperson]);
 
     const findPartnerId = async (cData: any) => {
         if (!cData.doc && !cData.email && !cData.name) return null;
@@ -163,13 +205,46 @@ const BudgetForm: React.FC = () => {
 
     const loadBaseData = async () => {
         const { data: c } = await supabase.from('partners').select('*').eq('type', 'CLIENTE');
-        // Load only top 50 products initially to avoid payload issues
         const { data: p } = await supabase.from('products').select('*').limit(50);
+        // fetch all FORNECEDOR so we don't miss any due to category mismatch
         const { data: s } = await supabase.from('partners').select('*').eq('type', 'FORNECEDOR');
         const { data: f } = await supabase.from('calculation_factors').select('*');
         setClientsList(c || []);
         setProductsList(p || []);
-        setSuppliersList(s || []);
+
+        let suppliers = s || [];
+        const required = ['XBZ', 'ASIA', 'SPOT'];
+        const missing = required.filter(name => !suppliers.find((sup: any) => sup.name?.toUpperCase() === name));
+
+        if (missing.length > 0) {
+            for (const name of missing) {
+                // Upsert one by one to prevent a single failure from failing the entire batch
+                // Use a default doc string just in case it's required by the schema or RLS
+                const { data: newSupplier, error } = await supabase.from('partners').upsert({
+                    type: 'FORNECEDOR',
+                    name: name,
+                    supplier_category: 'PRODUTOS',
+                    doc: `00.000.000/0001-${name === 'XBZ' ? '01' : name === 'ASIA' ? '02' : '03'}` // ensure uniqueness
+                }, { onConflict: 'name', ignoreDuplicates: true }).select().maybeSingle();
+
+                if (error) {
+                    console.error(`Erro inserindo fornecedor padrão ${name}:`, error);
+                    // Add via fake ID if it completely fails to insert
+                    suppliers.push({
+                        id: crypto.randomUUID(),
+                        type: 'FORNECEDOR',
+                        name: name,
+                        supplier_category: 'PRODUTOS',
+                        _isTemp: true
+                    });
+                } else if (newSupplier) {
+                    suppliers.push(newSupplier);
+                }
+            }
+        }
+
+        // Assegurar que os nomes baseados em fontes de integração sejam case insensitive ao mapear list
+        setSuppliersList(suppliers);
         setFactors(f || []);
     };
 
@@ -195,9 +270,20 @@ const BudgetForm: React.FC = () => {
             setStatus(data.status);
             setDataOrcamento(data.created_at.split('T')[0]);
             setIssuer(data.issuer);
-            // Load client
-            const client = clientsList.find((cl: any) => cl.id === data.client_id) as any;
-            if (client) setClientData({ id: client.id, name: client.name, doc: client.doc, phone: client.phone, email: client.email, emailFin: client.financial_email });
+            // Load client directly from DB to avoid race condition with clientsList
+            if (data.client_id) {
+                const { data: clientRecord } = await supabase.from('partners').select('*').eq('id', data.client_id).single();
+                if (clientRecord) {
+                    setClientData({
+                        id: clientRecord.id,
+                        name: clientRecord.name,
+                        doc: clientRecord.doc || '',
+                        phone: clientRecord.phone || '',
+                        email: clientRecord.email || '',
+                        emailFin: clientRecord.financial_email || ''
+                    });
+                }
+            }
 
             // Map items
             setItems(data.budget_items.map((it: any) => ({
@@ -212,26 +298,38 @@ const BudgetForm: React.FC = () => {
                 despesaExtra: it.extra_expense,
                 layoutCost: it.layout_cost,
                 fator: it.calculation_factor,
-                bvPct: it.bv_pct,
-                isApproved: it.is_approved
+                bvPct: it.bv_pct || 0,
+                extraPct: it.extra_pct || 0,
+                isApproved: it.is_approved,
+                customization_supplier_id: it.customization_supplier_id || '',
+                transport_supplier_id: it.transport_supplier_id || '',
+                client_transport_supplier_id: it.client_transport_supplier_id || '',
+                layout_supplier_id: it.layout_supplier_id || '',
+                extra_supplier_id: it.extra_supplier_id || ''
             })));
         }
     };
 
 
-    const saveBudget = async () => {
+    const saveBudget = async (silent = false) => {
         if (status === 'PROPOSTA ACEITA') {
-            toast.error('Este orçamento já foi aprovado e convertido em pedido. Não é possível editá-lo.');
+            if (!silent) toast.error('Este orçamento já foi aprovado e convertido em pedido. Não é possível editá-lo.');
             return;
         }
         if (!budgetNumber || !vendedor || !clientData.name) {
-            toast.error('Preencha os campos obrigatórios (Pedido, Vendedor, Cliente).');
+            if (!silent) toast.error('Preencha os campos obrigatórios (Pedido, Vendedor, Cliente).');
             return;
         }
-        setLoading(true);
+        if (silent) {
+            setIsAutoSaving(true);
+        } else {
+            setLoading(true);
+        }
         try {
             let finalBudgetNumber = budgetNumber;
+            let currentId = id;
             if (budgetNumber === 'AUTO') {
+                if (silent) return; // Não autossalva orçamentos novos até o salvamento manual
                 // Get next number from DB function
                 const { data: numData, error: numError } = await supabase.rpc('get_next_budget_number');
                 if (numError) throw numError;
@@ -239,57 +337,111 @@ const BudgetForm: React.FC = () => {
                 setBudgetNumber(finalBudgetNumber);
             }
 
+            // Ensure client exists - auto-create if needed
+            let resolvedClientId = clientData.id;
+            if (!resolvedClientId) {
+                resolvedClientId = await findPartnerId(clientData);
+            }
+            if (!resolvedClientId && clientData.name) {
+                // Auto-create client partner
+                const { data: newPartner, error: partnerError } = await supabase.from('partners').insert([{
+                    type: 'CLIENTE',
+                    name: clientData.name,
+                    doc: clientData.doc || null,
+                    phone: clientData.phone || null,
+                    email: clientData.email || null,
+                    financial_email: clientData.emailFin || null
+                }]).select().single();
+                if (!partnerError && newPartner) {
+                    resolvedClientId = newPartner.id;
+                    setClientData({ ...clientData, id: newPartner.id });
+                }
+            }
+
             const payload = {
                 budget_number: finalBudgetNumber,
                 salesperson: vendedor,
                 status,
-                client_id: clientData.id || await findPartnerId(clientData) || null,
+                client_id: resolvedClientId || null,
                 issuer,
                 total_amount: items.reduce((sum, it) => sum + calculateItemTotal(it), 0)
             };
 
-            let budgetId = id;
-            if (!id || id === 'novo') {
+            let budgetId = currentId;
+            if (!currentId || currentId === 'novo') {
                 const { data, error } = await supabase.from('budgets').insert([payload]).select().single();
                 if (error) throw error;
                 budgetId = data.id;
             } else {
-                const { error } = await supabase.from('budgets').update(payload).eq('id', id);
+                const { error } = await supabase.from('budgets').update(payload).eq('id', currentId);
                 if (error) throw error;
             }
 
             // Save items
             await supabase.from('budget_items').delete().eq('budget_id', budgetId);
-            const itemsPayload = items.map(it => ({
-                budget_id: budgetId,
-                product_name: it.productName,
-                supplier_id: it.supplier_id || null,
-                quantity: it.quantity,
-                unit_price: it.priceUnit,
-                customization_cost: it.custoPersonalizacao,
-                supplier_transport_cost: it.transpFornecedor,
-                client_transport_cost: it.transpCliente,
-                extra_expense: it.despesaExtra,
-                layout_cost: it.layoutCost,
-                calculation_factor: it.fator,
-                bv_pct: it.bvPct,
-                total_item_value: calculateItemTotal(it),
-                is_approved: it.isApproved
-            }));
+            const itemsPayload = items.map(it => {
+                const suppIndex = suppliersList.find(s => s.id === it.supplier_id);
+                return {
+                    budget_id: budgetId,
+                    product_name: it.productName,
+                    supplier_id: (suppIndex && suppIndex._isTemp) ? null : (it.supplier_id || null),
+                    quantity: it.quantity,
+                    unit_price: it.priceUnit,
+                    customization_cost: it.custoPersonalizacao,
+                    supplier_transport_cost: it.transpFornecedor,
+                    client_transport_cost: it.transpCliente,
+                    extra_expense: it.despesaExtra,
+                    layout_cost: it.layoutCost,
+                    calculation_factor: it.fator,
+                    bv_pct: it.bvPct,
+                    extra_pct: it.extraPct,
+                    total_item_value: calculateItemTotal(it),
+                    is_approved: it.isApproved,
+                    customization_supplier_id: it.customization_supplier_id || null,
+                    transport_supplier_id: it.transport_supplier_id || null,
+                    client_transport_supplier_id: it.client_transport_supplier_id || null,
+                    layout_supplier_id: it.layout_supplier_id || null,
+                    extra_supplier_id: it.extra_supplier_id || null
+                };
+            });
             if (items.length > 0) {
-                await supabase.from('budget_items').insert(itemsPayload);
+                const { error: itemsError } = await supabase.from('budget_items').insert(itemsPayload);
+                if (itemsError) throw itemsError;
             }
 
-            toast.success('Orçamento salvo com sucesso!');
-            if (!id || id === 'novo') navigate(`/orcamento/${budgetId}`);
+            if (!silent) {
+                toast.success('Orçamento salvo com sucesso!');
+                if (!id || id === 'novo') {
+                    navigate(`/orcamento/${budgetId}`, { replace: true });
+                }
+            }
+            setLastSaved(new Date());
         } catch (e: any) {
-            toast.error('Erro ao salvar: ' + e.message);
+            if (!silent) toast.error('Erro ao salvar: ' + e.message);
+            else console.error('Auto-save error:', e.message);
         } finally {
-            setLoading(false);
+            if (silent) setIsAutoSaving(false);
+            else setLoading(false);
         }
     };
 
-    const generateOrder = async () => {
+    // Auto-save effect
+    useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+
+        if (!id || id === 'novo' || budgetNumber === 'AUTO') return;
+
+        const delayDebounceFn = setTimeout(() => {
+            saveBudget(true);
+        }, 1500);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [items, vendedor, status, dataOrcamento, dataPedido, issuer, clientData.id, clientData.emailFin]);
+
+    const handleGenerateOrderClick = () => {
         if (!id || budgetNumber === 'AUTO') {
             toast.error('Salve o orçamento antes de gerar o pedido.');
             return;
@@ -301,54 +453,59 @@ const BudgetForm: React.FC = () => {
             return;
         }
 
-        if (!window.confirm('Confirma a geração do pedido? O orçamento será aprovado e bloqueado para edições.')) return;
+        setIsCommercialModalOpen(true);
+    };
 
+    const confirmGenerateOrder = async () => {
+        if (!commercialData.payment_term || !commercialData.supplier_deadline || !commercialData.shipping_deadline) {
+            toast.error('Preencha os campos obrigatórios do comercial antes de continuar.');
+            return;
+        }
+
+        const approvedItems = items.filter(it => it.isApproved);
+
+        setIsCommercialModalOpen(false);
+        navigate('/pedido/novo', {
+            state: {
+                fromBudget: {
+                    issuer: issuer,
+                    vendedor: vendedor,
+                    budgetNumber: budgetNumber,
+                    budget_date: dataOrcamento,
+                    clientData: clientData,
+                    budgetId: id
+                },
+                items: approvedItems,
+                commercialData: commercialData
+            }
+        });
+    };
+
+    const handleSaveSupplier = async () => {
+        if (!newSupplier.name || !newSupplier.doc) {
+            toast.error('Preencha Nome/Razão Social e CNPJ/CPF.');
+            return;
+        }
         setLoading(true);
         try {
-            // 1. Check if order exists
-            const { data: existing } = await supabase.from('orders').select('id').eq('order_number', budgetNumber).single();
-            if (existing) {
-                toast.error('Já existe um pedido com este número.');
-                return;
-            }
-
-            // 2. Create Order
-            const { data: newOrder, error: orderError } = await supabase.from('orders').insert([{
-                order_number: budgetNumber,
-                salesperson: vendedor,
-                status: 'EM ABERTO',
-                client_id: clientData.id,
-                total_amount: approvedItems.reduce((acc, it) => acc + calculateItemTotal(it), 0),
-                issuer: issuer,
-                created_at: new Date().toISOString(),
-                order_date: new Date().toISOString()
+            const { data, error } = await supabase.from('partners').insert([{
+                type: 'FORNECEDOR',
+                name: newSupplier.name,
+                doc: newSupplier.doc,
+                phone: newSupplier.phone,
+                email: newSupplier.email
             }]).select().single();
-
-            if (orderError) throw orderError;
-
-            // 3. Create Order Items
-            const orderItemsPayload = approvedItems.map(it => ({
-                order_id: newOrder.id,
-                product_name: it.productName,
-                quantity: it.quantity,
-                unit_price: it.priceUnit,
-                total_item_value: calculateItemTotal(it), // Approximate or recalculate
-                supplier_id: it.supplier_id
-                // Add margins/costs if needed in order_items schema
-            }));
-
-            const { error: itemsError } = await supabase.from('order_items').insert(orderItemsPayload);
-            if (itemsError) throw itemsError;
-
-            // 4. Update Budget Status
-            await supabase.from('budgets').update({ status: 'PROPOSTA ACEITA' }).eq('id', id);
-            setStatus('PROPOSTA ACEITA');
-
-            toast.success('Pedido gerado com sucesso!');
-            // Navigate to Order View (assuming URL)
-            navigate(`/orders`); // Or specific order view if available
-        } catch (error: any) {
-            toast.error('Erro ao gerar pedido: ' + error.message);
+            if (error) {
+                if (error.code === '23505') throw new Error('Já existe um fornecedor com este Nome ou CPF/CNPJ.');
+                throw error;
+            }
+            // Add to list and close
+            setSuppliersList(prev => [...prev, data]);
+            setIsSupplierModalOpen(false);
+            setNewSupplier({ name: '', doc: '', phone: '', email: '', supplier_category: 'PRODUTOS' });
+            toast.success('Fornecedor adicionado com sucesso!');
+        } catch (e: any) {
+            toast.error('Erro ao adicionar fornecedor: ' + e.message);
         } finally {
             setLoading(false);
         }
@@ -376,29 +533,32 @@ const BudgetForm: React.FC = () => {
             if (createError) throw createError;
 
             // Copy items
-            const itemsPayload = items.map(it => ({
-                budget_id: newBudget.id,
-                product_name: it.productName,
-                supplier_id: it.supplier_id,
-                quantity: it.quantity,
-                unit_price: it.priceUnit,
-                customization_cost: it.custoPersonalizacao,
-                supplier_transport_cost: it.transpFornecedor,
-                client_transport_cost: it.transpCliente,
-                extra_expense: it.despesaExtra,
-                layout_cost: it.layoutCost,
-                calculation_factor: it.fator,
-                bv_pct: it.bvPct,
-                total_item_value: calculateItemTotal(it),
-                is_approved: false // Reset approval on duplicate
-            }));
+            const itemsPayload = items.map(it => {
+                const suppIndex = suppliersList.find(s => s.id === it.supplier_id);
+                return {
+                    budget_id: newBudget.id,
+                    product_name: it.productName,
+                    supplier_id: (suppIndex && suppIndex._isTemp) ? null : it.supplier_id,
+                    quantity: it.quantity,
+                    unit_price: it.priceUnit,
+                    customization_cost: it.custoPersonalizacao,
+                    supplier_transport_cost: it.transpFornecedor,
+                    client_transport_cost: it.transpCliente,
+                    extra_expense: it.despesaExtra,
+                    layout_cost: it.layoutCost,
+                    calculation_factor: it.fator,
+                    bv_pct: it.bvPct,
+                    total_item_value: calculateItemTotal(it),
+                    is_approved: false // Reset approval on duplicate
+                };
+            });
 
             if (items.length > 0) {
                 await supabase.from('budget_items').insert(itemsPayload);
             }
 
             toast.success('Orçamento duplicado!');
-            navigate(`/orcamento/${newBudget.id}`);
+            navigate(`/ orcamento / ${newBudget.id} `);
             window.location.reload(); // Force reload to clear state if needed
         } catch (error: any) {
             toast.error('Erro ao duplicar: ' + error.message);
@@ -418,7 +578,8 @@ const BudgetForm: React.FC = () => {
                         {id && id !== 'novo' ? 'EDITAR ORÇAMENTO' : 'NOVO ORÇAMENTO'}
                     </h2>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-3 items-center">
+                    {/* Auto-save indicators removed as requested */}
                     {status === 'PROPOSTA ACEITA' ? (
                         <div className="flex gap-3">
                             <button onClick={duplicateBudget} disabled={loading} className="px-6 py-3 rounded-lg shadow-sm text-sm font-bold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition-all uppercase flex items-center gap-2">
@@ -433,10 +594,10 @@ const BudgetForm: React.FC = () => {
                             <button onClick={duplicateBudget} disabled={loading} className="px-6 py-3 rounded-lg shadow-sm text-sm font-bold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition-all uppercase">
                                 Duplicar
                             </button>
-                            <button onClick={saveBudget} disabled={loading} className="px-6 py-3 rounded-lg shadow-sm text-sm font-bold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition-all uppercase">
-                                {loading ? 'Salvando...' : 'Salvar Orçamento'}
+                            <button onClick={() => saveBudget(false)} disabled={loading} className="px-6 py-3 rounded-lg shadow-sm text-sm font-bold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition-all uppercase">
+                                {loading && !isAutoSaving ? 'Salvando...' : 'Salvar Orçamento'}
                             </button>
-                            <button onClick={generateOrder} className="px-6 py-3 rounded-lg shadow-sm text-sm font-bold text-white bg-blue-500 hover:bg-blue-600 transition-all uppercase flex items-center gap-2">
+                            <button onClick={handleGenerateOrderClick} className="px-6 py-3 rounded-lg shadow-sm text-sm font-bold text-white bg-blue-500 hover:bg-blue-600 transition-all uppercase flex items-center gap-2">
                                 <span className="material-icons-outlined text-sm">shopping_cart</span> Gerar Pedido
                             </button>
                         </>
@@ -444,119 +605,121 @@ const BudgetForm: React.FC = () => {
                 </div>
             </div>
 
-            {/* Informações Gerais */}
-            <section className="bg-white shadow-sm rounded-xl border border-gray-200 p-6">
-                <div className="flex items-center gap-2 mb-6 border-b border-gray-100 pb-4">
-                    <span className="material-icons-outlined text-blue-500">info</span>
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Informações Gerais</h3>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                        <label className="block text-xs font-bold text-blue-500 uppercase mb-2">Pedido <span className="text-red-500">*</span></label>
-                        <input
-                            className={`form - input block w - full text - center rounded - lg font - bold py - 2 border - blue - 500 ${budgetNumber === 'AUTO' ? 'bg-blue-50 text-blue-500' : ''} `}
-                            placeholder="GERADO AUTO"
-                            value={budgetNumber}
-                            readOnly={budgetNumber === 'AUTO' || (!!id && id !== 'novo')}
-                            onChange={e => setBudgetNumber(e.target.value)}
-                        />
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                {/* Informações Gerais */}
+                <section className="bg-white shadow-sm rounded-xl border border-gray-200 p-6 flex flex-col h-full">
+                    <div className="flex items-center gap-2 mb-6 border-b border-gray-100 pb-4">
+                        <span className="material-icons-outlined text-blue-500">info</span>
+                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Informações Gerais</h3>
                     </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Vendedor <span className="text-red-500">*</span></label>
-                        <select
-                            className="form-select block w-full py-2 rounded-lg text-sm font-bold border-gray-300 disabled:bg-gray-100"
-                            value={vendedor}
-                            onChange={e => setVendedor(e.target.value)}
-                            disabled={status === 'PROPOSTA ACEITA'}
-                        >
-                            <option value="">SELECIONE...</option>
-                            <option value="VENDAS 01">VENDAS 01</option>
-                            <option value="VENDAS 02">VENDAS 02</option>
-                            <option value="VENDAS 03">VENDAS 03</option>
-                            <option value="VENDAS 04">VENDAS 04</option>
-                            <option value="VENDAS 05">VENDAS 05</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Status <span className="text-red-500">*</span></label>
-                        <select className="form-select block w-full py-2 rounded-lg text-sm border-gray-300" value={status} onChange={e => setStatus(e.target.value)}>
-                            <option value="EM ABERTO">EM ABERTO</option>
-                            <option value="EM NEGOCIAÇÃO">EM NEGOCIAÇÃO</option>
-                            <option value="PROPOSTA ENVIADA">PROPOSTA ENVIADA</option>
-                            <option value="PROPOSTA ACEITA">PROPOSTA ACEITA</option>
-                            <option value="PROPOSTA RECUSADA">PROPOSTA RECUSADA</option>
-                            <option value="CANCELADO">CANCELADO</option>
-                        </select>
-                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">
+                        <div>
+                            <label className="block text-xs font-bold text-blue-500 uppercase mb-2">Pedido <span className="text-red-500">*</span></label>
+                            <input
+                                className={`form-input block w-full text-center rounded-lg font-bold py-2 border-blue-500 ${budgetNumber === 'AUTO' ? 'bg-blue-50 text-blue-500' : ''}`}
+                                placeholder="GERADO AUTO"
+                                value={budgetNumber || ''}
+                                readOnly={budgetNumber === 'AUTO' || (!!id && id !== 'novo') || status === 'PROPOSTA ACEITA'}
+                                onChange={e => setBudgetNumber(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Vendedor <span className="text-red-500">*</span></label>
+                            <select
+                                className={`form-select block w-full py-2 rounded-lg text-sm font-bold border-gray-300 disabled:bg-gray-100 ${isSeller ? 'bg-gray-100' : ''}`}
+                                value={vendedor}
+                                onChange={e => setVendedor(e.target.value)}
+                                disabled={status === 'PROPOSTA ACEITA' || isSeller}
+                            >
+                                <option value="">SELECIONE...</option>
+                                <option value="VENDAS 01">VENDAS 01</option>
+                                <option value="VENDAS 02">VENDAS 02</option>
+                                <option value="VENDAS 03">VENDAS 03</option>
+                                <option value="VENDAS 04">VENDAS 04</option>
+                                <option value="VENDAS 05">VENDAS 05</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Status <span className="text-red-500">*</span></label>
+                            <select className="form-select block w-full py-2 rounded-lg text-sm border-gray-300" value={status || ''} onChange={e => setStatus(e.target.value)} disabled={status === 'PROPOSTA ACEITA'}>
+                                <option value="EM ABERTO">EM ABERTO</option>
+                                <option value="EM NEGOCIAÇÃO">EM NEGOCIAÇÃO</option>
+                                <option value="PROPOSTA ENVIADA">PROPOSTA ENVIADA</option>
+                                <option value="PROPOSTA ACEITA">PROPOSTA ACEITA</option>
+                                <option value="PROPOSTA RECUSADA">PROPOSTA RECUSADA</option>
+                                <option value="CANCELADO">CANCELADO</option>
+                            </select>
+                        </div>
 
-                    <div className="relative">
-                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Data do Orçamento <span className="text-red-500">*</span></label>
-                        <div className="flex items-center">
-                            <span className="material-icons-outlined absolute left-3 text-gray-400 pointer-events-none">calendar_month</span>
-                            <input type="date" className="form-input block w-full pl-10 rounded-lg text-sm border-gray-300" value={dataOrcamento} onChange={e => setDataOrcamento(e.target.value)} />
+                        <div className="relative">
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Data do Orçamento <span className="text-red-500">*</span></label>
+                            <div className="flex items-center">
+                                <span className="material-icons-outlined absolute left-3 text-gray-400 pointer-events-none">calendar_month</span>
+                                <input type="date" className="form-input block w-full pl-10 rounded-lg text-sm border-gray-300" value={dataOrcamento || ''} onChange={e => setDataOrcamento(e.target.value)} disabled={status === 'PROPOSTA ACEITA'} />
+                            </div>
+                        </div>
+                        <div className="relative">
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Data do Pedido <span className="text-red-500">*</span></label>
+                            <div className="flex items-center">
+                                <span className="material-icons-outlined absolute left-3 text-gray-400 pointer-events-none">event_available</span>
+                                <input type="date" className="form-input block w-full pl-10 rounded-lg text-sm border-gray-300" value={dataPedido || ''} onChange={e => setDataPedido(e.target.value)} disabled={status === 'PROPOSTA ACEITA'} />
+                            </div>
+                        </div>
+
+                        <div className="sm:col-span-2 mt-auto pt-4">
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Emitente</label>
+                            <div className="grid grid-cols-3 gap-3">
+                                {['CRISTAL', 'ESPIRITO', 'NATUREZA'].map(op => (
+                                    <button
+                                        key={op}
+                                        onClick={() => setIssuer(op)}
+                                        className={`py-2 px-2 border-2 rounded-lg font-bold text-[9px] transition-all uppercase ${issuer === op ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-gray-100 text-gray-400'} ${status === 'PROPOSTA ACEITA' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        disabled={status === 'PROPOSTA ACEITA'}
+                                    >
+                                        {op === 'ESPIRITO' ? 'ESPÍRITO BRINDES' : op === 'CRISTAL' ? 'CRISTAL BRINDES' : 'NATUREZA BRINDES'}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
-                    <div className="relative">
-                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Data do Pedido <span className="text-red-500">*</span></label>
-                        <div className="flex items-center">
-                            <span className="material-icons-outlined absolute left-3 text-gray-400 pointer-events-none">event_available</span>
-                            <input type="date" className="form-input block w-full pl-10 rounded-lg text-sm border-gray-300" value={dataPedido} onChange={e => setDataPedido(e.target.value)} />
+                </section>
+
+                {/* Dados do Cliente */}
+                <section className="bg-white shadow-sm rounded-xl border border-gray-200 p-6 flex flex-col h-full">
+                    <div className="flex items-center gap-2 mb-6 border-b border-gray-100 pb-4">
+                        <span className="material-icons-outlined text-blue-500">person</span>
+                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Dados do Cliente</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="col-span-2">
+                            <CustomSelect
+                                label="Nome / Razão Social *"
+                                options={clientsList}
+                                onSelect={c => setClientData({ id: c.id, name: c.name, doc: c.doc, phone: c.phone, email: c.email, emailFin: c.financial_email })}
+                                onAdd={() => navigate('/cadastros')}
+                                value={clientData.name}
+                                disabled={isClientLocked || status === 'PROPOSTA ACEITA'}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">CNPJ / CPF</label>
+                            <input className="form-input w-full rounded-lg border-gray-200 text-sm bg-gray-50" value={clientData.doc || ''} readOnly />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Telefone</label>
+                            <input className="form-input w-full rounded-lg border-gray-200 text-sm bg-gray-50" value={clientData.phone || ''} readOnly />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">E-mail Contato</label>
+                            <input className="form-input w-full rounded-lg border-gray-200 text-sm bg-gray-50" value={clientData.email || ''} readOnly />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">E-mail Financeiro</label>
+                            <input className="form-input w-full rounded-lg border-gray-200 text-sm" value={clientData.emailFin || ''} onChange={e => setClientData({ ...clientData, emailFin: e.target.value })} disabled={status === 'PROPOSTA ACEITA'} />
                         </div>
                     </div>
-
-                    <div className="md:col-span-3">
-                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Emitente</label>
-                        <div className="grid grid-cols-3 gap-3">
-                            {['CRISTAL', 'ESPIRITO', 'NATUREZA'].map(op => (
-                                <button
-                                    key={op}
-                                    onClick={() => setIssuer(op)}
-                                    className={`py-2 px-2 border-2 rounded-lg font-bold text-[9px] transition-all uppercase ${issuer === op ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-gray-100 text-gray-400'} ${status === 'PROPOSTA ACEITA' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                    disabled={status === 'PROPOSTA ACEITA'}
-                                >
-                                    {op === 'ESPIRITO' ? 'ESPÍRITO BRINDES' : op === 'CRISTAL' ? 'CRISTAL BRINDES' : 'NATUREZA BRINDES'}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* Dados do Cliente */}
-            <section className="bg-white shadow-sm rounded-xl border border-gray-200 p-6">
-                <div className="flex items-center gap-2 mb-6 border-b border-gray-100 pb-4">
-                    <span className="material-icons-outlined text-blue-500">person</span>
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Dados do Cliente</h3>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="col-span-2">
-                        <CustomSelect
-                            label="Nome / Razão Social *"
-                            options={clientsList}
-                            onSelect={c => setClientData({ id: c.id, name: c.name, doc: c.doc, phone: c.phone, email: c.email, emailFin: c.financial_email })}
-                            onAdd={() => navigate('/cadastros')}
-                            value={clientData.name}
-                            disabled={isClientLocked || status === 'PROPOSTA ACEITA'}
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">CNPJ / CPF</label>
-                        <input className="form-input w-full rounded-lg border-gray-200 text-sm bg-gray-50" value={clientData.doc} readOnly />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Telefone</label>
-                        <input className="form-input w-full rounded-lg border-gray-200 text-sm bg-gray-50" value={clientData.phone} readOnly />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">E-mail Contato</label>
-                        <input className="form-input w-full rounded-lg border-gray-200 text-sm bg-gray-50" value={clientData.email} readOnly />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">E-mail Financeiro</label>
-                        <input className="form-input w-full rounded-lg border-gray-200 text-sm" value={clientData.emailFin} onChange={e => setClientData({ ...clientData, emailFin: e.target.value })} />
-                    </div>
-                </div>
-            </section>
+                </section>
+            </div>
 
             {/* Produtos */}
             <section className="space-y-4">
@@ -598,19 +761,38 @@ const BudgetForm: React.FC = () => {
                                     {/* Produto e Fornecedor */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="md:col-span-2">
-                                            <CustomSelect label="Produto" options={productsList} onSelect={p => updateItem(it.id, 'productName', p.name)} onAdd={() => { }} value={it.productName} onSearch={searchProducts} />
+                                            <CustomSelect label="Produto" options={productsList} onSelect={p => {
+                                                updateItem(it.id, 'productName', p.name);
+
+                                                let supplierName = null;
+                                                if (p.source) {
+                                                    supplierName = p.source.toUpperCase();
+                                                } else {
+                                                    const lowerName = p.name.toLowerCase();
+                                                    if (lowerName.includes('xbz')) supplierName = 'XBZ';
+                                                    else if (lowerName.includes('asia') || lowerName.includes('ásia')) supplierName = 'ASIA';
+                                                    else if (lowerName.includes('spot')) supplierName = 'SPOT';
+                                                }
+
+                                                if (supplierName) {
+                                                    const found = suppliersList.find(s => s.name?.toUpperCase() === supplierName);
+                                                    if (found) {
+                                                        updateItem(it.id, 'supplier_id', found.id);
+                                                    }
+                                                }
+                                            }} onAdd={() => { }} value={it.productName || ''} onSearch={searchProducts} disabled={status === 'PROPOSTA ACEITA'} />
                                         </div>
                                         <div className="md:col-span-1">
-                                            <CustomSelect label="Fornecedor" options={suppliersList} onSelect={s => updateItem(it.id, 'supplier_id', s.id)} onAdd={() => { }} placeholder="Fornecedor..." />
+                                            <CustomSelect label="Fornecedor" options={suppliersList} onSelect={s => updateItem(it.id, 'supplier_id', s.id)} onAdd={() => { setIsSupplierModalOpen(true); }} placeholder="Fornecedor..." disabled={status === 'PROPOSTA ACEITA'} value={suppliersList.find(s => s.id === it.supplier_id)?.name || ''} />
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Qtd</label>
-                                                <input type="number" className="form-input w-full rounded-lg text-center font-bold border-gray-300 focus:border-blue-500 focus:ring-blue-500" value={it.quantity} onChange={e => updateItem(it.id, 'quantity', Number(e.target.value))} />
+                                                <input type="number" className="form-input w-full rounded-lg text-center font-bold border-gray-300 focus:border-blue-500 focus:ring-blue-500" value={it.quantity || ''} onChange={e => updateItem(it.id, 'quantity', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
                                             </div>
                                             <div>
                                                 <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Preço Unit.</label>
-                                                <input className="form-input w-full rounded-lg text-right font-bold border-gray-300" value={formatCurrency(it.priceUnit)} onChange={e => updateItem(it.id, 'priceUnit', parseCurrencyToNumber(e.target.value))} />
+                                                <input className="form-input w-full rounded-lg text-right font-bold border-gray-300" value={formatCurrency(it.priceUnit || 0)} onChange={e => updateItem(it.id, 'priceUnit', parseCurrencyToNumber(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
                                             </div>
                                         </div>
                                     </div>
@@ -620,30 +802,81 @@ const BudgetForm: React.FC = () => {
                                         <p className="text-[10px] font-bold text-gray-400 uppercase mb-3 flex items-center gap-1">
                                             <span className="material-icons-outlined text-xs">add_circle_outline</span> Custos Adicionais
                                         </p>
-                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                            <div>
-                                                <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Personalização</label>
-                                                <input className="form-input w-full text-xs rounded border-gray-200 text-right" value={formatCurrency(it.custoPersonalizacao)} onChange={e => updateItem(it.id, 'custoPersonalizacao', parseCurrencyToNumber(e.target.value))} />
+                                        <div className="space-y-3">
+                                            {/* Personalização */}
+                                            <div className="grid grid-cols-3 gap-2 items-end">
+                                                <div className="col-span-1">
+                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Personalização</label>
+                                                    <input className="form-input w-full text-xs rounded border-gray-200 text-right" value={formatCurrency(it.custoPersonalizacao)} onChange={e => updateItem(it.id, 'custoPersonalizacao', parseCurrencyToNumber(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Forn. Personalização</label>
+                                                    <select className="form-select w-full text-xs rounded border-gray-200" value={it.customization_supplier_id || ''} onChange={e => updateItem(it.id, 'customization_supplier_id', e.target.value)} disabled={status === 'PROPOSTA ACEITA'}>
+                                                        <option value="">Selecionar...</option>
+                                                        {suppliersList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                                    </select>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Layout</label>
-                                                <input className="form-input w-full text-xs rounded border-gray-200 text-right" value={formatCurrency(it.layoutCost)} onChange={e => updateItem(it.id, 'layoutCost', parseCurrencyToNumber(e.target.value))} />
+                                            {/* Layout */}
+                                            <div className="grid grid-cols-3 gap-2 items-end">
+                                                <div className="col-span-1">
+                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Layout</label>
+                                                    <input className="form-input w-full text-xs rounded border-gray-200 text-right" value={formatCurrency(it.layoutCost)} onChange={e => updateItem(it.id, 'layoutCost', parseCurrencyToNumber(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Forn. Layout</label>
+                                                    <select className="form-select w-full text-xs rounded border-gray-200" value={it.layout_supplier_id || ''} onChange={e => updateItem(it.id, 'layout_supplier_id', e.target.value)} disabled={status === 'PROPOSTA ACEITA'}>
+                                                        <option value="">Selecionar...</option>
+                                                        {suppliersList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                                    </select>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Despesa Extra</label>
-                                                <input className="form-input w-full text-xs rounded border-gray-200 text-right" value={formatCurrency(it.despesaExtra)} onChange={e => updateItem(it.id, 'despesaExtra', parseCurrencyToNumber(e.target.value))} />
+                                            {/* Despesa Extra */}
+                                            <div className="grid grid-cols-3 gap-2 items-end">
+                                                <div className="col-span-1">
+                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Despesa Extra</label>
+                                                    <input className="form-input w-full text-xs rounded border-gray-200 text-right" value={formatCurrency(it.despesaExtra)} onChange={e => updateItem(it.id, 'despesaExtra', parseCurrencyToNumber(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Forn. Desp. Extra</label>
+                                                    <select className="form-select w-full text-xs rounded border-gray-200" value={it.extra_supplier_id || ''} onChange={e => updateItem(it.id, 'extra_supplier_id', e.target.value)} disabled={status === 'PROPOSTA ACEITA'}>
+                                                        <option value="">Selecionar...</option>
+                                                        {suppliersList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                                    </select>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Frete Forn.</label>
-                                                <input className="form-input w-full text-xs rounded border-gray-200 text-right" value={formatCurrency(it.transpFornecedor)} onChange={e => updateItem(it.id, 'transpFornecedor', parseCurrencyToNumber(e.target.value))} />
+                                            {/* Frete Fornecedor */}
+                                            <div className="grid grid-cols-3 gap-2 items-end">
+                                                <div className="col-span-1">
+                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Frete Forn.</label>
+                                                    <input className="form-input w-full text-xs rounded border-gray-200 text-right" value={formatCurrency(it.transpFornecedor)} onChange={e => updateItem(it.id, 'transpFornecedor', parseCurrencyToNumber(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Forn. Transp. Forn.</label>
+                                                    <select className="form-select w-full text-xs rounded border-gray-200" value={it.transport_supplier_id || ''} onChange={e => updateItem(it.id, 'transport_supplier_id', e.target.value)} disabled={status === 'PROPOSTA ACEITA'}>
+                                                        <option value="">Selecionar...</option>
+                                                        {suppliersList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                                    </select>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Frete Cli.</label>
-                                                <input className="form-input w-full text-xs rounded border-gray-200 text-right" value={formatCurrency(it.transpCliente)} onChange={e => updateItem(it.id, 'transpCliente', parseCurrencyToNumber(e.target.value))} />
+
+                                            {/* Frete Cliente */}
+                                            <div className="grid grid-cols-3 gap-2 items-end">
+                                                <div className="col-span-1">
+                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Frete Cli.</label>
+                                                    <input className="form-input w-full text-xs rounded border-gray-200 text-right" value={formatCurrency(it.transpCliente)} onChange={e => updateItem(it.id, 'transpCliente', parseCurrencyToNumber(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Forn. Transp. Cli.</label>
+                                                    <select className="form-select w-full text-xs rounded border-gray-200" value={it.client_transport_supplier_id || ''} onChange={e => updateItem(it.id, 'client_transport_supplier_id', e.target.value)} disabled={status === 'PROPOSTA ACEITA'}>
+                                                        <option value="">Selecionar...</option>
+                                                        {suppliersList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                                    </select>
+                                                </div>
                                             </div>
 
                                             {/* Total Custo Display */}
-                                            <div className="bg-blue-50 rounded border border-blue-100 flex flex-col justify-center items-end px-2">
+                                            <div className="bg-blue-50 rounded border border-blue-100 flex flex-col justify-center items-end px-3 py-2 mt-2">
                                                 <span className="text-[8px] font-bold text-blue-400 uppercase">Custo Total Item</span>
                                                 <span className="text-sm font-bold text-blue-600">{formatCurrency(items.length > 0 ? (it.quantity * it.priceUnit) + (it.custoPersonalizacao + it.layoutCost + it.transpFornecedor + it.transpCliente + it.despesaExtra) : 0)}</span>
                                             </div>
@@ -657,7 +890,7 @@ const BudgetForm: React.FC = () => {
                                         <div>
                                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Fator de Multiplicação</label>
                                             <div className="flex gap-2">
-                                                <select className="form-select w-full rounded-lg border-gray-300 text-sm" value={it.fator} onChange={e => updateItem(it.id, 'fator', Number(e.target.value))}>
+                                                <select className="form-select w-full rounded-lg border-gray-300 text-sm" value={it.fator} onChange={e => updateItem(it.id, 'fator', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'}>
                                                     {factors.map(f => (
                                                         <option key={f.id} value={1 + (f.tax_percent + f.contingency_percent + f.margin_percent) / 100}>{f.name}</option>
                                                     ))}
@@ -671,9 +904,33 @@ const BudgetForm: React.FC = () => {
                                         <div>
                                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">BV (%)</label>
                                             <div className="relative">
-                                                <input type="number" className="form-input w-full rounded-lg border-gray-300 text-right pr-8 font-bold" value={it.bvPct} onChange={e => updateItem(it.id, 'bvPct', Number(e.target.value))} />
+                                                <input type="number" className="form-input w-full rounded-lg border-gray-300 text-right pr-8 font-bold" value={it.bvPct} onChange={e => updateItem(it.id, 'bvPct', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
                                                 <span className="absolute right-3 top-2 text-gray-400 text-sm">%</span>
                                             </div>
+                                            {it.bvPct > 0 && (
+                                                <div className="mt-1 flex justify-end items-center gap-1">
+                                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Valor BV:</span>
+                                                    <span className="text-[11px] font-black text-blue-600">
+                                                        {formatCurrency(calculateItemTotal(it) * (it.bvPct / 100))}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Saldo Extra (%)</label>
+                                            <div className="relative">
+                                                <input type="number" className="form-input w-full rounded-lg border-gray-300 text-right pr-8 font-bold" value={it.extraPct} onChange={e => updateItem(it.id, 'extraPct', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
+                                                <span className="absolute right-3 top-2 text-gray-400 text-sm">%</span>
+                                            </div>
+                                            {it.extraPct > 0 && (
+                                                <div className="mt-1 flex justify-end items-center gap-1">
+                                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Valor Extra:</span>
+                                                    <span className="text-[11px] font-black text-blue-600">
+                                                        {formatCurrency(calculateItemTotal(it) * (it.extraPct / 100))}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 
@@ -704,6 +961,26 @@ const BudgetForm: React.FC = () => {
                     </div>
                 )}
             </section>
+
+            <GenerateOrderModal
+                isOpen={isCommercialModalOpen}
+                onClose={() => setIsCommercialModalOpen(false)}
+                commercialData={commercialData}
+                setCommercialData={setCommercialData}
+                onConfirm={confirmGenerateOrder}
+                loading={loading}
+                approvedItems={items.filter(it => it.isApproved)}
+                suppliersList={suppliersList}
+            />
+
+            <QuickSupplierModal
+                isOpen={isSupplierModalOpen}
+                onClose={() => setIsSupplierModalOpen(false)}
+                newSupplier={newSupplier}
+                setNewSupplier={setNewSupplier}
+                onSave={handleSaveSupplier}
+                loading={loading}
+            />
         </div>
     );
 };

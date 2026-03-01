@@ -16,6 +16,7 @@ const ProductsPage: React.FC = () => {
     const [sourceFilter, setSourceFilter] = useState('ALL');
     const [page, setPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
+    const [globalCount, setGlobalCount] = useState(0);
     const PAGE_SIZE = 50;
 
     useEffect(() => {
@@ -56,7 +57,13 @@ const ProductsPage: React.FC = () => {
 
             if (error) throw error;
             setProducts(data || []);
-            setTotalCount(count || 0);
+            if (searchTerm || sourceFilter !== 'ALL') {
+                const { count: gCount } = await supabase.from('products').select('*', { count: 'exact', head: true });
+                setGlobalCount(gCount || 0);
+            } else {
+                setGlobalCount(count || 0);
+            }
+
         } catch (error: any) {
             console.error('Error fetching products:', error);
             toast.error('Erro ao carregar produtos');
@@ -164,7 +171,7 @@ const ProductsPage: React.FC = () => {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total de Produtos</p>
-                                <p className="text-3xl font-bold text-gray-900 mt-2">{products.length}</p>
+                                <p className="text-3xl font-bold text-gray-900 mt-2">{globalCount}</p>
                             </div>
                             <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
                                 <span className="material-icons-outlined text-blue-600 text-2xl">inventory</span>
@@ -176,7 +183,7 @@ const ProductsPage: React.FC = () => {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Resultados da Busca</p>
-                                <p className="text-3xl font-bold text-gray-900 mt-2">{filteredProducts.length}</p>
+                                <p className="text-3xl font-bold text-gray-900 mt-2">{totalCount}</p>
                             </div>
                             <div className="w-12 h-12 bg-emerald-50 rounded-lg flex items-center justify-center">
                                 <span className="material-icons-outlined text-emerald-600 text-2xl">filter_list</span>

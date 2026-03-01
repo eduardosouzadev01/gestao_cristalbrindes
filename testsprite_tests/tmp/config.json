@@ -9,11 +9,11 @@
     "projectName": "Gestão_Pedidos V01",
     "projectPath": "c:\\Users\\eduardosouza\\Desktop\\Gestão de Pedidos\\Gestão_Pedidos V01",
     "testIds": [],
-    "additionalInstruction": "",
+    "additionalInstruction": "Execute as many tests as possible for validation",
     "envs": {
       "API_KEY": "sk-user-IfcP7iZLOpJgHqy1IXNFN3CZwtv_XvzE9UPMXZWNVffz5g43kW_G8nU8CgFJEKW2gtXlUgFvgKoqxkgcRK6Uu-qHS4_7U9nM6mBu6tZgayiXF3gvbQsFG37UdNjskx96Kzg"
     }
   },
-  "serverPort": 49674,
-  "proxy": "http://15dd0ace-25fe-457f-8807-b33162cec1e4:Zz45svtT14t3SRvGd25op5PPY7XWbSby@tun.testsprite.com:8080"
+  "serverPort": 55543,
+  "proxy": "http://993a5ad7-9a94-4d9b-8873-4e9542973680:pmdjV90PmOGw24J6rJYiXgOAyW1PRfaL@tun.testsprite.com:8080"
 }

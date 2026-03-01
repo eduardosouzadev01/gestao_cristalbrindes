@@ -48,12 +48,30 @@ const BudgetList: React.FC = () => {
                 .from('budgets')
                 .select('*, partners(name, doc)', { count: 'exact' });
 
-            if (searchTerm) {
-                query = query.or(`budget_number.ilike.%${searchTerm}%,partners.name.ilike.%${searchTerm}%`);
+            if (location.state?.clientId) {
+                query = query.eq('client_id', location.state.clientId);
+            } else if (searchTerm) {
+                const { data: matchedPartners } = await supabase
+                    .from('partners')
+                    .select('id')
+                    .or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,doc.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`);
+
+                const pIds = matchedPartners?.map((p: any) => p.id) || [];
+
+                if (pIds.length > 0) {
+                    query = query.or(`budget_number.ilike.%${searchTerm}%,client_id.in.(${pIds.join(',')})`);
+                } else {
+                    query = query.ilike('budget_number', `%${searchTerm}%`);
+                }
             }
-            if (vendedorFilter !== 'Todos os Vendedores') {
+
+            // Force sellers to only see their own budgets
+            if (appUser?.permissions?.viewOwnOrdersOnly && appUser?.salesperson) {
+                query = query.eq('salesperson', appUser.salesperson);
+            } else if (vendedorFilter !== 'Todos os Vendedores') {
                 query = query.eq('salesperson', vendedorFilter);
             }
+
             if (statusFilter !== 'Todos') {
                 query = query.eq('status', statusFilter);
             }
@@ -112,9 +130,6 @@ const BudgetList: React.FC = () => {
                     </h1>
                     <p className="text-sm text-gray-500 mt-1">Gerencie propostas e acompanhamento comercial</p>
                 </div>
-                <Link to="/orcamento/novo" className="ml-3 inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors">
-                    <span className="material-icons-outlined mr-2">add</span> Novo Orçamento
-                </Link>
             </div>
 
             <div className="bg-white shadow-sm rounded-xl border border-gray-200 mb-8 p-5">
@@ -147,7 +162,6 @@ const BudgetList: React.FC = () => {
                             <option>VENDAS 02</option>
                             <option>VENDAS 03</option>
                             <option>VENDAS 04</option>
-                            <option>VENDAS 05</option>
                         </select>
                     </div>
                     <div className="w-full md:w-48">
@@ -229,7 +243,9 @@ const BudgetList: React.FC = () => {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center space-x-2">
                                         <button onClick={(e) => { e.stopPropagation(); navigate(`/orcamento/${b.id}`); }} className="text-blue-500 hover:text-blue-700"><span className="material-icons-outlined">edit</span></button>
-                                        <button onClick={(e) => { e.stopPropagation(); deleteBudget(b.id); }} className="text-red-400 hover:text-red-600"><span className="material-icons-outlined">delete</span></button>
+                                        {!appUser?.salesperson && (
+                                            <button onClick={(e) => { e.stopPropagation(); deleteBudget(b.id); }} className="text-red-400 hover:text-red-600"><span className="material-icons-outlined">delete</span></button>
+                                        )}
                                     </td>
                                 </tr>
                             ))
@@ -271,7 +287,7 @@ const BudgetList: React.FC = () => {
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 

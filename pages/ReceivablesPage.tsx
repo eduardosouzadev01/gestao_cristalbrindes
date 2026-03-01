@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { formatDate } from '../src/utils/dateUtils';
+import { exportToCSV, formatDateForExport } from '../src/utils/csvExport';
 import { toast } from 'sonner';
 
 interface ReceivableItem {
@@ -198,17 +199,45 @@ const ReceivablesPage: React.FC = () => {
           <p className="text-sm text-gray-500 mt-1">Gestão de entradas e recebimentos de pedidos</p>
         </div>
 
-        <div className="flex flex-wrap gap-2 items-center bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
-          <span className="text-[10px] font-bold text-gray-400 uppercase mr-2">Empresa:</span>
-          {['TODOS', 'CRISTAL', 'ESPIRITO', 'NATUREZA'].map(emp => (
-            <button
-              key={emp}
-              onClick={() => setIssuerFilter(emp)}
-              className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all ${issuerFilter === emp ? 'bg-blue-500 text-white' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              {emp === 'ESPIRITO' ? 'ESPÍRITO' : emp}
-            </button>
-          ))}
+        <div className="flex flex-wrap gap-2 items-center">
+          <button
+            onClick={() => {
+              exportToCSV(filteredItems.map(i => ({
+                vencimento: formatDateForExport(i.dueDate),
+                pedido: i.orderNumber,
+                cliente: i.clientName,
+                descricao: i.description,
+                valor: i.amount,
+                status: i.isPaid ? 'Pago' : 'Pendente',
+                emitente: i.issuer || ''
+              })), [
+                { header: 'Vencimento', accessor: 'vencimento' },
+                { header: 'Pedido', accessor: 'pedido' },
+                { header: 'Cliente', accessor: 'cliente' },
+                { header: 'Descrição', accessor: 'descricao' },
+                { header: 'Valor', accessor: 'valor' },
+                { header: 'Status', accessor: 'status' },
+                { header: 'Emitente', accessor: 'emitente' }
+              ], 'contas_a_receber');
+            }}
+            className="flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-600 font-bold text-xs rounded-lg hover:bg-green-100 transition-colors uppercase"
+          >
+            <span className="material-icons-outlined text-sm">download</span>
+            CSV
+          </button>
+
+          <div className="flex flex-wrap gap-2 items-center bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
+            <span className="text-[10px] font-bold text-gray-400 uppercase mr-2">Empresa:</span>
+            {['TODOS', 'CRISTAL', 'ESPIRITO', 'NATUREZA'].map(emp => (
+              <button
+                key={emp}
+                onClick={() => setIssuerFilter(emp)}
+                className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all ${issuerFilter === emp ? 'bg-blue-500 text-white' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                {emp === 'ESPIRITO' ? 'ESPÍRITO' : emp}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

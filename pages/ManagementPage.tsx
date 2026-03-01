@@ -7,35 +7,24 @@ import { useAuth } from '../lib/auth';
 const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 import { formatDate } from '../src/utils/dateUtils';
 import { maskPhone, maskCpfCnpj } from '../src/utils/maskUtils';
+import { PerformanceTab } from '../src/components/crm/PerformanceTab';
+import { FinanceiroTab } from '../src/components/crm/FinanceiroTab';
+import { Lead } from '../src/hooks/useCRM';
 
-// Interfaces
-interface Lead {
-    id: string;
-    client_name: string;
-    client_phone?: string;
-    client_email?: string;
-    client_doc?: string;
-    description?: string;
-    status: 'NOVO' | 'CRIANDO_ORCAMENTO' | 'ORCAMENTO_ENVIADO' | 'ACOMPANHAMENTO' | 'PEDIDO_ABERTO' | 'NAO_APROVADO' | 'ENTREGUE' | 'POS_VENDA' | 'FINALIZADO';
-    salesperson?: string;
-    next_action_date?: string;
-    notes?: string;
-    created_at: string;
-    priority?: 'ALTA' | 'NORMAL' | 'BAIXA';
-    lost_reason?: string;
-    estimated_value?: number;
-}
+// Interfaces (Lead importada de useCRM)
 
 const ManagementPage: React.FC = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const { hasPermission } = useAuth();
+    const { hasPermission, appUser } = useAuth();
+
+    const userSalesperson = appUser?.salesperson || '';
+    const isSeller = !!appUser?.salesperson;
 
     const initialLeadState: Partial<Lead> = {
-        status: 'NOVO',
-        salesperson: 'VENDAS 01',
+        status: 'ATENDIMENTO',
+        salesperson: userSalesperson || 'VENDAS 01',
         priority: 'NORMAL',
-        estimated_value: 0,
         client_name: '', client_phone: '', client_email: '', client_doc: ''
     };
 
@@ -57,10 +46,9 @@ const ManagementPage: React.FC = () => {
 
     const [editingLead, setEditingLead] = useState<Lead | null>(null);
     const [newLead, setNewLead] = useState<Partial<Lead>>({
-        status: 'NOVO',
-        salesperson: 'VENDAS 01', // Default
-        priority: 'NORMAL',
-        estimated_value: 0
+        status: 'ATENDIMENTO',
+        salesperson: userSalesperson || 'VENDAS 01',
+        priority: 'NORMAL'
     });
 
     // Client Search State
@@ -93,6 +81,9 @@ const ManagementPage: React.FC = () => {
     // Finalize Modal State
     const [isFinalizeModalOpen, setIsFinalizeModalOpen] = useState(false);
     const [finalizeForm, setFinalizeForm] = useState({ success: true, value: 0, notes: '' });
+    const [showClientForm, setShowClientForm] = useState(false);
+    const [isSavingPartner, setIsSavingPartner] = useState(false);
+    const [partnerSaved, setPartnerSaved] = useState(false);
 
     // Check Client Modal State
     const [isCheckClientModalOpen, setIsCheckClientModalOpen] = useState(false);
@@ -124,21 +115,24 @@ const ManagementPage: React.FC = () => {
         if (startDate) query = query.gte('created_at', startDate);
         if (endDate) query = query.lte('created_at', endDate + 'T23:59:59');
 
+        // Sellers can only see their own leads
+        if (isSeller && userSalesperson) {
+            query = query.eq('salesperson', userSalesperson);
+        }
+
         const { data, error } = await query;
         if (error) {
-            // If table doesn't exist yet (migration propagation), suppress specific error or handle gracefully
             if (error.code === '42P01') {
                 toast.error('ERRO CRÍTICO: Tabela CRM não encontrada. Contacte o suporte para rodar a migração.');
             } else {
                 toast.error('Erro ao carregar leads: ' + error.message);
             }
         } else {
-            // Sort by Priority then Date
             const priorityWeight = { 'ALTA': 3, 'NORMAL': 2, 'BAIXA': 1 };
             const sorted = (data || []).sort((a, b) => {
                 const pA = priorityWeight[a.priority as keyof typeof priorityWeight] || 0;
                 const pB = priorityWeight[b.priority as keyof typeof priorityWeight] || 0;
-                if (pA !== pB) return pB - pA; // Descending priority
+                if (pA !== pB) return pB - pA;
                 return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
             });
             setLeads(sorted);
@@ -179,9 +173,10 @@ const ManagementPage: React.FC = () => {
                 client_phone: foundClient.phone,
                 client_email: foundClient.email,
                 client_doc: foundClient.doc || '',
-                salesperson: foundClient.salesperson || baseLead.salesperson
+                salesperson: isSeller ? userSalesperson : (foundClient.salesperson || baseLead.salesperson)
             });
             setEditingLead(null);
+            setPartnerSaved(true);
             setIsLeadModalOpen(true);
         } else {
             toast('Cliente não encontrado. Preencha o cadastro.', { icon: '📝' });
@@ -193,6 +188,7 @@ const ManagementPage: React.FC = () => {
                 client_doc: ''
             });
             setEditingLead(null);
+            setPartnerSaved(false);
             setIsLeadModalOpen(true);
         }
     };
@@ -235,6 +231,47 @@ const ManagementPage: React.FC = () => {
         });
         setClientSearchTerm('');
         setShowClientResults(false);
+        setPartnerSaved(true); // Treat existing clients as already saved
+    };
+
+    const handleSavePartner = async () => {
+        if (!newLead.client_name) {
+            toast.error('Nome do cliente é obrigatório.');
+            return;
+        }
+
+        setIsSavingPartner(true);
+        try {
+            const partnerPayload = {
+                name: newLead.client_name,
+                phone: newLead.client_phone,
+                email: newLead.client_email,
+                doc: newLead.client_doc,
+                type: 'CLIENTE' as const,
+                salesperson: newLead.salesperson
+            };
+
+            let existingClientId = null;
+            if (newLead.client_doc) {
+                const { data: existing } = await supabase.from('partners').select('id').eq('doc', newLead.client_doc).maybeSingle();
+                if (existing) existingClientId = existing.id;
+            }
+
+            if (existingClientId) {
+                const { error } = await supabase.from('partners').update(partnerPayload).eq('id', existingClientId);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase.from('partners').insert([partnerPayload]);
+                if (error) throw error;
+            }
+
+            setPartnerSaved(true);
+            toast.success('Cliente salvo no banco de dados!');
+        } catch (e: any) {
+            toast.error('Erro ao salvar cliente: ' + e.message);
+        } finally {
+            setIsSavingPartner(false);
+        }
     };
 
     const saveLead = async () => {
@@ -243,22 +280,41 @@ const ManagementPage: React.FC = () => {
             return;
         }
 
+        if (newLead.client_email) {
+            const openStatuses = ['ATENDIMENTO', 'ORCAMENTO', 'PROPOSTA_ENVIADA', 'PEDIDO_ABERTO'];
+            let checkQuery = supabase
+                .from('crm_leads')
+                .select('id, salesperson')
+                .eq('client_email', newLead.client_email)
+                .in('status', openStatuses);
+
+            if (editingLead && editingLead.id) {
+                checkQuery = checkQuery.neq('id', editingLead.id);
+            }
+
+            const { data: existingLeads } = await checkQuery;
+
+            if (existingLeads && existingLeads.length > 0) {
+                alert(`Este e-mail já está em uso em um atendimento em aberto relacionado ao vendedor ${existingLeads[0].salesperson}. Você deve utilizar ou finalizar o atendimento existente.`);
+                return;
+            }
+        }
+
         try {
-            // 1. Save/Update Partner (Client)
-            if (newLead.client_name) {
+            // 1. Save/Update Partner (Client) - only if not already saved via the new button
+            if (!partnerSaved && newLead.client_name) {
                 const partnerPayload = {
                     name: newLead.client_name,
                     phone: newLead.client_phone,
                     email: newLead.client_email,
                     doc: newLead.client_doc,
                     type: 'CLIENTE',
-                    salesperson: newLead.salesperson // Assign salesperson if new
+                    salesperson: newLead.salesperson
                 };
 
-                // Try to find existing by doc
                 let existingClientId = null;
                 if (newLead.client_doc) {
-                    const { data: existing } = await supabase.from('partners').select('id').eq('doc', newLead.client_doc).single();
+                    const { data: existing } = await supabase.from('partners').select('id').eq('doc', newLead.client_doc).maybeSingle();
                     if (existing) existingClientId = existing.id;
                 }
 
@@ -283,7 +339,9 @@ const ManagementPage: React.FC = () => {
             }
             setIsLeadModalOpen(false);
             setEditingLead(null);
-            setNewLead({ status: 'NOVO', salesperson: 'VENDAS 01', priority: 'NORMAL' });
+            setShowClientForm(false);
+            setPartnerSaved(false);
+            setNewLead({ ...initialLeadState, salesperson: isSeller ? appUser?.salesperson : 'VENDAS 01' });
             setClientSearchTerm('');
             fetchLeads();
         } catch (e: any) {
@@ -467,42 +525,62 @@ const ManagementPage: React.FC = () => {
     const fetchPerformanceData = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
+
+            // Fetch Budgets for conversion stats
+            const { data: budgetsData, error: budgetError } = await supabase
                 .from('budgets')
                 .select('*')
                 .order('created_at', { ascending: false });
 
-            if (error) throw error;
+            if (budgetError) throw budgetError;
 
-            // Global Stats
-            setTotalBudgets(data.length);
-            setTotalApproved(data.filter((b: any) => b.status === 'PROPOSTA ACEITA').length);
-            setTotalValue(data.reduce((sum: number, b: any) => sum + (b.total_amount || 0), 0));
-            setRecentBudgets(data.slice(0, 5));
+            // Fetch CRM Leads for Kanban stats
+            const { data: leadsData, error: leadError } = await supabase
+                .from('crm_leads')
+                .select('id, status, salesperson, estimated_value');
+
+            if (leadError) throw leadError;
+
+            const allBudgets = budgetsData || [];
+            const allLeads = leadsData || [];
+
+            // Global Stats (from budgets)
+            setTotalBudgets(allBudgets.length);
+            setTotalApproved(allBudgets.filter((b: any) => b.status === 'PROPOSTA ACEITA').length);
+            setTotalValue(allBudgets.reduce((sum: number, b: any) => sum + (b.total_amount || 0), 0));
+            setRecentBudgets(allBudgets.slice(0, 5));
 
             // Group by salesperson
-            const grouped = data.reduce((acc: any, b: any) => {
-                const sp = b.salesperson || 'N/A';
-                if (!acc[sp]) acc[sp] = {
-                    name: sp,
-                    total: 0,
-                    approved: 0,
-                    pending: 0,
-                    refused: 0,
-                    value: 0
-                };
-                acc[sp].total += 1;
-                acc[sp].value += (b.total_amount || 0);
+            const sellers = Array.from(new Set([
+                ...allBudgets.map(b => b.salesperson || 'N/A'),
+                ...allLeads.map(l => l.salesperson || 'N/A')
+            ]));
 
-                if (b.status === 'PROPOSTA ACEITA') acc[sp].approved += 1;
-                else if (b.status === 'PROPOSTA RECUSADA' || b.status === 'CANCELADO') acc[sp].refused += 1;
-                else acc[sp].pending += 1;
+            const grouped = sellers.reduce((acc: any, sp: string) => {
+                const spBudgets = allBudgets.filter(b => b.salesperson === sp);
+                const spLeads = allLeads.filter(l => l.salesperson === sp);
+
+                acc[sp] = {
+                    name: sp,
+                    total: spBudgets.length,
+                    approved: spBudgets.filter((b: any) => b.status === 'PROPOSTA ACEITA').length,
+                    pending: spBudgets.filter((b: any) => b.status !== 'PROPOSTA ACEITA' && b.status !== 'PROPOSTA RECUSADA' && b.status !== 'CANCELADO').length,
+                    refused: spBudgets.filter((b: any) => b.status === 'PROPOSTA RECUSADA' || b.status === 'CANCELADO').length,
+                    value: spBudgets.reduce((sum: number, b: any) => sum + (b.total_amount || 0), 0),
+                    // New fields from CRM Leads
+                    atendimento: spLeads.filter(l => l.status === 'ATENDIMENTO').length,
+                    orcamento: spLeads.filter(l => l.status === 'ORCAMENTO').length,
+                    proposta: spLeads.filter(l => l.status === 'PROPOSTA_ENVIADA').length,
+                    aberto: spLeads.filter(l => l.status === 'PEDIDO_ABERTO').length,
+                    entregue: spLeads.filter(l => l.status === 'PEDIDO_ENTREGUE').length
+                };
 
                 return acc;
             }, {});
 
             setStats(Object.values(grouped));
         } catch (error: any) {
+            console.error(error);
             toast.error('Erro ao carregar dados do CRM.');
         } finally {
             setLoading(false);
@@ -582,14 +660,20 @@ const ManagementPage: React.FC = () => {
     };
 
     const leadColumns = [
-        { id: 'NOVO', title: 'Novo Atendimento', color: 'bg-blue-100 text-blue-800' },
-        { id: 'CRIANDO_ORCAMENTO', title: 'Criando orçamento', color: 'bg-indigo-100 text-indigo-800' },
-        { id: 'ORCAMENTO_ENVIADO', title: 'Orçamento enviado', color: 'bg-sky-100 text-sky-800' },
-        { id: 'ACOMPANHAMENTO', title: 'Acompanhamento', color: 'bg-yellow-100 text-yellow-800' },
-        { id: 'PEDIDO_ABERTO', title: 'Pedido aberto', color: 'bg-orange-100 text-orange-800' },
-        { id: 'ENTREGUE', title: 'Pedido entregue', color: 'bg-teal-100 text-teal-800' },
-        { id: 'POS_VENDA', title: 'Pós-venda', color: 'bg-purple-100 text-purple-800' },
+        { id: 'ATENDIMENTO', title: 'Em Atendimento', color: '#7b68ee', icon: 'support_agent' },
+        { id: 'ORCAMENTO', title: 'Em Orçamento', color: '#ff9800', icon: 'description' },
+        { id: 'PROPOSTA_ENVIADA', title: 'Proposta Enviada', color: '#1db954', icon: 'send' },
+        { id: 'PEDIDO_ABERTO', title: 'Pedido Aberto', color: '#00bcd4', icon: 'shopping_cart' },
+        { id: 'PEDIDO_ENTREGUE', title: 'Pedido Entregue', color: '#e91e63', icon: 'local_shipping' },
     ];
+
+    const getSalespersonInitials = (name?: string) => {
+        if (!name) return 'V';
+        if (name.toUpperCase().startsWith('VENDAS ')) return 'V' + name.toUpperCase().replace('VENDAS ', '');
+        const parts = name.split(' ');
+        if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+        return name.substring(0, 2).toUpperCase();
+    };
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -602,85 +686,96 @@ const ManagementPage: React.FC = () => {
                     <p className="text-sm text-gray-500 mt-1">Gestão de atendimentos e desempenho comercial.</p>
                 </div>
                 <div className="flex items-center gap-4">
-                    <div className="flex flex-col">
-                        <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
-                            <span className="material-icons-outlined text-gray-400 pl-2 text-sm">calendar_today</span>
-                            <input
-                                type="date"
-                                className="border-0 text-xs font-bold text-gray-500 uppercase focus:ring-0 py-1"
-                                value={startDate}
-                                onChange={e => {
-                                    const newStartDate = e.target.value;
-                                    setStartDate(newStartDate);
-                                    // Validate if end date is before start date
-                                    if (endDate && newStartDate && endDate < newStartDate) {
-                                        toast.error('Data final não pode ser anterior à data inicial');
-                                    }
-                                }}
-                            />
-                            <span className="text-gray-300">-</span>
-                            <input
-                                type="date"
-                                className="border-0 text-xs font-bold text-gray-500 uppercase focus:ring-0 py-1"
-                                value={endDate}
-                                onChange={e => {
-                                    const newEndDate = e.target.value;
-                                    // Validate if end date is before start date
-                                    if (startDate && newEndDate && newEndDate < startDate) {
-                                        toast.error('Data final não pode ser anterior à data inicial');
-                                        return;
-                                    }
-                                    setEndDate(newEndDate);
-                                }}
-                            />
-                            {startDate && <button onClick={() => { setStartDate(''); setEndDate(''); }} className="text-gray-400 hover:text-red-500 pr-2"><span className="material-icons-outlined text-sm">close</span></button>}
+                    {activeTab !== 'LEADS' && (
+                        <div className="flex flex-col">
+                            <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
+                                <span className="material-icons-outlined text-gray-400 pl-2 text-sm">calendar_today</span>
+                                <input
+                                    type="date"
+                                    className="border-0 text-xs font-bold text-gray-500 uppercase focus:ring-0 py-1"
+                                    value={startDate}
+                                    onChange={e => {
+                                        const newStartDate = e.target.value;
+                                        setStartDate(newStartDate);
+                                        // Validate if end date is before start date
+                                        if (endDate && newStartDate && endDate < newStartDate) {
+                                            toast.error('Data final não pode ser anterior à data inicial');
+                                        }
+                                    }}
+                                />
+                                <span className="text-gray-300">-</span>
+                                <input
+                                    type="date"
+                                    className="border-0 text-xs font-bold text-gray-500 uppercase focus:ring-0 py-1"
+                                    value={endDate}
+                                    onChange={e => {
+                                        const newEndDate = e.target.value;
+                                        // Validate if end date is before start date
+                                        if (startDate && newEndDate && newEndDate < startDate) {
+                                            toast.error('Data final não pode ser anterior à data inicial');
+                                            return;
+                                        }
+                                        setEndDate(newEndDate);
+                                    }}
+                                />
+                                {startDate && <button onClick={() => { setStartDate(''); setEndDate(''); }} className="text-gray-400 hover:text-red-500 pr-2"><span className="material-icons-outlined text-sm">close</span></button>}
+                            </div>
+                            {/* Validation message for incomplete date range */}
+                            {(startDate && !endDate) || (!startDate && endDate) ? (
+                                <span className="text-[10px] text-red-500 font-bold mt-1 ml-2">Preencha ambas as datas para filtrar</span>
+                            ) : null}
                         </div>
-                        {/* Validation message for incomplete date range */}
-                        {(startDate && !endDate) || (!startDate && endDate) ? (
-                            <span className="text-[10px] text-red-500 font-bold mt-1 ml-2">Preencha ambas as datas para filtrar</span>
-                        ) : null}
-                    </div>
-                    <div className="flex bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
-                        <button
-                            onClick={() => setActiveTab('LEADS')}
-                            className={`px-4 py-2 rounded-md text-xs font-bold uppercase transition-all flex items-center gap-2 ${activeTab === 'LEADS' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
-                        >
-                            <span className="material-icons-outlined text-sm">view_kanban</span>
-                            Atendimentos
-                        </button>
-                        {hasPermission('crm.performance') && (
+                    )}
+                    {/* Exibe o seletor de abas apenas se o usuário tiver acesso a mais do que "LEADS" */}
+                    {(hasPermission('crm.performance') || hasPermission('crm.financeiro')) && (
+                        <div className="flex bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
                             <button
-                                onClick={() => setActiveTab('PERFORMANCE')}
-                                className={`px-4 py-2 rounded-md text-xs font-bold uppercase transition-all flex items-center gap-2 ${activeTab === 'PERFORMANCE' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                                onClick={() => setActiveTab('LEADS')}
+                                className={`px-4 py-2 rounded-md text-xs font-bold uppercase transition-all flex items-center gap-2 ${activeTab === 'LEADS' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
                             >
-                                <span className="material-icons-outlined text-sm">insert_chart</span>
-                                Performance
+                                <span className="material-icons-outlined text-sm">view_kanban</span>
+                                Atendimentos
                             </button>
-                        )}
-                        {hasPermission('crm.financeiro') && (
-                            <button
-                                onClick={() => setActiveTab('FINANCEIRO')}
-                                className={`px-4 py-2 rounded-md text-xs font-bold uppercase transition-all flex items-center gap-2 ${activeTab === 'FINANCEIRO' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
-                            >
-                                <span className="material-icons-outlined text-sm">payments</span>
-                                Financeiro
-                            </button>
-                        )}
-                    </div>
+                            {hasPermission('crm.performance') && (
+                                <button
+                                    onClick={() => setActiveTab('PERFORMANCE')}
+                                    className={`px-4 py-2 rounded-md text-xs font-bold uppercase transition-all flex items-center gap-2 ${activeTab === 'PERFORMANCE' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                                >
+                                    <span className="material-icons-outlined text-sm">insert_chart</span>
+                                    Performance
+                                </button>
+                            )}
+                            {hasPermission('crm.financeiro') && (
+                                <button
+                                    onClick={() => setActiveTab('FINANCEIRO')}
+                                    className={`px-4 py-2 rounded-md text-xs font-bold uppercase transition-all flex items-center gap-2 ${activeTab === 'FINANCEIRO' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                                >
+                                    <span className="material-icons-outlined text-sm">payments</span>
+                                    Financeiro
+                                </button>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 
             {activeTab === 'LEADS' && (
                 <>
                     <div className="flex justify-end mb-6">
-                        <button onClick={() => { setCheckClientInput(''); setIsCheckClientModalOpen(true); }} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold uppercase text-xs hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center gap-2">
+                        <button onClick={() => {
+                            setNewLead({ ...initialLeadState, salesperson: isSeller ? appUser?.salesperson : 'VENDAS 01' });
+                            setEditingLead(null);
+                            setShowClientForm(false);
+                            setPartnerSaved(false);
+                            setIsLeadModalOpen(true);
+                        }} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold uppercase text-xs hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center gap-2">
                             <span className="material-icons-outlined">add</span> Novo Atendimento
                         </button>
                     </div>
 
                     <div
                         ref={scrollContainerRef}
-                        className="flex overflow-x-auto pb-8 gap-6 cursor-grab active:cursor-grabbing select-none"
+                        className="flex overflow-x-auto pb-4 gap-4 cursor-grab active:cursor-grabbing select-none [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-200 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-gray-300"
                         onMouseDown={(e) => {
                             if (!scrollContainerRef.current) return;
                             setIsDraggingScroll(true);
@@ -704,111 +799,133 @@ const ManagementPage: React.FC = () => {
                         {leadColumns.map(col => (
                             <div
                                 key={col.id}
-                                className={`min-w-[300px] w-[300px] flex-shrink-0 bg-gray-50 rounded-xl border-2 flex flex-col max-h-[calc(100vh-250px)] transition-all ${dragOverColumn === col.id ? 'border-blue-500 bg-blue-50/50 shadow-inner scale-[1.01]' : 'border-gray-200'}`}
+                                className={`min-w-[280px] w-[280px] flex-shrink-0 flex flex-col max-h-[calc(100vh-250px)] transition-all rounded-xl border ${dragOverColumn === col.id ? 'ring-2 ring-blue-400' : ''}`}
+                                style={{ backgroundColor: `${col.color}12`, borderColor: dragOverColumn === col.id ? undefined : `${col.color}30` }}
                                 onDragOver={handleDragOver}
                                 onDragEnter={(e) => handleDragEnter(e, col.id)}
                                 onDragLeave={handleDragLeave}
                                 onDrop={(e) => handleDrop(e, col.id)}
                             >
-                                <div className={`p-4 border-b border-gray-200 rounded-t-xl font-bold uppercase text-xs flex justify-between items-center ${col.color}`}>
-                                    {col.title}
-                                    <span className="bg-white/50 px-2 py-0.5 rounded-full text-[10px]">{leads.filter(l => l.status === col.id).length}</span>
+                                <div className="p-4 flex justify-between items-center group/header">
+                                    <div className="flex items-center gap-2">
+                                        <span className="material-icons-outlined text-sm" style={{ color: col.color }}>{col.icon}</span>
+                                        <div
+                                            className="px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider shadow-sm border border-gray-100 bg-white"
+                                            style={{ color: col.color }}
+                                        >
+                                            {col.title}
+                                        </div>
+                                        <span className="text-[11px] font-bold text-gray-400 bg-gray-100/50 px-2 py-0.5 rounded-full">
+                                            {leads.filter(l => l.status === col.id).length}
+                                        </span>
+                                    </div>
+                                    <button className="opacity-0 group-hover/header:opacity-100 text-gray-400 hover:text-gray-600 transition-opacity">
+                                        <span className="material-icons-outlined text-sm">more_horiz</span>
+                                    </button>
                                 </div>
-                                <div className="p-3 flex-1 overflow-y-auto space-y-3">
+
+                                <div className="px-3 flex-1 overflow-y-auto space-y-3 pb-4">
                                     {leads.filter(l => l.status === col.id).map(lead => (
                                         <div
                                             key={lead.id}
                                             draggable
                                             onDragStart={(e) => handleDragStart(e, lead)}
                                             onDragEnd={handleDragEnd}
-                                            className={`p-4 rounded-xl shadow-sm border-l-4 hover:shadow-md transition-all group relative cursor-pointer active:cursor-grabbing ${col.id === 'NOVO' ? 'bg-blue-50/30 border-l-blue-500 border-r border-t border-b border-blue-100' :
-                                                col.id === 'CRIANDO_ORCAMENTO' ? 'bg-purple-50/30 border-l-purple-500 border-r border-t border-b border-purple-100' :
-                                                    col.id === 'ORCAMENTO_ENVIADO' ? 'bg-amber-50/30 border-l-amber-500 border-r border-t border-b border-amber-100' :
-                                                        col.id === 'ACOMPANHAMENTO' ? 'bg-yellow-50/30 border-l-yellow-500 border-r border-t border-b border-yellow-100' :
-                                                            col.id === 'PEDIDO_ABERTO' ? 'bg-emerald-50/30 border-l-emerald-500 border-r border-t border-b border-emerald-100' :
-                                                                col.id === 'NAO_APROVADO' ? 'bg-red-50/30 border-l-red-500 border-r border-t border-b border-red-100' :
-                                                                    col.id === 'ENTREGUE' ? 'bg-green-50/30 border-l-green-600 border-r border-t border-b border-green-100' :
-                                                                        col.id === 'POS_VENDA' ? 'bg-sky-50/30 border-l-sky-500 border-r border-t border-b border-sky-100' :
-                                                                            'bg-gray-50/30 border-l-gray-500 border-r border-t border-b border-gray-100' // FINALIZADO
-                                                }`}
-                                            onClick={() => { setEditingLead(lead); setNewLead(lead); setIsLeadModalOpen(true); }}
+                                            className="bg-white rounded-xl shadow-sm border border-gray-100 border-l-[3px] hover:shadow-md hover:-translate-y-0.5 transition-all group relative cursor-pointer active:cursor-grabbing p-4 flex flex-col min-h-[140px]"
+                                            style={{ borderLeftColor: col.color }}
+                                            onClick={() => {
+                                                setEditingLead(lead);
+                                                setNewLead(lead);
+                                                setPartnerSaved(true);
+                                                setIsLeadModalOpen(true);
+                                            }}
                                         >
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div className="flex flex-col">
-                                                    <span className="text-[10px] font-bold text-gray-400 uppercase">{lead.salesperson}</span>
-                                                    <span className="text-[9px] text-gray-400 font-bold flex items-center gap-1">
-                                                        <span className="material-icons-outlined text-[10px]">timer</span>
-                                                        {Math.floor((Date.now() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24)) + 1} dias na fila
+                                            <div className="flex justify-between items-center mb-2">
+                                                {lead.priority && (
+                                                    <span className={`px-2 py-[2px] rounded text-[9px] font-bold tracking-wider ${lead.priority === 'ALTA' ? 'bg-red-50 text-red-600' :
+                                                            lead.priority === 'BAIXA' ? 'bg-gray-50 text-gray-500' : 'bg-blue-50 text-blue-600'
+                                                        }`}>
+                                                        {lead.priority}
                                                     </span>
-                                                </div>
-                                                <div className="flex flex-col items-end">
-                                                    <span className="text-[10px] text-gray-400">{formatDate(lead.created_at)}</span>
-                                                    {lead.priority && (
-                                                        <span className={`text-[9px] font-bold px-1.5 rounded uppercase mt-1 ${lead.priority === 'ALTA' ? 'bg-red-100 text-red-600' :
-                                                            lead.priority === 'BAIXA' ? 'bg-gray-100 text-gray-500' :
-                                                                'bg-blue-50 text-blue-500' // Normal default
-                                                            }`}>
-                                                            {lead.priority}
-                                                        </span>
-                                                    )}
+                                                )}
+                                                <div className="flex items-center text-gray-400 text-[10px] font-medium transition-colors group-hover:text-gray-600">
+                                                    <span className="material-icons-outlined text-[12px] mr-1">schedule</span>
+                                                    {formatDate(lead.created_at)}
                                                 </div>
                                             </div>
-                                            <h4 className="font-bold text-gray-800 text-sm mb-1">{lead.client_name}</h4>
-                                            {lead.estimated_value ? <p className="text-xs font-black text-green-600 mb-2">{formatCurrency(lead.estimated_value)}</p> : null}
-                                            {lead.client_phone && <p className="text-xs text-gray-500 flex items-center gap-1 mb-1"><span className="material-icons-outlined text-[10px]">call</span> {lead.client_phone}</p>}
-                                            {lead.client_email && <p className="text-xs text-gray-500 flex items-center gap-1 mb-2"><span className="material-icons-outlined text-[10px]">email</span> {lead.client_email}</p>}
-                                            {lead.description && <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded mb-2 line-clamp-3">{lead.description}</p>}
-                                            {lead.lost_reason && (
-                                                <div className="text-[10px] bg-red-50 text-red-600 p-2 rounded border border-red-100 mb-2 italic">
-                                                    <strong>Motivo Recusa:</strong> {lead.lost_reason}
-                                                </div>
+
+                                            <h4 className="font-bold text-gray-800 text-[14px] leading-snug line-clamp-2 mb-1 pr-4">{lead.client_name}</h4>
+
+                                            {lead.description && (
+                                                <p className="text-gray-500 text-[11px] mb-3 line-clamp-2 leading-relaxed flex-1">
+                                                    {lead.description}
+                                                </p>
                                             )}
 
-                                            <div className="mt-3 pt-3 border-t border-gray-100 hidden group-hover:flex flex-col gap-2">
-                                                {/* Action Buttons */}
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            navigate('/orcamentos', { state: { clientName: lead.client_name } });
-                                                        }}
-                                                        className="px-2 py-1.5 bg-blue-50 text-blue-600 rounded text-[10px] font-bold uppercase hover:bg-blue-100 flex items-center justify-center gap-1"
-                                                    >
-                                                        <span className="material-icons-outlined text-[12px]">folder_open</span> Orçamentos
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            navigate('/', { state: { clientName: lead.client_name } });
-                                                        }}
-                                                        className="px-2 py-1.5 bg-green-50 text-green-600 rounded text-[10px] font-bold uppercase hover:bg-green-100 flex items-center justify-center gap-1"
-                                                    >
-                                                        <span className="material-icons-outlined text-[12px]">inventory_2</span> Pedidos
-                                                    </button>
+                                            <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-50 opacity-80 group-hover:opacity-100 transition-opacity">
+                                                <div className="flex items-center gap-2">
+                                                    {lead.salesperson && (
+                                                        <div
+                                                            className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 text-blue-600 font-bold text-[9px] border border-blue-100 shadow-sm"
+                                                            title={lead.salesperson}
+                                                        >
+                                                            {getSalespersonInitials(lead.salesperson)}
+                                                        </div>
+                                                    )}
                                                 </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    {lead.client_phone && <span className="material-icons-outlined text-[13px] text-gray-400 group-hover:text-blue-500 transition-colors" title="Telefone Registrado">phone</span>}
+                                                    {lead.client_email && <span className="material-icons-outlined text-[13px] text-gray-400 group-hover:text-blue-500 transition-colors" title="E-mail Registrado">email</span>}
+                                                </div>
+                                            </div>
 
-                                                <div className="flex justify-between items-center mt-1">
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); convertToBudget(lead); }}
-                                                        className="text-[10px] font-bold text-purple-600 uppercase hover:underline flex items-center gap-1"
-                                                    >
-                                                        <span className="material-icons-outlined text-[12px]">add_circle</span> Criar Orçamento
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setPendingStatusLead(lead);
-                                                            setFinalizeForm({ success: true, value: lead.estimated_value || 0, notes: '' });
-                                                            setIsFinalizeModalOpen(true);
-                                                        }}
-                                                        className="text-[10px] font-bold text-green-600 uppercase hover:underline flex items-center gap-1"
-                                                    >
-                                                        <span className="material-icons-outlined text-[12px]">check_circle</span> Finalizar
-                                                    </button>
-                                                </div>
+                                            {/* Hover Quick Actions */}
+                                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-white shadow-xl border border-gray-100 rounded-lg p-1">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); navigate('/pedidos', { state: { clientName: lead.client_name } }); }}
+                                                    className="p-1 hover:bg-indigo-50 rounded text-indigo-500" title="Ver Pedidos"
+                                                >
+                                                    <span className="material-icons-outlined text-sm">shopping_bag</span>
+                                                </button>
+                                                <button
+                                                    onClick={async (e) => {
+                                                        e.stopPropagation();
+                                                        let clientId = '';
+                                                        const conditions = [];
+                                                        if (lead.client_doc) conditions.push(`doc.eq.${lead.client_doc}`);
+                                                        if (lead.client_email) conditions.push(`email.eq.${lead.client_email}`);
+                                                        if (lead.client_phone) conditions.push(`phone.eq.${lead.client_phone}`);
+                                                        if (conditions.length === 0) conditions.push(`name.ilike.${lead.client_name}`);
+
+                                                        const { data } = await supabase.from('partners').select('id').or(conditions.join(',')).eq('type', 'CLIENTE').limit(1);
+                                                        if (data && data.length > 0) clientId = data[0].id;
+
+                                                        navigate('/orcamentos', { state: { clientName: lead.client_name, clientId: clientId } });
+                                                    }}
+                                                    className="p-1 hover:bg-emerald-50 rounded text-emerald-500" title="Orçamentos em andamento"
+                                                >
+                                                    <span className="material-icons-outlined text-sm">request_quote</span>
+                                                </button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); convertToBudget(lead); }}
+                                                    className="p-1 hover:bg-gray-100 rounded text-purple-500" title="Criar Orçamento"
+                                                >
+                                                    <span className="material-icons-outlined text-sm">add_circle</span>
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setPendingStatusLead(lead);
+                                                        setIsFinalizeModalOpen(true);
+                                                    }}
+                                                    className="p-1 hover:bg-green-50 rounded text-green-500" title="Finalizar"
+                                                >
+                                                    <span className="material-icons-outlined text-sm">check_circle</span>
+                                                </button>
                                             </div>
                                         </div>
                                     ))}
+
                                 </div>
                             </div>
                         ))}
@@ -817,289 +934,28 @@ const ManagementPage: React.FC = () => {
             )}
 
             {activeTab === 'PERFORMANCE' && (
-                <>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                        {/* Stats Cards */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-bold text-gray-400 uppercase">Total de Orçamentos</p>
-                                <p className="text-3xl font-black text-gray-900 mt-1">{totalBudgets}</p>
-                            </div>
-                            <div className="bg-blue-50 p-3 rounded-xl text-blue-600">
-                                <span className="material-icons-outlined text-2xl">description</span>
-                            </div>
-                        </div>
-                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-bold text-gray-400 uppercase">Taxa de Conversão Global</p>
-                                <p className="text-3xl font-black text-green-600 mt-1">
-                                    {totalBudgets > 0 ? ((totalApproved / totalBudgets) * 100).toFixed(1) : 0}%
-                                </p>
-                            </div>
-                            <div className="bg-green-50 p-3 rounded-xl text-green-600">
-                                <span className="material-icons-outlined text-2xl">trending_up</span>
-                            </div>
-                        </div>
-                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-bold text-gray-400 uppercase">Valor Total em Propostas</p>
-                                <p className="text-3xl font-black text-purple-600 mt-1">{formatCurrency(totalValue)}</p>
-                            </div>
-                            <div className="bg-purple-50 p-3 rounded-xl text-purple-600">
-                                <span className="material-icons-outlined text-2xl">attach_money</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Salesperson Performance */}
-                    <h2 className="text-lg font-bold text-gray-800 uppercase mb-4 flex items-center gap-2">
-                        <span className="material-icons-outlined text-gray-400">groups</span> Desempenho por Vendedor
-                    </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                        {stats.length === 0 ? (
-                            <p className="text-gray-400 italic col-span-3 text-center py-10">Nenhum dado disponível.</p>
-                        ) : (
-                            stats.map((s) => (
-                                <div key={s.name} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group hover:border-purple-300 transition-all">
-                                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-xs border border-purple-200">
-                                                {s.name.substring(0, 2).toUpperCase()}
-                                            </div>
-                                            <span className="font-black text-gray-700 uppercase text-xs">{s.name}</span>
-                                        </div>
-                                        <span className="bg-gray-200 text-gray-600 text-[10px] font-black px-2 py-1 rounded-full">{s.total} PROPOSTAS</span>
-                                    </div>
-                                    <div className="p-6">
-                                        <div className="grid grid-cols-3 gap-2 mb-4">
-                                            <div className="text-center p-2 bg-green-50 rounded-lg border border-green-100">
-                                                <p className="text-[9px] font-bold text-green-600 uppercase mb-1">Aprovados</p>
-                                                <p className="text-lg font-black text-green-700">{s.approved}</p>
-                                            </div>
-                                            <div className="text-center p-2 bg-yellow-50 rounded-lg border border-yellow-100">
-                                                <p className="text-[9px] font-bold text-yellow-600 uppercase mb-1">Em Aberto</p>
-                                                <p className="text-lg font-black text-yellow-700">{s.pending}</p>
-                                            </div>
-                                            <div className="text-center p-2 bg-red-50 rounded-lg border border-red-100">
-                                                <p className="text-[9px] font-bold text-red-400 uppercase mb-1">Perdidos</p>
-                                                <p className="text-lg font-black text-red-500">{s.refused}</p>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-3">
-                                            <div className="pt-3 border-t border-gray-50 flex justify-between items-center">
-                                                <span className="text-[10px] font-bold text-gray-400 uppercase">Volume de Vendas</span>
-                                                <span className="text-sm font-black text-gray-800">{formatCurrency(s.value)}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div>
-                            <h2 className="text-lg font-bold text-gray-800 uppercase mb-4 flex items-center gap-2">
-                                <span className="material-icons-outlined text-gray-400">history</span> Atividade Recente
-                            </h2>
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-50">
-                                        <tr>
-                                            <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase">Orçamento</th>
-                                            <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase">Cliente</th>
-                                            <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase">Status</th>
-                                            <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase">Valor</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
-                                        {recentBudgets.map((b) => (
-                                            <tr key={b.id} className="hover:bg-gray-50">
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">#{b.budget_number}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500 font-medium">{b.client_id ? 'CLIENTE REGISTRADO' : 'CLIENTE NOVO/PENDENTE'}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${b.status === 'PROPOSTA ACEITA' ? 'bg-green-100 text-green-700' :
-                                                        b.status.includes('RECUSAD') || b.status.includes('CANCEL') ? 'bg-red-100 text-red-700' :
-                                                            'bg-yellow-100 text-yellow-700'
-                                                        }`}>
-                                                        {b.status}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-900">
-                                                    {formatCurrency(b.total_amount)}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <div>
-                            <h2 className="text-lg font-bold text-gray-800 uppercase mb-4 flex items-center gap-2">
-                                <span className="material-icons-outlined text-red-400">cancel</span> Motivos de Perda (Pedido não aprovado)
-                            </h2>
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden p-6">
-                                <div className="space-y-4">
-                                    {Array.from(new Set(leads.filter(l => l.status === 'NAO_APROVADO' && l.lost_reason).map(l => l.lost_reason))).length === 0 ? (
-                                        <p className="text-gray-400 italic text-center py-4">Nenhum motivo registrado ainda.</p>
-                                    ) : (
-                                        Object.entries(
-                                            leads.filter(l => l.status === 'NAO_APROVADO' && l.lost_reason)
-                                                .reduce((acc: any, curr) => {
-                                                    acc[curr.lost_reason!] = (acc[curr.lost_reason!] || 0) + 1;
-                                                    return acc;
-                                                }, {})
-                                        ).sort((a, b) => (b[1] as number) - (a[1] as number)).map(([reason, count]) => (
-                                            <div key={reason} className="flex flex-col">
-                                                <div className="flex justify-between items-center text-xs mb-1">
-                                                    <span className="font-bold text-gray-700 uppercase">{reason}</span>
-                                                    <span className="font-black text-gray-400">{count} ocorrências</span>
-                                                </div>
-                                                <div className="w-full bg-gray-100 h-2 rounded-full">
-                                                    <div
-                                                        className="bg-red-400 h-2 rounded-full"
-                                                        style={{ width: `${((count as number) / leads.filter(l => l.status === 'NAO_APROVADO').length) * 100}%` }}
-                                                    ></div>
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </>
+                <PerformanceTab
+                    totalBudgets={totalBudgets}
+                    totalApproved={totalApproved}
+                    totalValue={totalValue}
+                    stats={stats}
+                    recentBudgets={recentBudgets}
+                    formatCurrency={formatCurrency}
+                    leads={leads}
+                />
             )}
 
             {activeTab === 'FINANCEIRO' && (
-                <div className="space-y-8">
-                    {/* Finance Filters */}
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-wrap gap-6 items-center justify-between">
-                        <div className="flex flex-wrap gap-4 items-center">
-                            <div className="flex flex-col">
-                                <label className="text-[10px] font-black text-gray-400 uppercase mb-1 ml-1 tracking-widest">Mês de Referência</label>
-                                <select
-                                    className="form-select rounded-xl border-gray-100 bg-gray-50 text-xs font-bold text-gray-700 min-w-[140px] focus:ring-blue-500 focus:border-blue-500 transition-all"
-                                    value={month}
-                                    onChange={e => setMonth(parseInt(e.target.value))}
-                                >
-                                    {['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'].map((m, i) => (
-                                        <option key={i} value={i + 1}>{m}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="flex flex-col">
-                                <label className="text-[10px] font-black text-gray-400 uppercase mb-1 ml-1 tracking-widest">Ano</label>
-                                <select
-                                    className="form-select rounded-xl border-gray-100 bg-gray-50 text-xs font-bold text-gray-700 min-w-[100px] focus:ring-blue-500 focus:border-blue-500 transition-all"
-                                    value={year}
-                                    onChange={e => setYear(parseInt(e.target.value))}
-                                >
-                                    {[2024, 2025, 2026].map(y => (
-                                        <option key={y} value={y}>{y}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="flex flex-col">
-                                <label className="text-[10px] font-black text-gray-400 uppercase mb-1 ml-1 tracking-widest">Filtrar por Vendedor</label>
-                                <select
-                                    className="form-select rounded-xl border-gray-100 bg-gray-50 text-xs font-bold text-gray-700 min-w-[180px] focus:ring-blue-500 focus:border-blue-500 transition-all"
-                                    value={selectedSalesperson}
-                                    onChange={e => setSelectedSalesperson(e.target.value)}
-                                >
-                                    <option value="Todos">Todos os Vendedores</option>
-                                    <option value="VENDAS 01">VENDAS 01</option>
-                                    <option value="VENDAS 02">VENDAS 02</option>
-                                    <option value="VENDAS 03">VENDAS 03</option>
-                                    <option value="VENDAS 04">VENDAS 04</option>
-                                    <option value="VENDAS 05">VENDAS 05</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div className="bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 hidden sm:block">
-                            <p className="text-[10px] font-black text-blue-400 uppercase tracking-tighter">Período Selecionado</p>
-                            <p className="text-xs font-black text-blue-600 uppercase">
-                                {['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][month - 1]} · {year}
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Finance Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group hover:border-blue-200 transition-all">
-                            <span className="material-icons-outlined absolute top-2 right-2 text-6xl text-blue-500 opacity-5 group-hover:opacity-10 transition-opacity">shopping_cart</span>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Vendas (Bruto)</p>
-                            <h3 className="text-2xl font-black text-blue-600 tracking-tighter">{formatCurrency(finStats.totalSales)}</h3>
-                            <p className="text-[10px] text-gray-400 mt-2 font-bold">{finStats.orderCount} Pedidos | TM: {formatCurrency(finStats.ticketMedio)}</p>
-                        </div>
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group hover:border-purple-200 transition-all">
-                            <span className="material-icons-outlined absolute top-2 right-2 text-6xl text-purple-500 opacity-5 group-hover:opacity-10 transition-opacity">payments</span>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Comissões</p>
-                            <h3 className="text-2xl font-black text-purple-600 tracking-tighter">{formatCurrency(finStats.totalCommissions)}</h3>
-                            <p className="text-[10px] text-gray-400 mt-2 font-bold whitespace-nowrap uppercase">Devido aos vendedores</p>
-                        </div>
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group hover:border-red-200 transition-all">
-                            <span className="material-icons-outlined absolute top-2 right-2 text-6xl text-red-500 opacity-5 group-hover:opacity-10 transition-opacity">money_off</span>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Despesas Fixas</p>
-                            <h3 className="text-2xl font-black text-red-600 tracking-tighter">{formatCurrency(finStats.totalFixedExpenses)}</h3>
-                            <p className="text-[10px] text-gray-400 mt-2 font-bold whitespace-nowrap uppercase">Gastos da Unidade</p>
-                        </div>
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group hover:border-green-200 transition-all">
-                            <span className="material-icons-outlined absolute top-2 right-2 text-6xl text-green-500 opacity-5 group-hover:opacity-10 transition-opacity">account_balance</span>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Resultado Líquido</p>
-                            <h3 className={`text-2xl font-black tracking-tighter ${finStats.totalNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(finStats.totalNet)}</h3>
-                            <p className="text-[10px] text-gray-400 mt-2 font-bold whitespace-nowrap uppercase italic">Estimado (Sem Impostos)</p>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        {/* Top Products */}
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-6 pb-2 border-b border-gray-50 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <span className="material-icons-outlined text-orange-500">emoji_events</span> Produtos Mais Vendidos
-                                </div>
-                                <span className="text-[9px] bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">Top 5</span>
-                            </h3>
-                            <div className="space-y-4">
-                                {finStats.topProducts.length === 0 ? (
-                                    <p className="text-gray-400 italic text-center text-xs py-4">Nenhum produto vendido no período.</p>
-                                ) : finStats.topProducts.map((p, i) => (
-                                    <div key={i} className="flex items-center justify-between group">
-                                        <div className="flex items-center gap-3">
-                                            <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black ${i === 0 ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-500'}`}>{i + 1}</span>
-                                            <p className="text-xs font-bold text-gray-700 uppercase group-hover:text-blue-600 transition-colors">{p.name}</p>
-                                        </div>
-                                        <span className="text-sm font-black text-gray-900">{formatCurrency(p.total)}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Status Breakdown */}
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-6 pb-2 border-b border-gray-50 flex items-center gap-2">
-                                <span className="material-icons-outlined text-blue-500">pie_chart</span> Volume por Status de Pedido
-                            </h3>
-                            <div className="space-y-4">
-                                {finStats.salesByStatus.length === 0 ? (
-                                    <p className="text-gray-400 italic text-center text-xs py-4">Sem movimentação no período.</p>
-                                ) : finStats.salesByStatus.map((s, i) => (
-                                    <div key={i}>
-                                        <div className="flex justify-between text-[10px] font-bold mb-1 uppercase text-gray-500 tracking-tighter">
-                                            <span>{s.status}</span>
-                                            <span className="text-gray-900">{formatCurrency(s.total)}</span>
-                                        </div>
-                                        <div className="w-full bg-gray-50 h-2 rounded-full overflow-hidden border border-gray-100">
-                                            <div className="bg-blue-500 h-full shadow-[0_0_10px_rgba(59,130,246,0.5)]" style={{ width: `${(s.total / (finStats.totalSales || 1)) * 100}%` }}></div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <FinanceiroTab
+                    finStats={finStats}
+                    month={month}
+                    year={year}
+                    selectedSalesperson={selectedSalesperson}
+                    setMonth={setMonth}
+                    setYear={setYear}
+                    setSelectedSalesperson={setSelectedSalesperson}
+                    formatCurrency={formatCurrency}
+                />
             )}
 
             {/* Modal Lead */}
@@ -1135,7 +991,10 @@ const ManagementPage: React.FC = () => {
                                                     <div
                                                         key={client.id}
                                                         className="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-50 last:border-0"
-                                                        onClick={() => selectClient(client)}
+                                                        onClick={() => {
+                                                            selectClient(client);
+                                                            setShowClientForm(true); // Always show fields when a client is selected to confirm
+                                                        }}
                                                     >
                                                         <div className="flex justify-between items-start">
                                                             <p className="font-bold text-gray-800 text-sm">{client.name}</p>
@@ -1151,45 +1010,101 @@ const ManagementPage: React.FC = () => {
                                             </div>
                                         )}
                                     </div>
+
+                                    {!showClientForm && (
+                                        <div className="mt-4 flex items-center gap-2">
+                                            <span className="text-xs text-blue-400 uppercase font-bold tracking-widest flex-1 border-t border-blue-200 mt-1"></span>
+                                            <button
+                                                onClick={() => setShowClientForm(true)}
+                                                className="px-4 py-2 bg-white text-blue-600 border border-blue-200 rounded-lg font-bold uppercase text-xs hover:bg-blue-100 transition-colors shadow-sm flex items-center gap-2 shrink-0"
+                                            >
+                                                <span className="material-icons-outlined text-[16px]">add_circle</span> Cadastrar Novo Cliente
+                                            </button>
+                                            <span className="text-xs text-blue-400 uppercase font-bold tracking-widest flex-1 border-t border-blue-200 mt-1"></span>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
-                            <div>
-                                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Nome do Cliente *</label>
-                                <input className="form-input w-full rounded-lg border-gray-300" placeholder="Nome do cliente ou empresa" value={newLead.client_name || ''} onChange={e => setNewLead({ ...newLead, client_name: e.target.value })} />
-                            </div>
+                            {(editingLead || showClientForm) && (
+                                <div className={`p-4 rounded-xl border-2 transition-all ${partnerSaved ? 'border-green-500 bg-green-50' : 'border-blue-100 bg-white shadow-sm'}`}>
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h4 className={`text-xs font-black uppercase tracking-widest ${partnerSaved ? 'text-green-600' : 'text-blue-600'}`}>
+                                            {partnerSaved ? '✓ Cliente Identificado/Salvo' : 'Dados do Cliente'}
+                                        </h4>
+                                        {partnerSaved && (
+                                            <span className="bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase animate-pulse">Salvo</span>
+                                        )}
+                                    </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Telefone / WhatsApp</label>
-                                    <input
-                                        className="form-input w-full rounded-lg border-gray-300"
-                                        placeholder="(00) 00000-0000"
-                                        value={newLead.client_phone || ''}
-                                        onChange={e => setNewLead({ ...newLead, client_phone: maskPhone(e.target.value) })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">CPF / CNPJ</label>
-                                    <input
-                                        className="form-input w-full rounded-lg border-gray-300"
-                                        placeholder="000.000.000-00"
-                                        value={newLead.client_doc || ''}
-                                        onChange={e => setNewLead({ ...newLead, client_doc: maskCpfCnpj(e.target.value) })}
-                                    />
-                                </div>
-                            </div>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Nome do Cliente / Empresa *</label>
+                                            <input
+                                                className={`form-input w-full rounded-lg border-gray-300 ${partnerSaved ? 'bg-gray-50' : ''}`}
+                                                placeholder="Nome do cliente ou empresa"
+                                                value={newLead.client_name || ''}
+                                                onChange={e => { setNewLead({ ...newLead, client_name: e.target.value }); setPartnerSaved(false); }}
+                                            />
+                                        </div>
 
-                            <div>
-                                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">E-mail</label>
-                                <input
-                                    type="email"
-                                    className="form-input w-full rounded-lg border-gray-300"
-                                    placeholder="cliente@exemplo.com"
-                                    value={newLead.client_email || ''}
-                                    onChange={e => setNewLead({ ...newLead, client_email: e.target.value })}
-                                />
-                            </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Telefone / WhatsApp</label>
+                                                <input
+                                                    className={`form-input w-full rounded-lg border-gray-300 ${partnerSaved ? 'bg-gray-50' : ''}`}
+                                                    placeholder="(00) 00000-0000"
+                                                    value={newLead.client_phone || ''}
+                                                    onChange={e => { setNewLead({ ...newLead, client_phone: maskPhone(e.target.value) }); setPartnerSaved(false); }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">CPF / CNPJ</label>
+                                                <input
+                                                    className={`form-input w-full rounded-lg border-gray-300 ${partnerSaved ? 'bg-gray-50' : ''}`}
+                                                    placeholder="000.000.000-00"
+                                                    value={newLead.client_doc || ''}
+                                                    onChange={e => { setNewLead({ ...newLead, client_doc: maskCpfCnpj(e.target.value) }); setPartnerSaved(false); }}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">E-mail</label>
+                                            <input
+                                                type="email"
+                                                className={`form-input w-full rounded-lg border-gray-300 ${partnerSaved ? 'bg-gray-50' : ''}`}
+                                                placeholder="cliente@exemplo.com"
+                                                value={newLead.client_email || ''}
+                                                onChange={e => { setNewLead({ ...newLead, client_email: e.target.value }); setPartnerSaved(false); }}
+                                            />
+                                        </div>
+
+                                        {!partnerSaved && (
+                                            <div className="pt-2">
+                                                <button
+                                                    onClick={handleSavePartner}
+                                                    disabled={isSavingPartner}
+                                                    className="w-full py-3 bg-blue-500 text-white rounded-xl font-bold uppercase text-xs hover:bg-blue-600 shadow-md flex items-center justify-center gap-2 transition-all active:scale-95"
+                                                >
+                                                    {isSavingPartner ? (
+                                                        <>
+                                                            <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                                                            Salvando...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span className="material-icons-outlined text-sm">save</span>
+                                                            Salvar Dados do Cliente
+                                                        </>
+                                                    )}
+                                                </button>
+                                                <p className="text-[10px] text-gray-400 mt-2 text-center">Isso confirmará o cadastro no banco de dados antes de criar o atendimento.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
                             <div>
                                 <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Descrição do Pedido / Interesse</label>
@@ -1197,41 +1112,36 @@ const ManagementPage: React.FC = () => {
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Vendedor Responsável</label>
-                                    <select className="form-select w-full rounded-lg border-gray-300" value={newLead.salesperson} onChange={e => setNewLead({ ...newLead, salesperson: e.target.value })}>
-                                        <option value="VENDAS 01">VENDAS 01</option>
-                                        <option value="VENDAS 02">VENDAS 02</option>
-                                        <option value="VENDAS 03">VENDAS 03</option>
-                                        <option value="VENDAS 04">VENDAS 04</option>
-                                        <option value="VENDAS 05">VENDAS 05</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Valor Estimado (R$)</label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        className="form-input w-full rounded-lg border-gray-300"
-                                        placeholder="0,00"
-                                        value={newLead.estimated_value || 0}
-                                        onChange={e => setNewLead({ ...newLead, estimated_value: parseFloat(e.target.value) })}
-                                    />
-                                </div>
-                                <div className="col-span-2">
-                                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Status do Funil</label>
-                                    <select className="form-select w-full rounded-lg border-gray-300" value={newLead.status} onChange={e => setNewLead({ ...newLead, status: e.target.value as any })}>
-                                        <option value="NOVO">NOVO ATENDIMENTO</option>
-                                        <option value="CRIANDO_ORCAMENTO">CRIANDO ORÇAMENTO</option>
-                                        <option value="ORCAMENTO_ENVIADO">ORÇAMENTO ENVIADO</option>
-                                        <option value="ACOMPANHAMENTO">ACOMPANHAMENTO</option>
-                                        <option value="PEDIDO_ABERTO">PEDIDO ABERTO</option>
-                                        <option value="NAO_APROVADO">ORÇAMENTO NÃO APROVADO</option>
-                                        <option value="ENTREGUE">PEDIDO ENTREGUE</option>
-                                        <option value="POS_VENDA">PÓS-VENDA</option>
-                                        <option value="FINALIZADO">PEDIDO FINALIZADO</option>
-                                    </select>
-                                </div>
+                                {editingLead && (
+                                    <>
+                                        <div className="col-span-2">
+                                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Vendedor Responsável</label>
+                                            <select
+                                                className={`form-select w-full rounded-lg border-gray-300 ${isSeller ? 'bg-gray-100' : ''}`}
+                                                value={newLead.salesperson}
+                                                onChange={e => setNewLead({ ...newLead, salesperson: e.target.value })}
+                                                disabled={isSeller}
+                                            >
+                                                <option value="VENDAS 01">VENDAS 01</option>
+                                                <option value="VENDAS 02">VENDAS 02</option>
+                                                <option value="VENDAS 03">VENDAS 03</option>
+                                                <option value="VENDAS 04">VENDAS 04</option>
+                                            </select>
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Status do Funil</label>
+                                            <select className="form-select w-full rounded-lg border-gray-300" value={newLead.status} onChange={e => setNewLead({ ...newLead, status: e.target.value as any })}>
+                                                <option value="NOVO">ABERTOS</option>
+                                                <option value="CRIANDO_ORCAMENTO">EM COTAÇÃO</option>
+                                                <option value="ORCAMENTO_ENVIADO">PENDENTE</option>
+                                                <option value="ACOMPANHAMENTO">FOLLOW-UP</option>
+                                                <option value="PEDIDO_ABERTO">GANHO</option>
+                                                <option value="ENTREGUE">ENTREGUE</option>
+                                                <option value="POS_VENDA">PÓS-VENDA</option>
+                                            </select>
+                                        </div>
+                                    </>
+                                )}
                                 <div className="col-span-2">
                                     <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Prioridade</label>
                                     <div className="flex gap-4">
@@ -1258,10 +1168,16 @@ const ManagementPage: React.FC = () => {
                             </div>
                         </div>
                         <div className="px-6 py-4 bg-gray-50 flex justify-between items-center">
-                            {editingLead ? <button onClick={() => deleteLead(editingLead.id)} className="text-red-500 font-bold uppercase text-xs hover:underline">Excluir</button> : <div></div>}
+                            <div></div>
                             <div className="flex gap-2">
                                 <button onClick={() => setIsLeadModalOpen(false)} className="px-4 py-2 bg-white border border-gray-300 rounded-lg font-bold uppercase text-xs text-gray-600 hover:bg-gray-50">Cancelar</button>
-                                <button onClick={saveLead} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold uppercase text-xs hover:bg-blue-700 shadow-lg shadow-blue-200">Salvar</button>
+                                <button
+                                    onClick={saveLead}
+                                    disabled={!partnerSaved}
+                                    className={`px-6 py-2 rounded-lg font-bold uppercase text-xs shadow-lg transition-all ${partnerSaved ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200' : 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none'}`}
+                                >
+                                    Salvar Atendimento
+                                </button>
                             </div>
                         </div>
                     </div>

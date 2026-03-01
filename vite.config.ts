@@ -56,7 +56,7 @@ export default defineConfig(({ mode }) => {
   return {
     base: './', // Use caminhos relativos para garantir compatibilidade em qualquer subdiretório
     server: {
-      port: 3000,
+      port: 3005,
       host: '0.0.0.0',
     },
     plugins: [react(), proxyPlugin()],

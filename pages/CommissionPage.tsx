@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { formatMonthYear } from '../src/utils/dateUtils';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 const formatCurrency = (value: number) => {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -13,6 +14,7 @@ const CommissionPage: React.FC = () => {
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchCommissions();
@@ -57,7 +59,7 @@ const CommissionPage: React.FC = () => {
 
   const totalCommissions = commissions.reduce((acc, curr) => acc + (curr.amount || 0), 0);
 
-  const sellers = ['VENDAS 01', 'VENDAS 02', 'VENDAS 03', 'VENDAS 04', 'VENDAS 05'];
+  const sellers = ['VENDAS 01', 'VENDAS 02', 'VENDAS 03', 'VENDAS 04'];
   const sellerStats = sellers.map(seller => ({
     name: seller,
     total: commissions.filter(c => c.salesperson === seller).reduce((acc, curr) => acc + (curr.amount || 0), 0),
@@ -316,7 +318,10 @@ const CommissionPage: React.FC = () => {
                 filteredCommissions.map((comm) => (
                   <tr key={comm.id} className="hover:bg-gray-50 transition-colors group">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{comm.salesperson}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-bold">
+                    <td
+                      className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-bold cursor-pointer hover:underline"
+                      onClick={() => comm.order_id ? navigate(`/pedido/${comm.order_id}`) : null}
+                    >
                       #{comm.orders?.order_number || 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

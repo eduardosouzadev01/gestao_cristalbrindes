@@ -16,9 +16,12 @@ export const useOrderItems = (initialItems: any[] = []) => {
         layoutCost: 0,
         fator: 1.35,
         bvPct: 0,
+        extraPct: 0,
         taxPct: 0,
         unforeseenPct: 0,
         marginPct: 0,
+        supplier_transport_supplier_id: '',
+        client_transport_supplier_id: '',
         realPriceUnit: 0,
         realCustoPersonalizacao: 0,
         realTranspFornecedor: 0,
@@ -31,7 +34,12 @@ export const useOrderItems = (initialItems: any[] = []) => {
         transpClientePaid: false,
         despesaExtraPaid: false,
         layoutCostPaid: false,
-        isApproved: false
+        isApproved: false,
+        supplier_payment_date: null,
+        customization_payment_date: null,
+        transport_payment_date: null,
+        layout_payment_date: null,
+        extra_payment_date: null
     }]);
 
     const addItem = () => {
@@ -48,9 +56,12 @@ export const useOrderItems = (initialItems: any[] = []) => {
             layoutCost: 0,
             fator: 1.35,
             bvPct: 0,
+            extraPct: 0,
             taxPct: 0,
             unforeseenPct: 0,
             marginPct: 0,
+            supplier_transport_supplier_id: '',
+            client_transport_supplier_id: '',
             realPriceUnit: 0,
             realCustoPersonalizacao: 0,
             realTranspFornecedor: 0,
@@ -63,7 +74,12 @@ export const useOrderItems = (initialItems: any[] = []) => {
             transpClientePaid: false,
             despesaExtraPaid: false,
             layoutCostPaid: false,
-            isApproved: false
+            isApproved: false,
+            supplier_payment_date: null,
+            customization_payment_date: null,
+            transport_payment_date: null,
+            layout_payment_date: null,
+            extra_payment_date: null
         }]);
     };
 

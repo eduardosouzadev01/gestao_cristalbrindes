@@ -66,16 +66,89 @@ const NotificationCenter: React.FC = () => {
             .limit(10);
 
         if (data) {
-            setNotifications(data);
-            setUnreadCount(data.filter(n => !n.read).length);
+            // Combine with payment alerts
+            const alerts = await fetchPaymentAlerts();
+            const combined = [...alerts, ...data];
+            setNotifications(combined);
+            setUnreadCount(combined.filter(n => !n.read).length);
+        }
+    };
+
+    const fetchPaymentAlerts = async (): Promise<Notification[]> => {
+        try {
+            const today = new Date();
+            const threeDaysFromNow = new Date();
+            threeDaysFromNow.setDate(today.getDate() + 3);
+            const todayStr = today.toISOString().split('T')[0];
+            const thresholdStr = threeDaysFromNow.toISOString().split('T')[0];
+
+            const { data: orders } = await supabase
+                .from('orders')
+                .select('id, order_number, entry_amount, entry_date, entry_confirmed, remaining_amount, remaining_date, remaining_confirmed, payment_due_date, order_date, partners!orders_client_id_fkey(name)')
+                .or('entry_confirmed.eq.false,remaining_confirmed.eq.false');
+
+            if (!orders) return [];
+
+            const alerts: Notification[] = [];
+            const readAlertIds = JSON.parse(localStorage.getItem('cristal_read_alerts') || '[]');
+
+            orders.forEach((o: any) => {
+                // Entry about to expire or overdue
+                if (!o.entry_confirmed && o.entry_amount > 0) {
+                    const dueDate = o.entry_date || o.order_date;
+                    if (dueDate && dueDate <= thresholdStr) {
+                        const isOverdue = dueDate < todayStr;
+                        const alertId = `payment-alert-entry-${o.id}`;
+                        alerts.push({
+                            id: alertId,
+                            title: isOverdue ? `⚠️ Entrada VENCIDA - #${o.order_number}` : `💰 Entrada próxima do vencimento - #${o.order_number}`,
+                            message: `${o.partners?.name || 'Cliente'} — R$ ${o.entry_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ${isOverdue ? 'venceu em' : 'vence em'} ${new Date(dueDate + 'T12:00:00').toLocaleDateString('pt-BR')}`,
+                            type: isOverdue ? 'danger' : 'warning',
+                            read: readAlertIds.includes(alertId),
+                            link: `/pedido/${o.id}?mode=view`,
+                            created_at: new Date().toISOString()
+                        });
+                    }
+                }
+                // Remaining about to expire or overdue
+                if (!o.remaining_confirmed && o.remaining_amount > 0) {
+                    const dueDate = o.remaining_date || o.payment_due_date || o.order_date;
+                    if (dueDate && dueDate <= thresholdStr) {
+                        const isOverdue = dueDate < todayStr;
+                        const alertId = `payment-alert-remaining-${o.id}`;
+                        alerts.push({
+                            id: alertId,
+                            title: isOverdue ? `⚠️ Restante VENCIDO - #${o.order_number}` : `💰 Restante próximo do vencimento - #${o.order_number}`,
+                            message: `${o.partners?.name || 'Cliente'} — R$ ${o.remaining_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ${isOverdue ? 'venceu em' : 'vence em'} ${new Date(dueDate + 'T12:00:00').toLocaleDateString('pt-BR')}`,
+                            type: isOverdue ? 'danger' : 'warning',
+                            read: readAlertIds.includes(alertId),
+                            link: `/pedido/${o.id}?mode=view`,
+                            created_at: new Date().toISOString()
+                        });
+                    }
+                }
+            });
+
+            return alerts;
+        } catch {
+            return [];
         }
     };
 
     const markAsRead = async (id: string) => {
-        await supabase
-            .from('notifications')
-            .update({ read: true })
-            .eq('id', id);
+        // Local payment alerts
+        if (id.startsWith('payment-alert-')) {
+            const readAlerts = JSON.parse(localStorage.getItem('cristal_read_alerts') || '[]');
+            if (!readAlerts.includes(id)) {
+                readAlerts.push(id);
+                localStorage.setItem('cristal_read_alerts', JSON.stringify(readAlerts));
+            }
+        } else {
+            await supabase
+                .from('notifications')
+                .update({ read: true })
+                .eq('id', id);
+        }
 
         setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n));
         setUnreadCount(prev => Math.max(0, prev - 1));
@@ -87,6 +160,13 @@ const NotificationCenter: React.FC = () => {
             .update({ read: true })
             .eq('user_email', appUser?.email)
             .eq('read', false);
+
+        // Mark all payment alerts as read
+        const alertIds = notifications.filter(n => n.id.startsWith('payment-alert-') && !n.read).map(n => n.id);
+        if (alertIds.length > 0) {
+            const existing = JSON.parse(localStorage.getItem('cristal_read_alerts') || '[]');
+            localStorage.setItem('cristal_read_alerts', JSON.stringify([...existing, ...alertIds]));
+        }
 
         setNotifications(notifications.map(n => ({ ...n, read: true })));
         setUnreadCount(0);
