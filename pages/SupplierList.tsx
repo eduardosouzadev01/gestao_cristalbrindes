@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 
 const SupplierList: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'PRODUTOS' | 'GRAVACOES' | 'TRANSPORTADORES'>('PRODUTOS');
+  const [activeTab, setActiveTab] = useState<'PRODUTOS' | 'PERSONALIZACAO' | 'TRANSPORTADORES'>('PRODUTOS');
   const [partners, setPartners] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -33,10 +33,10 @@ const SupplierList: React.FC = () => {
       if (error) throw error;
       if (data) {
         setPartners(data.map(p => {
-          // Determine category implicitly if not exists: 'PRODUTOS', 'GRAVACOES', 'TRANSPORTADORES'
+          // Determine category implicitly if not exists: 'PRODUTOS', 'PERSONALIZACAO', 'TRANSPORTADORES'
           let cat = p.supplier_category || 'PRODUTOS';
           if (p.name.toLowerCase().includes('transp')) cat = 'TRANSPORTADORES';
-          if (p.name.toLowerCase().includes('grav')) cat = 'GRAVACOES';
+          if (p.name.toLowerCase().includes('grav') || cat === 'GRAVACOES' || cat === 'PERSONALIZACAO') cat = 'PERSONALIZACAO';
           return {
             ...p,
             supplier_category: cat,
@@ -84,10 +84,10 @@ const SupplierList: React.FC = () => {
               Produtos <span className={`py-0.5 px-2.5 rounded-full text-xs ${activeTab === 'PRODUTOS' ? 'bg-emerald-100 text-emerald-500' : 'bg-gray-100 text-gray-500'}`}>{partners.filter(p => p.supplier_category === 'PRODUTOS').length}</span>
             </button>
             <button
-              onClick={() => setActiveTab('GRAVACOES')}
-              className={`${activeTab === 'GRAVACOES' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-gray-500'} border-b-2 font-bold text-sm flex items-center gap-2 pb-2 transition-all`}
+              onClick={() => setActiveTab('PERSONALIZACAO')}
+              className={`${activeTab === 'PERSONALIZACAO' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-gray-500'} border-b-2 font-bold text-sm flex items-center gap-2 pb-2 transition-all`}
             >
-              Gravações <span className={`py-0.5 px-2.5 rounded-full text-xs ${activeTab === 'GRAVACOES' ? 'bg-emerald-100 text-emerald-500' : 'bg-gray-100 text-gray-500'}`}>{partners.filter(p => p.supplier_category === 'GRAVACOES').length}</span>
+              Personalização <span className={`py-0.5 px-2.5 rounded-full text-xs ${activeTab === 'PERSONALIZACAO' ? 'bg-emerald-100 text-emerald-500' : 'bg-gray-100 text-gray-500'}`}>{partners.filter(p => p.supplier_category === 'PERSONALIZACAO').length}</span>
             </button>
             <button
               onClick={() => setActiveTab('TRANSPORTADORES')}

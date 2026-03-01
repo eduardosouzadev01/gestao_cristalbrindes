@@ -68,15 +68,32 @@ const CustomSelect: React.FC<{
                         <input autoFocus className="w-full text-sm border-0 focus:ring-0 p-1" placeholder="Pesquisar..." value={search} onChange={e => setSearch(e.target.value)} />
                     </div>
                     <div className="max-h-48 overflow-y-auto">
-                        {filtered.map(opt => (
-                            <div key={opt.id} className="px-4 py-2 text-sm hover:bg-blue-50 cursor-pointer flex justify-between group" onClick={() => { onSelect(opt); setSearch(opt.name); setIsOpen(false); }}>
-                                <span>{opt.name}</span>
-                                {opt.code && <span className="text-gray-400 text-xs font-mono group-hover:text-blue-500">{opt.code}</span>}
-                            </div>
-                        ))}
+                        {(() => {
+                            const hasCategories = filtered.some(o => o.supplier_category);
+                            if (hasCategories && filtered.length > 0) {
+                                const categories = Array.from(new Set(filtered.map(o => o.supplier_category).filter(Boolean)));
+                                return categories.map(cat => (
+                                    <div key={cat as string}>
+                                        <div className="px-4 py-1.5 text-[10px] font-bold text-blue-600 bg-blue-50 uppercase tracking-widest border-y border-blue-100">{cat === 'GRAVACOES' ? 'PERSONALIZAÇÃO' : (cat as string)}</div>
+                                        {filtered.filter(o => o.supplier_category === cat).map(opt => (
+                                            <div key={opt.id} className="px-4 py-2 text-sm hover:bg-blue-50 cursor-pointer flex justify-between group" onClick={() => { onSelect(opt); setSearch(opt.name); setIsOpen(false); }}>
+                                                <span className="text-gray-700">{opt.name}</span>
+                                                {opt.code && <span className="text-gray-400 text-xs font-mono group-hover:text-blue-500">{opt.code}</span>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ));
+                            }
+                            return filtered.map(opt => (
+                                <div key={opt.id} className="px-4 py-2 text-sm hover:bg-blue-50 cursor-pointer flex justify-between group" onClick={() => { onSelect(opt); setSearch(opt.name); setIsOpen(false); }}>
+                                    <span className="text-gray-700">{opt.name}</span>
+                                    {opt.code && <span className="text-gray-400 text-xs font-mono group-hover:text-blue-500">{opt.code}</span>}
+                                </div>
+                            ));
+                        })()}
                         {filtered.length === 0 && (
                             <div className="px-4 py-2 text-xs text-gray-400 italic">
-                                {label === 'Fornecedor' || label === 'Fornecedor *' ? 'Nenhum fornecedor encontrado.' : 'Nenhum item encontrado.'}
+                                {label.includes('Fornecedor') ? 'Nenhum fornecedor encontrado.' : 'Nenhum item encontrado.'}
                             </div>
                         )}
                         <div className="px-4 py-2 text-sm text-blue-600 font-bold hover:bg-blue-50 cursor-pointer border-t" onClick={() => { onAdd(); setIsOpen(false); }}>+ CADASTRAR NOVO</div>

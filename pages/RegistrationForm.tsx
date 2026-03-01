@@ -88,7 +88,11 @@ const RegistrationForm: React.FC = () => {
     onSuccess: (message) => {
       toast.success(message);
       queryClient.invalidateQueries({ queryKey: ['partners'] }); // Limpa o cache das tabelas
-      navigate('/cadastros');
+      if (partnerType === 'FORNECEDOR') {
+        navigate('/fornecedores');
+      } else {
+        navigate('/clientes');
+      }
     },
     onError: (error: any) => {
       console.error('Erro ao salvar:', error);
@@ -143,7 +147,7 @@ const RegistrationForm: React.FC = () => {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div className="mb-10 flex items-center">
         <button
-          onClick={() => activeStep === 'FORM' ? setActiveStep('TYPE') : navigate('/cadastros')}
+          onClick={() => activeStep === 'FORM' ? setActiveStep('TYPE') : navigate(partnerType === 'FORNECEDOR' ? '/fornecedores' : '/clientes')}
           className="mr-4 p-2 rounded-full bg-white shadow-sm hover:bg-gray-50 border border-gray-200 text-gray-500 transition-colors"
         >
           <span className="material-icons-outlined text-xl">arrow_back</span>

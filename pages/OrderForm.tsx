@@ -34,13 +34,18 @@ const CustomSelect: React.FC<{
   onSelect: (opt: any) => void;
   onAdd: () => void;
   placeholder?: string;
+  value?: string;
   error?: boolean;
   disabled?: boolean;
   onSearch?: (term: string) => void;
-}> = ({ label, options = [], onSelect, onAdd, placeholder, error, disabled, onSearch }) => {
+}> = ({ label, options = [], onSelect, onAdd, placeholder, value, error, disabled, onSearch }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(value || '');
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setSearch(value || '');
+  }, [value]);
 
   useEffect(() => {
     if (onSearch && isOpen) {
@@ -73,7 +78,7 @@ const CustomSelect: React.FC<{
         onClick={() => !disabled && setIsOpen(!isOpen)}
         className={`form-input w-full rounded-lg flex justify-between items-center cursor-pointer bg-white py-2 ${error ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300'} ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
       >
-        <span className={search ? "text-gray-900" : "text-gray-400"}>{search || placeholder || "Selecione..."}</span>
+        <span className={(search || value) ? "text-gray-900" : "text-gray-400"}>{search || value || placeholder || "Selecione..."}</span>
         <span className="material-icons-outlined text-gray-400">expand_more</span>
       </div>
 
@@ -89,18 +94,31 @@ const CustomSelect: React.FC<{
             />
           </div>
           <div className="max-h-48 overflow-y-auto">
-            {filtered.map(opt => (
-              <div
-                key={opt.id}
-                className="px-4 py-2 text-sm hover:bg-blue-50 cursor-pointer text-gray-700 flex justify-between group"
-                onClick={() => { onSelect(opt); setSearch(opt.name); setIsOpen(false); }}
-              >
-                <span>{opt.name}</span>
-                {opt.code && <span className="text-gray-400 text-xs font-mono group-hover:text-blue-500">{opt.code}</span>}
-              </div>
-            ))}
+            {(() => {
+              const hasCategories = filtered.some(o => o.supplier_category);
+              if (hasCategories && filtered.length > 0) {
+                const categories = Array.from(new Set(filtered.map(o => o.supplier_category).filter(Boolean)));
+                return categories.map(cat => (
+                  <div key={cat as string}>
+                    <div className="px-4 py-1.5 text-[10px] font-bold text-blue-600 bg-blue-50 uppercase tracking-widest border-y border-blue-100">{cat === 'GRAVACOES' ? 'PERSONALIZAÇÃO' : (cat as string)}</div>
+                    {filtered.filter(o => o.supplier_category === cat).map(opt => (
+                      <div key={opt.id} className="px-4 py-2 text-sm hover:bg-blue-50 cursor-pointer text-gray-700 flex justify-between group" onClick={() => { onSelect(opt); setSearch(opt.name); setIsOpen(false); }}>
+                        <span>{opt.name}</span>
+                        {opt.code && <span className="text-gray-400 text-xs font-mono group-hover:text-blue-500">{opt.code}</span>}
+                      </div>
+                    ))}
+                  </div>
+                ));
+              }
+              return filtered.map(opt => (
+                <div key={opt.id} className="px-4 py-2 text-sm hover:bg-blue-50 cursor-pointer text-gray-700 flex justify-between group" onClick={() => { onSelect(opt); setSearch(opt.name); setIsOpen(false); }}>
+                  <span>{opt.name}</span>
+                  {opt.code && <span className="text-gray-400 text-xs font-mono group-hover:text-blue-500">{opt.code}</span>}
+                </div>
+              ));
+            })()}
             {filtered.length === 0 && (
-              <div className="px-4 py-2 text-xs text-gray-400 italic">Nenhum produto encontrado.</div>
+              <div className="px-4 py-2 text-xs text-gray-400 italic">{label.includes('Fornecedor') ? 'Nenhum fornecedor encontrado.' : 'Nenhum item encontrado.'}</div>
             )}
             <div
               className="px-4 py-2 text-sm text-blue-600 font-bold hover:bg-blue-50 cursor-pointer border-t border-gray-100 flex items-center gap-2"
@@ -135,14 +153,19 @@ const OrderForm: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
-  const isReadOnly = new URLSearchParams(location.search).get('mode') === 'view';
+  const isReadOnlyParam = new URLSearchParams(location.search).get('mode') === 'view';
   const isNewOrder = !id || id === 'novo';
+
+  // States
+  const [status, setStatus] = useState('AGUARDANDO PAGAMENTO ENTRADA');
+
+  const isReadOnly = isReadOnlyParam || status === 'CANCELADO';
   const canEditPayment = !isReadOnly || appUser?.email === 'cristalbrindes@cristalbrindes.com.br' || appUser?.email === 'cristalbrindes@cristalbrindes';
 
   // Constants
   const statusOptions = [
     'AGUARDANDO PAGAMENTO ENTRADA', 'EM PRODUÇÃO', 'EM TRANSPORTE', 'EM CONFERÊNCIA',
-    'AGUARDANDO PAGAMENTO 2 PARCELA', 'ENTREGUE', 'AGUARDANDO PAGAMENTO FATURAMENTO', 'FINALIZADO'
+    'AGUARDANDO PAGAMENTO 2 PARCELA', 'ENTREGUE', 'AGUARDANDO PAGAMENTO FATURAMENTO', 'FINALIZADO', 'CANCELADO'
   ];
 
   // States
@@ -165,7 +188,6 @@ const OrderForm: React.FC = () => {
   // Form State
   const [orderNumber, setOrderNumber] = useState('');
   const [vendedor, setVendedor] = useState('');
-  const [status, setStatus] = useState('AGUARDANDO PAGAMENTO ENTRADA');
   const [dataOrcamento, setDataOrcamento] = useState(getTodayISO());
   const [dataPedido, setDataPedido] = useState(getTodayISO());
   const [dataLimite, setDataLimite] = useState('');
@@ -534,22 +556,25 @@ const OrderForm: React.FC = () => {
         order_number: orderNumber,
         salesperson: vendedor,
         status: status,
-        budget_date: dataOrcamento,
-        order_date: dataPedido,
+        budget_date: dataOrcamento || null,
+        order_date: dataPedido || null,
         client_id: clientData.id,
         issuer: emitente,
         billing_type: modalidade,
         payment_method: opcaoPagamento,
-        payment_due_date: dataLimite,
-        supplier_departure_date: supplierDepartureDate,
-        invoice_number: null,
+        payment_due_date: dataLimite || null,
+        supplier_departure_date: supplierDepartureDate || null,
+        invoice_number: invoiceNumber || null,
         total_amount: totalPedido,
         entry_amount: parseCurrencyToNumber(recebimentoEntrada),
         entry_date: type === 'entrada' ? date : (dataEntrada || null),
         entry_confirmed: payloadEntryConfirmed,
         remaining_amount: parseCurrencyToNumber(recebimentoRestante),
         remaining_date: type === 'restante' ? date : (dataRestante || null),
-        remaining_confirmed: payloadRemainingConfirmed
+        remaining_confirmed: payloadRemainingConfirmed,
+        purchase_order: purchaseOrder || null,
+        layout_info: layout || null,
+        observations: observacoes || null
       };
 
       const itemsPayload = items.map(item => ({
@@ -565,6 +590,7 @@ const OrderForm: React.FC = () => {
         calculation_factor: item.fator,
 
         bv_pct: item.bvPct,
+        extra_pct: item.extraPct,
         total_item_value: calculateItemTotal(item),
 
         tax_pct: item.taxPct,
@@ -587,7 +613,12 @@ const OrderForm: React.FC = () => {
         customization_payment_date: item.customization_payment_date || null,
         transport_payment_date: item.transport_payment_date || null,
         layout_payment_date: item.layout_payment_date || null,
-        extra_payment_date: item.extra_payment_date || null
+        extra_payment_date: item.extra_payment_date || null,
+        customization_supplier_id: item.customization_supplier_id || null,
+        transport_supplier_id: item.transport_supplier_id || null,
+        client_transport_supplier_id: item.client_transport_supplier_id || null,
+        layout_supplier_id: item.layout_supplier_id || null,
+        extra_supplier_id: item.extra_supplier_id || null
       }));
 
       const { error } = await supabase.rpc('save_order', {
@@ -696,21 +727,25 @@ const OrderForm: React.FC = () => {
       order_number: orderNumber,
       salesperson: vendedor,
       status: status,
-      budget_date: dataOrcamento,
-      order_date: dataPedido,
+      budget_date: dataOrcamento || null,
+      order_date: dataPedido || null,
       client_id: clientData.id,
       issuer: emitente,
       billing_type: modalidade,
       payment_method: opcaoPagamento,
-      payment_due_date: dataLimite,
-      invoice_number: null,
+      payment_due_date: dataLimite || null,
+      invoice_number: invoiceNumber || null,
       total_amount: totalPedido,
       entry_amount: parseCurrencyToNumber(recebimentoEntrada),
       entry_date: dataEntrada || null,
       entry_confirmed: entradaConfirmed,
       remaining_amount: parseCurrencyToNumber(recebimentoRestante),
       remaining_date: dataRestante || null,
-      remaining_confirmed: restanteConfirmed
+      remaining_confirmed: restanteConfirmed,
+      purchase_order: purchaseOrder || null,
+      layout_info: layout || null,
+      observations: observacoes || null,
+      supplier_departure_date: supplierDepartureDate || null
     };
 
     try {
@@ -1071,11 +1106,27 @@ const OrderForm: React.FC = () => {
             {isReadOnly ? 'VISUALIZAR PEDIDO' : 'ABERTURA DE PEDIDO'}
           </h2>
         </div>
-        {!isReadOnly && (
-          <button onClick={validate} disabled={isSaving} className="ml-3 px-6 py-3 rounded-lg shadow-sm text-sm font-bold text-white bg-blue-500 hover:bg-blue-600 transition-all active:scale-95 uppercase disabled:opacity-50 disabled:cursor-not-allowed">
-            {isSaving ? 'SALVANDO...' : (!!location.state?.fromBudget ? 'CRIAR PEDIDO' : 'FINALIZAR ABERTURA')}
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {!isReadOnly && !isNewOrder && (
+            <button
+              onClick={async () => {
+                if (window.confirm('TEM CERTEZA QUE DESEJA CANCELAR ESTE PEDIDO? Esta ação desabilitará edições e removerá os valores do financeiro.')) {
+                  setStatus('CANCELADO');
+                  await supabase.from('orders').update({ status: 'CANCELADO' }).eq('id', id);
+                  toast.success('Pedido Cancelado com Sucesso');
+                }
+              }}
+              className="px-4 py-3 rounded-lg border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 text-sm font-bold transition-all uppercase"
+            >
+              Cancelar Pedido
+            </button>
+          )}
+          {!isReadOnly && (
+            <button onClick={validate} disabled={isSaving} className="px-6 py-3 rounded-lg shadow-sm text-sm font-bold text-white bg-blue-500 hover:bg-blue-600 transition-all active:scale-95 uppercase disabled:opacity-50 disabled:cursor-not-allowed">
+              {isSaving ? 'SALVANDO...' : (!!location.state?.fromBudget ? 'CRIAR PEDIDO' : 'FINALIZAR ABERTURA')}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Status Stepper */}
@@ -1084,7 +1135,7 @@ const OrderForm: React.FC = () => {
           <div className="flex items-center justify-between min-w-[800px]">
             {(() => {
               const stepperConfig = [
-                { label: 'AGUARDANDO PAGAMENTO ENTRADA', icon: 'payments', short: 'Pag. Entrada' },
+                { label: 'AGUARDANDO PAGAMENTO ENTRADA', icon: 'payments', short: '1ª Parcela' },
                 { label: 'EM PRODUÇÃO', icon: 'precision_manufacturing', short: 'Produção' },
                 { label: 'EM TRANSPORTE', icon: 'local_shipping', short: 'Transporte' },
                 { label: 'EM CONFERÊNCIA', icon: 'fact_check', short: 'Conferência' },
@@ -1411,11 +1462,11 @@ const OrderForm: React.FC = () => {
 
                 {['custoPersonalizacao', 'layoutCost', 'transpFornecedor', 'transpCliente', 'despesaExtra'].map(f => {
                   const labelMap: any = {
-                    custoPersonalizacao: 'Custo Personalização',
+                    custoPersonalizacao: '1ª Parcela Personalização',
                     transpFornecedor: 'Transp Fornecedor',
                     transpCliente: 'Transp Cliente',
                     despesaExtra: 'Despesa Extra',
-                    layoutCost: 'Custo Layout'
+                    layoutCost: '1ª Parcela Layout'
                   };
                   const realFieldMap: any = {
                     custoPersonalizacao: 'realCustoPersonalizacao',
