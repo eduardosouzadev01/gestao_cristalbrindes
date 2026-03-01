@@ -10,13 +10,25 @@ const ClientList: React.FC = () => {
   const { hasPermission } = useAuth();
 
   useEffect(() => {
-    fetchPartners();
-  }, []);
+    const handler = setTimeout(() => {
+      fetchPartners(searchTerm);
+    }, 400);
 
-  const fetchPartners = async () => {
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  const fetchPartners = async (search?: string) => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.from('partners').select('*').eq('type', 'CLIENTE').order('name');
+      let query = supabase.from('partners').select('*').eq('type', 'CLIENTE');
+
+      if (search && search.trim()) {
+        const s = search.trim();
+        query = query.or(`name.ilike.%${s}%,doc.ilike.%${s}%,phone.ilike.%${s}%,email.ilike.%${s}%,salesperson.ilike.%${s}%`);
+      }
+
+      const { data, error } = await query.order('name').limit(1000);
+
       if (error) throw error;
       if (data) {
         setPartners(data.map(p => ({
@@ -33,26 +45,7 @@ const ClientList: React.FC = () => {
     }
   };
 
-  const filteredPartners = React.useMemo(() => {
-    const s = searchTerm.toLowerCase().trim();
-    if (!s) return partners;
-
-    return partners.filter(p => {
-      const name = (p.name || '').toLowerCase();
-      const doc = (p.doc || '').toLowerCase();
-      const phone = (p.phone || '').toLowerCase();
-      const email = (p.email || '').toLowerCase();
-      const salesperson = (p.salesperson || '').toLowerCase();
-
-      return name.includes(s) ||
-        doc.includes(s) ||
-        phone.includes(s) ||
-        email.includes(s) ||
-        salesperson.includes(s);
-    });
-  }, [partners, searchTerm]);
-
-  const currentData = filteredPartners;
+  const currentData = partners;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

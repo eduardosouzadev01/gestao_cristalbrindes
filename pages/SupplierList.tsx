@@ -7,21 +7,33 @@ const SupplierList: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'PRODUTOS' | 'GRAVACOES' | 'TRANSPORTADORES'>('PRODUTOS');
   const [partners, setPartners] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
   const { hasPermission } = useAuth();
 
   useEffect(() => {
-    fetchPartners();
-  }, []);
+    const handler = setTimeout(() => {
+      fetchPartners(searchTerm);
+    }, 400);
 
-  const fetchPartners = async () => {
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  const fetchPartners = async (search?: string) => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.from('partners').select('*').eq('type', 'FORNECEDOR').order('name');
+      let query = supabase.from('partners').select('*').eq('type', 'FORNECEDOR');
+
+      if (search && search.trim()) {
+        const s = search.trim();
+        query = query.or(`name.ilike.%${s}%,doc.ilike.%${s}%,phone.ilike.%${s}%,email.ilike.%${s}%`);
+      }
+
+      const { data, error } = await query.order('name').limit(1000);
+
       if (error) throw error;
       if (data) {
         setPartners(data.map(p => {
           // Determine category implicitly if not exists: 'PRODUTOS', 'GRAVACOES', 'TRANSPORTADORES'
-          // For now, if no supplier_category, fallback to PRODUTOS to not break
           let cat = p.supplier_category || 'PRODUTOS';
           if (p.name.toLowerCase().includes('transp')) cat = 'TRANSPORTADORES';
           if (p.name.toLowerCase().includes('grav')) cat = 'GRAVACOES';
@@ -86,7 +98,13 @@ const SupplierList: React.FC = () => {
           </nav>
           <div className="relative max-w-xs w-full">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 material-icons-outlined text-gray-400 text-sm">filter_list</span>
-            <input type="text" placeholder="Filtrar por nome, CNPJ..." className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            <input
+              type="text"
+              placeholder="Filtrar por nome, CNPJ..."
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-emerald-500 focus:border-emerald-500"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
         </div>
 
