@@ -375,7 +375,20 @@ const OrderForm: React.FC = () => {
       const { data: products, error: errProd } = await supabase.from('products').select('*').limit(50);
       if (!errProd && products) setProductsList(products);
       const { data: factors } = await supabase.from('calculation_factors').select('*');
-      if (factors) setFactorsList(factors);
+      if (factors) {
+        const factorOrder = ["ideal", "médio", "médio", "mínimo", "minimo", "7/15", "21/30"];
+        const sorted = [...factors].sort((a, b) => {
+          const nameA = a.name.toLowerCase();
+          const nameB = b.name.toLowerCase();
+          const indexA = factorOrder.findIndex(o => nameA.includes(o));
+          const indexB = factorOrder.findIndex(o => nameB.includes(o));
+          if (indexA === -1 && indexB === -1) return nameA.localeCompare(nameB);
+          if (indexA === -1) return 1;
+          if (indexB === -1) return -1;
+          return indexA - indexB;
+        });
+        setFactorsList(sorted);
+      }
     } catch (err) {
       console.error('Erro ao buscar dados:', err);
     }

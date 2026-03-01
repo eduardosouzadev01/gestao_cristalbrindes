@@ -262,7 +262,30 @@ const BudgetForm: React.FC = () => {
 
         // Assegurar que os nomes baseados em fontes de integração sejam case insensitive ao mapear list
         setSuppliersList(suppliers);
-        setFactors(f || []);
+        // Organizar fatores conforme solicitado: Ideal, Médio, Mínimo, Prazos
+        let sortedFactors = f || [];
+        const factorOrder = ["ideal", "médio", "médio", "mínimo", "minimo", "7/15", "21/30"];
+        sortedFactors.sort((a, b) => {
+            const nameA = a.name.toLowerCase();
+            const nameB = b.name.toLowerCase();
+            const indexA = factorOrder.findIndex(o => nameA.includes(o));
+            const indexB = factorOrder.findIndex(o => nameB.includes(o));
+            if (indexA === -1 && indexB === -1) return nameA.localeCompare(nameB);
+            if (indexA === -1) return 1;
+            if (indexB === -1) return -1;
+            return indexA - indexB;
+        });
+
+        setFactors(sortedFactors);
+
+        // Se for orçamento novo e encontramos o fator ideal, atualizar o fator dos itens
+        if ((!id || id === 'novo') && items.length === 1 && items[0].productName === '') {
+            const idealFactor = sortedFactors.find(sf => sf.name.toLowerCase().includes('ideal'));
+            if (idealFactor) {
+                const multiplier = 1 + (idealFactor.tax_percent + idealFactor.contingency_percent + idealFactor.margin_percent) / 100;
+                setItems(prev => prev.map(it => ({ ...it, fator: multiplier })));
+            }
+        }
     };
 
     const searchProducts = async (term: string) => {
