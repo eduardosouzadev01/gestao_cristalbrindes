@@ -376,16 +376,26 @@ const OrderForm: React.FC = () => {
       if (!errProd && products) setProductsList(products);
       const { data: factors } = await supabase.from('calculation_factors').select('*');
       if (factors) {
-        const factorOrder = ["ideal", "médio", "médio", "mínimo", "minimo", "7/15", "21/30"];
+        const factorOrder = ["mínimo", "minimo", "ideal", "médio", "médio", "7/15", "21/30"];
         const sorted = [...factors].sort((a, b) => {
           const nameA = a.name.toLowerCase();
           const nameB = b.name.toLowerCase();
           const indexA = factorOrder.findIndex(o => nameA.includes(o));
           const indexB = factorOrder.findIndex(o => nameB.includes(o));
-          if (indexA === -1 && indexB === -1) return nameA.localeCompare(nameB);
-          if (indexA === -1) return 1;
-          if (indexB === -1) return -1;
-          return indexA - indexB;
+
+          if (indexA !== indexB) {
+            if (indexA === -1) return 1;
+            if (indexB === -1) return -1;
+            return indexA - indexB;
+          }
+
+          // Se pertencerem à mesma categoria, o fator "limpo" (sem prazos) vem primeiro
+          const isPlainA = !nameA.includes('-') && !nameA.includes('prazo');
+          const isPlainB = !nameB.includes('-') && !nameB.includes('prazo');
+          if (isPlainA && !isPlainB) return -1;
+          if (!isPlainA && isPlainB) return 1;
+
+          return nameA.localeCompare(nameB);
         });
         setFactorsList(sorted);
       }
@@ -1609,29 +1619,6 @@ const OrderForm: React.FC = () => {
                 </div>
 
                 <div className="flex-1 w-full border-b md:border-b-0 md:border-r border-gray-200 pb-4 md:pb-0 md:pr-4">
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">BV (%)</p>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      disabled={isReadOnly}
-                      className="form-input bg-white border-gray-300 text-gray-700 font-bold rounded-lg w-full text-right pr-8 text-sm"
-                      placeholder="0%"
-                      value={item.bvPct}
-                      onChange={(e) => updateItem(item.id, 'bvPct', parseFloat(e.target.value) || 0)}
-                    />
-                    <span className="absolute right-3 top-2 text-gray-400 text-sm">%</span>
-                  </div>
-                  {item.bvPct > 0 && (
-                    <div className="mt-1 flex justify-end items-center gap-1">
-                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Valor BV:</span>
-                      <span className="text-[11px] font-black text-blue-600">
-                        {formatCurrency(calculateItemTotal(item) * (item.bvPct / 100))}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-1 w-full border-b md:border-b-0 md:border-r border-gray-200 pb-4 md:pb-0 md:pr-4">
                   <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Saldo Extra (%)</p>
                   <div className="relative">
                     <input
@@ -1649,6 +1636,29 @@ const OrderForm: React.FC = () => {
                       <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Valor Extra:</span>
                       <span className="text-[11px] font-black text-blue-600">
                         {formatCurrency(calculateItemTotal(item) * (item.extraPct / 100))}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 w-full border-b md:border-b-0 md:border-r border-gray-200 pb-4 md:pb-0 md:pr-4">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">BV (%)</p>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      disabled={isReadOnly}
+                      className="form-input bg-white border-gray-300 text-gray-700 font-bold rounded-lg w-full text-right pr-8 text-sm"
+                      placeholder="0%"
+                      value={item.bvPct}
+                      onChange={(e) => updateItem(item.id, 'bvPct', parseFloat(e.target.value) || 0)}
+                    />
+                    <span className="absolute right-3 top-2 text-gray-400 text-sm">%</span>
+                  </div>
+                  {item.bvPct > 0 && (
+                    <div className="mt-1 flex justify-end items-center gap-1">
+                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Valor BV:</span>
+                      <span className="text-[11px] font-black text-blue-600">
+                        {formatCurrency(calculateItemTotal(item) * (item.bvPct / 100))}
                       </span>
                     </div>
                   )}

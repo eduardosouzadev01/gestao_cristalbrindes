@@ -262,18 +262,28 @@ const BudgetForm: React.FC = () => {
 
         // Assegurar que os nomes baseados em fontes de integração sejam case insensitive ao mapear list
         setSuppliersList(suppliers);
-        // Organizar fatores conforme solicitado: Ideal, Médio, Mínimo, Prazos
+        // Organizar fatores conforme solicitado: Mínimo no topo, depois Ideal, Médio, Prazos
         let sortedFactors = f || [];
-        const factorOrder = ["ideal", "médio", "médio", "mínimo", "minimo", "7/15", "21/30"];
+        const factorOrder = ["mínimo", "minimo", "ideal", "médio", "médio", "7/15", "21/30"];
         sortedFactors.sort((a, b) => {
             const nameA = a.name.toLowerCase();
             const nameB = b.name.toLowerCase();
             const indexA = factorOrder.findIndex(o => nameA.includes(o));
             const indexB = factorOrder.findIndex(o => nameB.includes(o));
-            if (indexA === -1 && indexB === -1) return nameA.localeCompare(nameB);
-            if (indexA === -1) return 1;
-            if (indexB === -1) return -1;
-            return indexA - indexB;
+
+            if (indexA !== indexB) {
+                if (indexA === -1) return 1;
+                if (indexB === -1) return -1;
+                return indexA - indexB;
+            }
+
+            // Se pertencerem à mesma categoria, o fator "limpo" (sem prazos) vem primeiro
+            const isPlainA = !nameA.includes('-') && !nameA.includes('prazo');
+            const isPlainB = !nameB.includes('-') && !nameB.includes('prazo');
+            if (isPlainA && !isPlainB) return -1;
+            if (!isPlainA && isPlainB) return 1;
+
+            return nameA.localeCompare(nameB);
         });
 
         setFactors(sortedFactors);
@@ -942,22 +952,6 @@ const BudgetForm: React.FC = () => {
                                         </div>
 
                                         <div>
-                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">BV (%)</label>
-                                            <div className="relative">
-                                                <input type="number" className="form-input w-full rounded-lg border-gray-300 text-right pr-8 font-bold" value={it.bvPct} onChange={e => updateItem(it.id, 'bvPct', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
-                                                <span className="absolute right-3 top-2 text-gray-400 text-sm">%</span>
-                                            </div>
-                                            {it.bvPct > 0 && (
-                                                <div className="mt-1 flex justify-end items-center gap-1">
-                                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Valor BV:</span>
-                                                    <span className="text-[11px] font-black text-blue-600">
-                                                        {formatCurrency(calculateItemTotal(it) * (it.bvPct / 100))}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div>
                                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Saldo Extra (%)</label>
                                             <div className="relative">
                                                 <input type="number" className="form-input w-full rounded-lg border-gray-300 text-right pr-8 font-bold" value={it.extraPct} onChange={e => updateItem(it.id, 'extraPct', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
@@ -968,6 +962,22 @@ const BudgetForm: React.FC = () => {
                                                     <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Valor Extra:</span>
                                                     <span className="text-[11px] font-black text-blue-600">
                                                         {formatCurrency(calculateItemTotal(it) * (it.extraPct / 100))}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">BV (%)</label>
+                                            <div className="relative">
+                                                <input type="number" className="form-input w-full rounded-lg border-gray-300 text-right pr-8 font-bold" value={it.bvPct} onChange={e => updateItem(it.id, 'bvPct', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
+                                                <span className="absolute right-3 top-2 text-gray-400 text-sm">%</span>
+                                            </div>
+                                            {it.bvPct > 0 && (
+                                                <div className="mt-1 flex justify-end items-center gap-1">
+                                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Valor BV:</span>
+                                                    <span className="text-[11px] font-black text-blue-600">
+                                                        {formatCurrency(calculateItemTotal(it) * (it.bvPct / 100))}
                                                     </span>
                                                 </div>
                                             )}
