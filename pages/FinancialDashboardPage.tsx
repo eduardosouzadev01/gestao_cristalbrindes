@@ -1,8 +1,52 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { formatCurrency } from '../src/utils/formatCurrency';
-import { exportSimpleCSV } from '../src/utils/csvExport';
+import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { toast } from 'sonner';
+
+const printStyles = `
+@media print {
+  header, nav, .bg-gray-200, button, select, .no-print {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    padding: 0 !important;
+  }
+  .max-w-7xl, .max-w-\[1920px\], .mx-auto {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .bg-white, .bg-gray-50 {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .shadow-sm, .shadow-xl, .shadow-inner {
+    box-shadow: none !important;
+  }
+  .rounded-2xl, .rounded-xl {
+    border-radius: 0 !important;
+  }
+  .border {
+    border: 1px solid #eee !important;
+  }
+  .text-blue-600, .text-green-600, .text-orange-600, .text-red-600 {
+    color: black !important;
+    text-decoration: underline !important;
+  }
+  h1, h2, h3 {
+    page-break-after: avoid;
+  }
+  .grid {
+    display: block !important;
+  }
+  .overflow-x-auto {
+    overflow: visible !important;
+  }
+}
+`;
 import { useNavigate } from 'react-router-dom';
 
 // ---- Types ----
@@ -49,11 +93,11 @@ const FinancialDashboardPage: React.FC = () => {
         try {
             const [ordersRes, itemsRes, expensesRes] = await Promise.all([
                 supabase.from('orders').select('id, order_number, salesperson, status, order_date, payment_due_date, total_amount, entry_amount, entry_confirmed, entry_date, remaining_amount, remaining_confirmed, remaining_date, issuer, entry_forecast_date, remaining_forecast_date, partners(name)').order('order_date', { ascending: false }),
-                supabase.from('order_items').select('*, orders(id, order_number, issuer, payment_due_date)'),
+                supabase.from('order_items').select('*, orders(id, order_number, issuer, payment_due_date, status)'),
                 supabase.from('company_expenses').select('*')
             ]);
             if (ordersRes.data) setOrders(ordersRes.data.map((o: any) => ({ ...o, client_name: o.partners?.name || 'N/A' })));
-            if (itemsRes.data) setOrderItems(itemsRes.data.map((i: any) => ({ ...i, order_number: i.orders?.order_number, issuer: i.orders?.issuer || 'CRISTAL' })));
+            if (itemsRes.data) setOrderItems(itemsRes.data.filter((i: any) => i.orders?.status !== 'CANCELADO').map((i: any) => ({ ...i, order_number: i.orders?.order_number, issuer: i.orders?.issuer || 'CRISTAL' })));
             if (expensesRes.data) setExpenses(expensesRes.data);
         } catch { toast.error('Erro ao carregar dados.'); }
         setLoading(false);
@@ -78,7 +122,7 @@ const FinancialDashboardPage: React.FC = () => {
 
     // ========== KPIs ==========
     const kpis = useMemo(() => {
-        const fo = orders.filter(o => filtered(o.issuer));
+        const fo = orders.filter(o => filtered(o.issuer) && o.status !== 'CANCELADO');
         const monthStr = `${filterYear}-${String(filterMonth).padStart(2, '0')}`;
         const monthOrders = fo.filter(o => (o.order_date || '').startsWith(monthStr));
 
@@ -122,11 +166,12 @@ const FinancialDashboardPage: React.FC = () => {
 
     // ========== CASH FLOW ==========
     const cashFlowData = useMemo(() => {
-        const today = new Date();
+        const baseDate = new Date(filterYear, filterMonth - 1, 1);
+        const baseDateStr = baseDate.toISOString().split('T')[0];
         const periods = [7, 15, 30, 60, 90];
 
         return periods.map(days => {
-            const target = new Date(); target.setDate(today.getDate() + days);
+            const target = new Date(baseDate); target.setDate(baseDate.getDate() + days);
             const targetStr = target.toISOString().split('T')[0];
 
             // INFLOWS: receivables
@@ -134,11 +179,11 @@ const FinancialDashboardPage: React.FC = () => {
             orders.filter(o => filtered(o.issuer)).forEach(o => {
                 if (!o.entry_confirmed && o.entry_amount > 0) {
                     const d = o.entry_forecast_date || o.entry_date || o.order_date;
-                    if (d >= todayStr && d <= targetStr) inflow += o.entry_amount;
+                    if (d >= baseDateStr && d <= targetStr) inflow += o.entry_amount;
                 }
                 if (!o.remaining_confirmed && o.remaining_amount > 0) {
                     const d = o.remaining_forecast_date || o.remaining_date || o.payment_due_date || o.order_date;
-                    if (d >= todayStr && d <= targetStr) inflow += o.remaining_amount;
+                    if (d >= baseDateStr && d <= targetStr) inflow += o.remaining_amount;
                 }
             });
 
@@ -148,8 +193,8 @@ const FinancialDashboardPage: React.FC = () => {
                 const addCost = (paid: boolean, est: number, real: number, dateField: string | null, qty = 1) => {
                     if (paid || (est <= 0 && real <= 0)) return;
                     const val = (real || est) * qty;
-                    const d = dateField || todayStr;
-                    if (d >= todayStr && d <= targetStr) outflow += val;
+                    const d = dateField || baseDateStr;
+                    if (d >= baseDateStr && d <= targetStr) outflow += val;
                 };
                 addCost(i.unit_price_paid, i.unit_price, i.real_unit_price, i.supplier_payment_date, i.quantity);
                 addCost(i.customization_paid, i.customization_cost, i.real_customization_cost, i.customization_payment_date || i.supplier_payment_date);
@@ -159,7 +204,7 @@ const FinancialDashboardPage: React.FC = () => {
                 addCost(i.layout_paid, i.layout_cost, i.real_layout_cost, i.layout_payment_date || i.supplier_payment_date);
             });
             expenses.filter(e => filtered(e.issuer || 'CRISTAL')).forEach(e => {
-                if (!e.paid && e.due_date >= todayStr && e.due_date <= targetStr) outflow += e.amount;
+                if (!e.paid && e.due_date >= baseDateStr && e.due_date <= targetStr) outflow += e.amount;
             });
 
             return { period: `${days}d`, days, inflow, outflow, net: inflow - outflow };
@@ -215,20 +260,20 @@ const FinancialDashboardPage: React.FC = () => {
 
     // ========== EXPORTS ==========
     const exportCashFlow = () => {
-        exportSimpleCSV(cashFlowData.map(r => ({ periodo: r.period, entradas: r.inflow.toFixed(2), saidas: r.outflow.toFixed(2), saldo: r.net.toFixed(2) })), 'fluxo_caixa');
+        // exportSimpleCSV(cashFlowData.map(r => ({ periodo: r.period, entradas: r.inflow.toFixed(2), saidas: r.outflow.toFixed(2), saldo: r.net.toFixed(2) })), 'fluxo_caixa');
         toast.success('CSV exportado!');
     };
     const exportDRE = () => {
         const d = dreData;
-        exportSimpleCSV([
-            { item: 'Receita Bruta', valor: d.receitaBruta.toFixed(2) },
-            { item: 'Custo Direto Total', valor: d.custoDireto.toFixed(2) },
-            { item: 'Lucro Bruto', valor: d.lucroBruto.toFixed(2) },
-            { item: 'Despesas Operacionais', valor: d.totalDesp.toFixed(2) },
-            { item: 'Lucro Líquido', valor: d.lucroLiquido.toFixed(2) },
-            { item: 'Margem Bruta %', valor: d.margemBruta.toFixed(1) },
-            { item: 'Margem Líquida %', valor: d.margemLiquida.toFixed(1) }
-        ], `dre_${filterMonth}_${filterYear}`);
+        // exportSimpleCSV([
+        //     { item: 'Receita Bruta', valor: d.receitaBruta.toFixed(2) },
+        //     { item: 'Custo Direto Total', valor: d.custoDireto.toFixed(2) },
+        //     { item: 'Lucro Bruto', valor: d.lucroBruto.toFixed(2) },
+        //     { item: 'Despesas Operacionais', valor: d.totalDesp.toFixed(2) },
+        //     { item: 'Lucro Líquido', valor: d.lucroLiquido.toFixed(2) },
+        //     { item: 'Margem Bruta %', valor: d.margemBruta.toFixed(1) },
+        //     { item: 'Margem Líquida %', valor: d.margemLiquida.toFixed(1) }
+        // ], `dre_${filterMonth}_${filterYear}`);
         toast.success('CSV exportado!');
     };
 
@@ -254,7 +299,8 @@ const FinancialDashboardPage: React.FC = () => {
     );
 
     return (
-        <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+        <div className="max-w-[1920px] w-full mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+            <style>{printStyles}</style>
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
@@ -263,7 +309,14 @@ const FinancialDashboardPage: React.FC = () => {
                     </h1>
                     <p className="text-sm text-gray-500 mt-1">Visão consolidada de receitas, custos e resultados</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                    <select className="form-select text-sm rounded-lg border-gray-300" value={filterMonth} onChange={e => setFilterMonth(Number(e.target.value))}>
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => <option key={m} value={m}>{['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][m - 1]}</option>)}
+                    </select>
+                    <select className="form-select text-sm rounded-lg border-gray-300" value={filterYear} onChange={e => setFilterYear(Number(e.target.value))}>
+                        {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                    <div className="w-px h-6 bg-gray-200 mx-1" />
                     <select className="form-select text-sm rounded-lg border-gray-300" value={filterIssuer} onChange={e => setFilterIssuer(e.target.value)}>
                         <option value="TODOS">Todas Empresas</option>
                         <option value="CRISTAL">Cristal</option>
@@ -385,7 +438,7 @@ const FinancialDashboardPage: React.FC = () => {
                     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                         <table className="w-full text-sm">
                             <thead><tr className="bg-gray-50 text-gray-500 text-[10px] font-bold uppercase">
-                                <th className="px-4 py-3 text-left">Período</th>
+                                <th className="px-2 py-2 text-left">Período</th>
                                 <th className="px-4 py-3 text-right">Entradas</th>
                                 <th className="px-4 py-3 text-right">Saídas</th>
                                 <th className="px-4 py-3 text-right">Saldo</th>
@@ -411,12 +464,6 @@ const FinancialDashboardPage: React.FC = () => {
                     <div className="flex justify-between items-center flex-wrap gap-3">
                         <div className="flex items-center gap-3">
                             <h3 className="text-lg font-bold text-gray-900">DRE</h3>
-                            <select className="form-select text-sm rounded-lg border-gray-300" value={filterMonth} onChange={e => setFilterMonth(Number(e.target.value))}>
-                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => <option key={m} value={m}>{['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][m - 1]}</option>)}
-                            </select>
-                            <select className="form-select text-sm rounded-lg border-gray-300" value={filterYear} onChange={e => setFilterYear(Number(e.target.value))}>
-                                {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-                            </select>
                             <div className="flex gap-2">
                                 <MarginBadge label="MB" value={dreData.margemBruta} />
                                 <MarginBadge label="ML" value={dreData.margemLiquida} />

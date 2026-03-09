@@ -56,106 +56,158 @@ const SupplierList: React.FC = () => {
   const currentData = partners.filter(p => p.supplier_category === activeTab);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="md:flex md:items-center md:justify-between mb-8">
-        <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate flex items-center gap-3">
-            <span className="material-icons-outlined text-emerald-500 text-3xl">local_shipping</span>
-            Gerenciamento de Fornecedores
+    <div className="max-w-[1920px] w-full mx-auto px-4 py-4 space-y-4">
+      {/* Header Section */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-black leading-none text-gray-900 uppercase tracking-tighter flex items-center gap-2">
+            <span className="material-icons-outlined text-emerald-600 text-2xl">local_shipping</span>
+            GERENCIAMENTO DE FORNECEDORES
           </h2>
-          <p className="mt-1 text-sm text-gray-500">Visualize e gerencie seus parceiros de negócio divididos por categorias.</p>
+          <p className="mt-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Base de fornecedores, serviços e logística</p>
         </div>
         <Link
           to="/cadastros/novo?tipo=FORNECEDOR"
-          className="ml-3 inline-flex items-center px-6 py-3 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition-colors"
+          className="inline-flex items-center px-4 py-2 border border-transparent rounded shadow-sm text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 transition-all uppercase tracking-widest"
         >
-          <span className="material-icons-outlined mr-2">add</span>
-          Adicionar Fornecedor
+          <span className="material-icons-outlined mr-2 text-sm">add</span>
+          Novo Fornecedor
         </Link>
       </div>
 
-      <div className="bg-white shadow-lg rounded-xl overflow-hidden border border-gray-100">
-        <div className="border-b border-gray-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <nav className="flex space-x-6">
-            <button
-              onClick={() => setActiveTab('PRODUTOS')}
-              className={`${activeTab === 'PRODUTOS' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-gray-500'} border-b-2 font-bold text-sm flex items-center gap-2 pb-2 transition-all`}
-            >
-              Produtos <span className={`py-0.5 px-2.5 rounded-full text-xs ${activeTab === 'PRODUTOS' ? 'bg-emerald-100 text-emerald-500' : 'bg-gray-100 text-gray-500'}`}>{partners.filter(p => p.supplier_category === 'PRODUTOS').length}</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('PERSONALIZACAO')}
-              className={`${activeTab === 'PERSONALIZACAO' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-gray-500'} border-b-2 font-bold text-sm flex items-center gap-2 pb-2 transition-all`}
-            >
-              Personalização <span className={`py-0.5 px-2.5 rounded-full text-xs ${activeTab === 'PERSONALIZACAO' ? 'bg-emerald-100 text-emerald-500' : 'bg-gray-100 text-gray-500'}`}>{partners.filter(p => p.supplier_category === 'PERSONALIZACAO').length}</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('TRANSPORTADORES')}
-              className={`${activeTab === 'TRANSPORTADORES' ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-gray-500'} border-b-2 font-bold text-sm flex items-center gap-2 pb-2 transition-all`}
-            >
-              Transportadores <span className={`py-0.5 px-2.5 rounded-full text-xs ${activeTab === 'TRANSPORTADORES' ? 'bg-emerald-100 text-emerald-500' : 'bg-gray-100 text-gray-500'}`}>{partners.filter(p => p.supplier_category === 'TRANSPORTADORES').length}</span>
-            </button>
+      {/* Optimized Tabs & Filter Row */}
+      <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
+        <div className="border-b border-gray-200 bg-gray-50/30 px-3 py-1.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <nav className="flex items-center gap-4">
+            {[
+              { id: 'PRODUTOS', label: 'PRODUTOS/MATERIAIS', icon: 'inventory_2' },
+              { id: 'PERSONALIZACAO', label: 'PERSONALIZAÇÃO/GRAV.', icon: 'brush' },
+              { id: 'TRANSPORTADORES', label: 'LOGÍSTICA/TRANSP.', icon: 'conveyor' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`py-1 px-1 flex items-center gap-2 border-b-2 transition-all group ${activeTab === tab.id
+                    ? 'border-emerald-600 text-emerald-700 font-black'
+                    : 'border-transparent text-gray-400 font-bold hover:text-gray-600'
+                  }`}
+              >
+                <span className={`material-icons-outlined text-sm ${activeTab === tab.id ? 'text-emerald-500' : 'text-gray-300 group-hover:text-gray-400'}`}>{tab.icon}</span>
+                <span className="text-[10px] uppercase tracking-widest whitespace-nowrap">{tab.label}</span>
+                <span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${activeTab === tab.id ? 'bg-emerald-600 text-white shadow-sm' : 'bg-gray-200 text-gray-500'
+                  }`}>
+                  {partners.filter(p => p.supplier_category === tab.id).length}
+                </span>
+              </button>
+            ))}
           </nav>
+
           <div className="relative max-w-xs w-full">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 material-icons-outlined text-gray-400 text-sm">filter_list</span>
+            <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+              <span className="material-icons-outlined text-gray-400 text-xs">filter_list</span>
+            </span>
             <input
               type="text"
-              placeholder="Filtrar por nome, CNPJ..."
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-emerald-500 focus:border-emerald-500"
+              placeholder="PESQUISAR NESTA CATEGORIA..."
+              className="block w-full pl-8 pr-3 border border-gray-300 focus:ring-0 focus:border-emerald-500 rounded text-[10px] h-7 font-black uppercase placeholder:text-gray-300 tracking-tight shadow-inner"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
         </div>
 
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              {['Nome / Razão Social', 'CNPJ/CPF', 'Telefone', 'E-mail', ''].map(h => (
-                <th key={h} className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {loading ? (
-              <tr><td colSpan={5} className="p-10 text-center text-gray-500">Carregando fornecedores...</td></tr>
-            ) : currentData.length === 0 ? (
-              <tr><td colSpan={5} className="p-10 text-center text-gray-500">Nenhum registro encontrado nesta categoria.</td></tr>
-            ) : (
-              currentData.map((c, i) => (
-                <tr key={i} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center">
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm ${c.color}`}>{c.initials}</div>
-                      <div className="ml-4">
-                        <div className="text-sm font-semibold text-gray-900">{c.name}</div>
-                        <div className="text-xs text-emerald-600 font-bold tracking-widest uppercase">{c.supplier_category}</div>
-                      </div>
+        {/* Dense Table */}
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-white">
+              <tr className="text-[8px] font-black text-gray-400 uppercase tracking-widest">
+                {['DADOS DO FORNECEDOR', 'DOCUMENTO (CNPJ/CPF)', 'TELEFONE/WHATSAPP', 'E-MAIL DE CONTATO', 'AÇÕES'].map((h, i) => (
+                  <th key={h} className={`px-4 py-2 text-left ${i === 4 ? 'text-right' : ''}`}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 bg-white">
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <span className="material-icons-outlined animate-spin text-emerald-500 text-2xl">sync</span>
+                      <p className="text-[10px] font-black text-gray-400 uppercase">Sincronizando fornecedores...</p>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">{c.doc || '-'}</td>
-                  <td className="px-6 py-4 text-sm text-gray-900">{c.phone || '-'}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{c.email || '-'}</td>
-                  <td className="px-6 py-4 text-right text-sm font-medium">
-                    <button className="text-emerald-500 hover:text-emerald-700 mx-2"><span className="material-icons-outlined">edit</span></button>
-                    {hasPermission('canDelete') && (
-                      <button className="text-gray-400 hover:text-red-600 mx-2"><span className="material-icons-outlined">delete</span></button>
-                    )}
+                </tr>
+              ) : currentData.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-gray-400 italic">
+                    <span className="material-icons-outlined text-gray-200 text-4xl mb-2">not_interested</span>
+                    <p className="text-[10px] font-black uppercase tracking-widest">Nenhum registro nesta categoria</p>
                   </td>
                 </tr>
-              )))}
-          </tbody>
-        </table>
+              ) : (
+                currentData.map((c, i) => (
+                  <tr key={i} className="hover:bg-emerald-50/30 transition-colors group">
+                    <td className="px-4 py-1.5">
+                      <div className="flex items-center gap-3">
+                        <div className={`h-8 w-8 rounded flex-shrink-0 flex items-center justify-center font-black text-[10px] shadow-sm border ${i % 2 === 0 ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-white'}`}>
+                          {c.initials}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-xs font-black text-gray-800 uppercase truncate max-w-[280px] leading-tight group-hover:text-emerald-600 transition-colors">
+                            {c.name}
+                          </span>
+                          <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{c.supplier_category}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-1.5 whitespace-nowrap">
+                      <span className="text-[10px] font-bold text-gray-600">{c.doc || '-'}</span>
+                    </td>
+                    <td className="px-4 py-1.5 whitespace-nowrap">
+                      <span className="text-[10px] font-bold text-gray-600">{c.phone || '-'}</span>
+                    </td>
+                    <td className="px-4 py-1.5 whitespace-nowrap">
+                      <span className="text-[10px] font-bold text-emerald-600/70 lowercase hover:underline underline-offset-2">{c.email || '-'}</span>
+                    </td>
+                    <td className="px-4 py-1.5 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                        <Link
+                          to={`/cadastros/editar/${c.id}?tipo=FORNECEDOR`}
+                          className="p-1 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                        >
+                          <span className="material-icons-outlined text-sm">edit</span>
+                        </Link>
+                        {hasPermission('canDelete') && (
+                          <button
+                            className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                          >
+                            <span className="material-icons-outlined text-sm">delete</span>
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
 
-        <div className="bg-white px-6 py-3 border-t border-gray-200 flex items-center justify-between">
-          <p className="text-sm text-gray-700">
-            Mostrando <span className="font-medium">{currentData.length > 0 ? 1 : 0}</span> a <span className="font-medium">{currentData.length}</span> de <span className="font-medium">{currentData.length}</span> resultados
+        {/* Dense Pagination */}
+        <div className="bg-gray-50/50 border-t border-gray-200 px-4 py-2 flex items-center justify-between">
+          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+            REGISTROS ENCONTRADOS: <span className="text-gray-900">{currentData.length}</span>
           </p>
-          <nav className="inline-flex rounded-md shadow-sm -space-x-px">
-            <button className="px-2 py-2 rounded-l-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50"><span className="material-icons-outlined text-sm">chevron_left</span></button>
-            <button className="bg-emerald-50 border-emerald-500 text-emerald-500 px-4 py-2 border text-sm font-medium">1</button>
-            <button className="px-2 py-2 rounded-r-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50"><span className="material-icons-outlined text-sm">chevron_right</span></button>
-          </nav>
+          <div className="flex items-center gap-1">
+            <nav className="inline-flex rounded shadow-sm overflow-hidden" aria-label="Pagination">
+              <button className="px-1 py-1 border border-gray-300 bg-white text-gray-400 hover:bg-gray-50 transition-colors">
+                <span className="material-icons-outlined text-xs leading-none">chevron_left</span>
+              </button>
+              <button className="z-10 bg-emerald-600 border border-emerald-600 text-white px-2.5 py-1 text-[9px] font-black">1</button>
+              <button className="px-1 py-1 border border-gray-300 bg-white text-gray-400 hover:bg-gray-50 transition-colors">
+                <span className="material-icons-outlined text-xs leading-none">chevron_right</span>
+              </button>
+            </nav>
+          </div>
         </div>
       </div>
     </div>

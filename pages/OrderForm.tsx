@@ -8,6 +8,9 @@ import { formatCurrency, parseCurrencyToNumber } from '../src/utils/formatCurren
 import { calculateItemTotal, calculateItemRealTotal } from '../src/utils/formulas';
 import { useOrderItems } from '../src/hooks/useOrderItems';
 import { maskPhone, maskCpfCnpj, validateEmail, validateCpfCnpj } from '../src/utils/maskUtils';
+import { CustomSelect } from '../src/components/order-form/CustomSelect';
+import { Modal } from '../src/components/order-form/Modal';
+import { ProductModal } from '../src/components/modals/ProductModal';
 
 // --- Utils Centralized ---
 
@@ -27,126 +30,7 @@ const formatPhone = (value: string) => {
   return digits.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3").substring(0, 15);
 };
 
-// --- Componente Dropdown Clássico ---
-const CustomSelect: React.FC<{
-  label: string;
-  options: any[];
-  onSelect: (opt: any) => void;
-  onAdd: () => void;
-  placeholder?: string;
-  value?: string;
-  error?: boolean;
-  disabled?: boolean;
-  onSearch?: (term: string) => void;
-}> = ({ label, options = [], onSelect, onAdd, placeholder, value, error, disabled, onSearch }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState(value || '');
-  const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    setSearch(value || '');
-  }, [value]);
-
-  useEffect(() => {
-    if (onSearch && isOpen) {
-      const timer = setTimeout(() => {
-        onSearch(search);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [search, isOpen]);
-
-  const filtered = options.filter(o =>
-    o.name.toLowerCase().includes(search.toLowerCase()) ||
-    (o.code && o.code.toLowerCase().includes(search.toLowerCase()))
-  );
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  return (
-    <div className="relative" ref={containerRef}>
-      <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{label}</label>
-      <div
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-        className={`form-input w-full rounded-lg flex justify-between items-center cursor-pointer bg-white py-2 ${error ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300'} ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-      >
-        <span className={(search || value) ? "text-gray-900" : "text-gray-400"}>{search || value || placeholder || "Selecione..."}</span>
-        <span className="material-icons-outlined text-gray-400">expand_more</span>
-      </div>
-
-      {isOpen && !disabled && (
-        <div className="absolute z-[110] w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="p-2 border-b border-gray-100">
-            <input
-              autoFocus
-              className="w-full text-sm border-0 focus:ring-0 p-1"
-              placeholder="Pesquisar..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <div className="max-h-48 overflow-y-auto">
-            {(() => {
-              const hasCategories = filtered.some(o => o.supplier_category);
-              if (hasCategories && filtered.length > 0) {
-                const categories = Array.from(new Set(filtered.map(o => o.supplier_category).filter(Boolean)));
-                return categories.map(cat => (
-                  <div key={cat as string}>
-                    <div className="px-4 py-1.5 text-[10px] font-bold text-blue-600 bg-blue-50 uppercase tracking-widest border-y border-blue-100">{cat === 'GRAVACOES' ? 'PERSONALIZAÇÃO' : (cat as string)}</div>
-                    {filtered.filter(o => o.supplier_category === cat).map(opt => (
-                      <div key={opt.id} className="px-4 py-2 text-sm hover:bg-blue-50 cursor-pointer text-gray-700 flex justify-between group" onClick={() => { onSelect(opt); setSearch(opt.name); setIsOpen(false); }}>
-                        <span>{opt.name}</span>
-                        {opt.code && <span className="text-gray-400 text-xs font-mono group-hover:text-blue-500">{opt.code}</span>}
-                      </div>
-                    ))}
-                  </div>
-                ));
-              }
-              return filtered.map(opt => (
-                <div key={opt.id} className="px-4 py-2 text-sm hover:bg-blue-50 cursor-pointer text-gray-700 flex justify-between group" onClick={() => { onSelect(opt); setSearch(opt.name); setIsOpen(false); }}>
-                  <span>{opt.name}</span>
-                  {opt.code && <span className="text-gray-400 text-xs font-mono group-hover:text-blue-500">{opt.code}</span>}
-                </div>
-              ));
-            })()}
-            {filtered.length === 0 && (
-              <div className="px-4 py-2 text-xs text-gray-400 italic">{label.includes('Fornecedor') ? 'Nenhum fornecedor encontrado.' : 'Nenhum item encontrado.'}</div>
-            )}
-            <div
-              className="px-4 py-2 text-sm text-blue-600 font-bold hover:bg-blue-50 cursor-pointer border-t border-gray-100 flex items-center gap-2"
-              onClick={() => { onAdd(); setIsOpen(false); }}
-            >
-              <span className="material-icons-outlined text-sm">add</span> Adicionar Novo
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode }> = ({ isOpen, onClose, title, children }) => {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
-        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-          <h3 className="font-bold text-gray-800">{title}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><span className="material-icons-outlined">close</span></button>
-        </div>
-        <div className="p-6">{children}</div>
-      </div>
-    </div>
-  );
-};
 
 const OrderForm: React.FC = () => {
   const { appUser } = useAuth();
@@ -171,6 +55,7 @@ const OrderForm: React.FC = () => {
   // States
   const [emitente, setEmitente] = useState('CRISTAL');
   const [activeModal, setActiveModal] = useState<'CLIENTE' | 'FORNECEDOR' | 'PRODUTO' | null>(null);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [confirmPayModal, setConfirmPayModal] = useState<'entrada' | 'restante' | null>(null);
   const [historia, setHistoria] = useState('');
   const [logs, setLogs] = useState<{ user: string, msg: string, time: string }[]>([]);
@@ -178,6 +63,56 @@ const OrderForm: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [purchaseOrder, setPurchaseOrder] = useState('');
   const [confirmCostPaymentModal, setConfirmCostPaymentModal] = useState<{ itemId: string | number, field: string, label: string, amount: number } | null>(null);
+  const [collapsedItems, setCollapsedItems] = useState<Set<string | number>>(new Set());
+  const [transferModal, setTransferModal] = useState(false);
+  const [transferReason, setTransferReason] = useState('');
+  const [transferTargetSalesperson, setTransferTargetSalesperson] = useState('');
+  const [isTransferring, setIsTransferring] = useState(false);
+
+  const toggleItemCollapse = (itemId: string | number) => {
+    setCollapsedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  };
+
+  const submitTransferRequest = async () => {
+    if (!transferTargetSalesperson || !transferReason) {
+      toast.error('Preencha o vendedor destino e o motivo.');
+      return;
+    }
+    setIsTransferring(true);
+    try {
+      await supabase.from('seller_transfer_requests').insert({
+        order_id: id,
+        order_number: orderNumber,
+        current_salesperson: vendedor,
+        requested_salesperson: transferTargetSalesperson,
+        reason: transferReason,
+        status: 'PENDENTE',
+        requested_by_email: appUser?.email || ''
+      });
+      // Notifica a gerência
+      await supabase.from('notifications').insert({
+        user_email: 'cristalbrindes@cristalbrindes.com.br',
+        title: `🔄 Solicitação de Troca - #${orderNumber}`,
+        message: `${vendedor} → ${transferTargetSalesperson}. Motivo: ${transferReason}`,
+        type: 'info',
+        read: false,
+        link: `/crm`
+      });
+      toast.success('Solicitação enviada à gerência!');
+      setTransferModal(false);
+      setTransferReason('');
+      setTransferTargetSalesperson('');
+    } catch (err: any) {
+      toast.error('Erro ao enviar solicitação: ' + err.message);
+    } finally {
+      setIsTransferring(false);
+    }
+  };
 
   // Data Lists
   const [clientsList, setClientsList] = useState<any[]>([]);
@@ -245,10 +180,7 @@ const OrderForm: React.FC = () => {
     setIsSaving(true);
     try {
       if (activeModal === 'PRODUTO') {
-        const { error } = await supabase.from('products').insert([{
-          name: newPartnerData.name,
-        }]);
-        if (error) throw error;
+        // Não deve mais cair aqui para produto, mas manter por segurança
       } else {
         const { error } = await supabase.from('partners').insert([{
           name: newPartnerData.name,
@@ -607,25 +539,23 @@ const OrderForm: React.FC = () => {
       };
 
       const itemsPayload = items.map(item => ({
+        id: (typeof item.id === 'string' && item.id.length > 20) ? item.id : null,
         product_name: item.productName,
         supplier_id: item.supplier_id || null,
         quantity: item.quantity,
         unit_price: item.priceUnit,
         customization_cost: item.custoPersonalizacao,
         supplier_transport_cost: item.transpFornecedor,
-        client_transport_cost: item.client_transport_cost,
+        client_transport_cost: item.transpCliente,
         extra_expense: item.despesaExtra,
         layout_cost: item.layoutCost,
         calculation_factor: item.fator,
-
         bv_pct: item.bvPct,
         extra_pct: item.extraPct,
         total_item_value: calculateItemTotal(item),
-
         tax_pct: item.taxPct,
         unforeseen_pct: item.unforeseenPct,
         margin_pct: item.marginPct,
-
         real_unit_price: item.realPriceUnit,
         real_customization_cost: item.realCustoPersonalizacao,
         real_supplier_transport_cost: item.realTranspFornecedor,
@@ -670,7 +600,8 @@ const OrderForm: React.FC = () => {
     try {
       const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', id);
       if (error) {
-        toast.error('Erro ao atualizar status');
+        console.error('Erro detalhado:', error);
+        toast.error(`Erro ao atualizar status: ${error.message || error.details || 'Desconhecido'}`);
       } else {
         toast.success('Status atualizado');
         logOrderChange('status', oldStatus, newStatus, 'Alteração rápida de status na listagem/formulário');
@@ -711,44 +642,45 @@ const OrderForm: React.FC = () => {
     });
 
     const itemsPayload = updatedItems.map(item => ({
+      id: (typeof item.id === 'string' && item.id.length > 20) ? item.id : null,
       product_name: item.productName,
       supplier_id: item.supplier_id || null,
       quantity: item.quantity,
       unit_price: item.priceUnit,
       customization_cost: item.custoPersonalizacao,
       supplier_transport_cost: item.transpFornecedor,
-      client_transport_cost: item.client_transport_cost,
+      client_transport_cost: item.transpCliente,
       extra_expense: item.despesaExtra,
       layout_cost: item.layoutCost,
       calculation_factor: item.fator,
       total_item_value: calculateItemTotal(item),
-
+      bv_pct: item.bvPct,
+      extra_pct: item.extraPct,
       tax_pct: item.taxPct,
       unforeseen_pct: item.unforeseenPct,
       margin_pct: item.marginPct,
-
       real_unit_price: item.realPriceUnit,
       real_customization_cost: item.realCustoPersonalizacao,
       real_supplier_transport_cost: item.realTranspFornecedor,
       real_client_transport_cost: item.realTranspCliente,
       real_extra_expense: item.realDespesaExtra,
       real_layout_cost: item.realLayoutCost,
+      unit_price_paid: item.priceUnitPaid,
+      customization_paid: item.custoPersonalizacaoPaid,
+      supplier_transport_paid: item.transpFornecedorPaid,
+      client_transport_paid: item.transpClientePaid,
+      extra_expense_paid: item.despesaExtraPaid,
       layout_paid: item.layoutCostPaid,
       supplier_payment_date: item.supplier_payment_date || null,
       customization_payment_date: item.customization_payment_date || null,
       transport_payment_date: item.transport_payment_date || null,
       layout_payment_date: item.layout_payment_date || null,
       extra_payment_date: item.extra_payment_date || null,
-
-      // Override the specific field for the target item
-      ...(item.id === itemId ? {
-        unit_price_paid: field === 'priceUnit' ? value : item.priceUnitPaid,
-        customization_paid: field === 'custoPersonalizacao' ? value : item.custoPersonalizacaoPaid,
-        supplier_transport_paid: field === 'transpFornecedor' ? value : item.transpFornecedorPaid,
-        client_transport_paid: field === 'transpCliente' ? value : item.transpClientePaid,
-        extra_expense_paid: field === 'despesaExtra' ? value : item.despesaExtraPaid,
-        layout_paid: field === 'layoutCost' ? value : item.layoutCostPaid
-      } : {})
+      customization_supplier_id: item.customization_supplier_id || null,
+      transport_supplier_id: item.transport_supplier_id || null,
+      client_transport_supplier_id: item.client_transport_supplier_id || null,
+      layout_supplier_id: item.layout_supplier_id || null,
+      extra_supplier_id: item.extra_supplier_id || null
     }));
 
     const orderPayload = {
@@ -942,32 +874,29 @@ const OrderForm: React.FC = () => {
 
       // Construct Order Items Payload
       const itemsPayload = items.map(item => ({
+        id: (typeof item.id === 'string' && item.id.length > 20) ? item.id : null,
         product_name: item.productName,
         supplier_id: item.supplier_id || null,
         quantity: item.quantity,
         unit_price: item.priceUnit,
         customization_cost: item.custoPersonalizacao,
         supplier_transport_cost: item.transpFornecedor,
-        client_transport_cost: item.client_transport_cost,
+        client_transport_cost: item.transpCliente, // fixed
         extra_expense: item.despesaExtra,
         layout_cost: item.layoutCost,
         calculation_factor: item.fator,
-
         bv_pct: item.bvPct,
         extra_pct: item.extraPct,
         total_item_value: calculateItemTotal(item),
-
         tax_pct: item.taxPct,
         unforeseen_pct: item.unforeseenPct,
         margin_pct: item.marginPct,
-
         real_unit_price: item.realPriceUnit,
         real_customization_cost: item.realCustoPersonalizacao,
         real_supplier_transport_cost: item.realTranspFornecedor,
         real_client_transport_cost: item.realTranspCliente,
         real_extra_expense: item.realDespesaExtra,
         real_layout_cost: item.realLayoutCost,
-
         unit_price_paid: item.priceUnitPaid,
         customization_paid: item.custoPersonalizacaoPaid,
         supplier_transport_paid: item.transpFornecedorPaid,
@@ -1014,9 +943,66 @@ const OrderForm: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
-      {/* Modal de Cadastro */}
-      <Modal isOpen={!!activeModal} onClose={() => { setActiveModal(null); setNewPartnerData({ name: '', doc: '', phone: '', email: '' }); }} title={`CADASTRAR NOVO ${activeModal}`}>
+    <div className="max-w-[1920px] w-full mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+
+      {/* Product Form Modal */}
+      {isProductModalOpen && (
+        <ProductModal
+          isOpen={isProductModalOpen}
+          onClose={() => setIsProductModalOpen(false)}
+          onSaveSuccess={() => {
+            fetchData();
+          }}
+        />
+      )}
+
+      {/* Modal de Solicitação de Troca de Vendedor */}
+      <Modal isOpen={transferModal} onClose={() => setTransferModal(false)} title="SOLICITAR TROCA DE VENDEDOR">
+        <div className="py-2 space-y-4">
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-800">
+            <p className="font-medium">Pedido: <span className="font-bold">#{orderNumber}</span> | Vendedor atual: <span className="font-bold">{vendedor}</span></p>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Transferir para *</label>
+            <select
+              className="form-select w-full rounded-lg border-gray-300 text-sm"
+              value={transferTargetSalesperson}
+              onChange={(e) => setTransferTargetSalesperson(e.target.value)}
+            >
+              <option value="">Selecione o vendedor...</option>
+              {['VENDAS 01', 'VENDAS 02', 'VENDAS 03', 'VENDAS 04', 'VENDAS 05']
+                .filter(s => s !== vendedor)
+                .map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Motivo da solicitação *</label>
+            <textarea
+              className="form-textarea w-full rounded-lg border-gray-300 text-sm"
+              rows={3}
+              placeholder="Descreva o motivo da transferência..."
+              value={transferReason}
+              onChange={(e) => setTransferReason(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button onClick={() => setTransferModal(false)} className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
+              Cancelar
+            </button>
+            <button
+              onClick={submitTransferRequest}
+              disabled={isTransferring || !transferTargetSalesperson || !transferReason}
+              className="flex-1 py-2.5 bg-orange-500 text-white rounded-lg text-sm font-semibold hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <span className="material-icons-outlined text-sm">send</span>
+              {isTransferring ? 'Enviando...' : 'Enviar Solicitação'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal de Cadastro (Partners) */}
+      <Modal isOpen={!!activeModal && activeModal !== 'PRODUTO'} onClose={() => { setActiveModal(null); setNewPartnerData({ name: '', doc: '', phone: '', email: '' }); }} title={`CADASTRAR NOVO ${activeModal}`}>
         <form onSubmit={(e) => { e.preventDefault(); savePartner(); }} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Nome / Descrição <span className="text-red-500">*</span></label>
@@ -1136,6 +1122,16 @@ const OrderForm: React.FC = () => {
           </h2>
         </div>
         <div className="flex items-center gap-3">
+          {/* Botão Solicitar Troca de Vendedor - apenas para usuários vendedor em pedidos existentes */}
+          {appUser?.salesperson && !isNewOrder && (
+            <button
+              onClick={() => setTransferModal(true)}
+              className="px-4 py-2 rounded-lg border border-orange-200 text-orange-600 bg-orange-50 hover:bg-orange-100 text-xs font-semibold transition-all flex items-center gap-1.5"
+            >
+              <span className="material-icons-outlined text-sm">swap_horiz</span>
+              Solicitar Troca de Vendedor
+            </button>
+          )}
           {!isReadOnly && !isNewOrder && (
             <button
               onClick={async () => {
@@ -1145,78 +1141,90 @@ const OrderForm: React.FC = () => {
                   toast.success('Pedido Cancelado com Sucesso');
                 }
               }}
-              className="px-4 py-3 rounded-lg border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 text-sm font-bold transition-all uppercase"
+              className="px-4 py-2 rounded-lg border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 text-[12px] font-semibold transition-all"
             >
               Cancelar Pedido
             </button>
           )}
           {!isReadOnly && (
-            <button onClick={validate} disabled={isSaving} className="px-6 py-3 rounded-lg shadow-sm text-sm font-bold text-white bg-blue-500 hover:bg-blue-600 transition-all active:scale-95 uppercase disabled:opacity-50 disabled:cursor-not-allowed">
-              {isSaving ? 'SALVANDO...' : (!!location.state?.fromBudget ? 'CRIAR PEDIDO' : 'FINALIZAR ABERTURA')}
+            <button onClick={validate} disabled={isSaving} className="px-6 py-2.5 rounded-lg shadow-sm text-[13px] font-semibold text-white bg-[#0F6CBD] hover:bg-[#0c5aa5] transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+              {isSaving ? 'Salvando...' : (!!location.state?.fromBudget ? 'Criar Pedido' : 'Finalizar Abertura')}
             </button>
           )}
         </div>
       </div>
 
-      {/* Status Stepper */}
+      {/* Status Stepper - Minimalist style */}
       {!isNewOrder && (
-        <div className="mb-8 bg-white shadow-sm rounded-xl border border-gray-200 p-6 overflow-x-auto">
-          <div className="flex items-center justify-between min-w-[800px]">
+        <div className="mb-6 px-4 py-2 overflow-x-auto">
+          <div className="flex items-center justify-center min-w-[700px]">
             {(() => {
+              const isCancelled = status === 'CANCELADO';
+              if (isCancelled) {
+                return (
+                  <div className="flex items-center gap-3 bg-red-50 border border-red-100 px-8 py-4 rounded-2xl animate-pulse">
+                    <span className="material-icons-outlined text-red-500 text-3xl">cancel</span>
+                    <div className="flex flex-col">
+                      <span className="text-red-900 font-black text-xl leading-none uppercase tracking-tighter">Pedido Cancelado</span>
+                      <span className="text-red-600 text-[10px] font-bold uppercase tracking-widest mt-1">Este pedido foi descontinuado e não gera mais movimentações</span>
+                    </div>
+                  </div>
+                );
+              }
+
               const stepperConfig = [
-                { label: 'AGUARDANDO PAGAMENTO ENTRADA', icon: 'payments', short: '1ª Parcela' },
+                { label: 'AGUARDANDO PAGAMENTO ENTRADA', icon: 'credit_card', short: '1ª Parcela' },
                 { label: 'EM PRODUÇÃO', icon: 'precision_manufacturing', short: 'Produção' },
                 { label: 'EM TRANSPORTE', icon: 'local_shipping', short: 'Transporte' },
                 { label: 'EM CONFERÊNCIA', icon: 'fact_check', short: 'Conferência' },
-                { label: 'AGUARDANDO PAGAMENTO 2 PARCELA', icon: 'account_balance_wallet', short: 'Pag. 2ª Parcela' },
-                { label: 'ENTREGUE', icon: 'inventory_2', short: 'Entregue' },
-                { label: 'AGUARDANDO PAGAMENTO FATURAMENTO', icon: 'receipt_long', short: 'Faturamento' },
-                { label: 'FINALIZADO', icon: 'check_circle', short: 'Finalizado' }
+                { label: 'AGUARDANDO PAGAMENTO 2 PARCELA', icon: 'account_balance_wallet', short: 'Pag. 2ª Parc' },
+                { label: 'ENTREGUE', icon: 'check_circle_outline', short: 'Entregue' },
               ];
-              const currentIdx = stepperConfig.findIndex(s => s.label === status);
+              let currentIdx = stepperConfig.findIndex(s => s.label === status);
+              if (status === 'FINALIZADO' || status === 'AGUARDANDO PAGAMENTO FATURAMENTO') {
+                currentIdx = stepperConfig.length; // mark all as completed
+              }
+
+
               return stepperConfig.map((step, idx) => {
                 const isCompleted = idx < currentIdx;
                 const isCurrent = idx === currentIdx;
                 const isFuture = idx > currentIdx;
                 return (
                   <React.Fragment key={step.label}>
-                    <div className="flex flex-col items-center relative group flex-shrink-0">
-                      <div
+                    <div className="flex flex-col items-center flex-shrink-0" style={{ minWidth: 72 }}>
+                      <button
                         onClick={() => {
                           if (!isReadOnly || (!isNewOrder && isReadOnly)) {
                             const newStatus = step.label;
                             if (newStatus === 'FINALIZADO') {
                               const isAdmin = appUser?.email?.includes('admin') || appUser?.permissions?.fullAccess;
-                              if (!isAdmin) {
-                                toast.error('Apenas administradores podem finalizar.');
-                                return;
-                              }
+                              if (!isAdmin) { toast.error('Apenas administradores podem finalizar.'); return; }
                             }
                             setStatus(newStatus);
-                            if (isReadOnly && !isNewOrder) {
-                              atomicUpdateStatus(newStatus);
-                            }
+                            if (isReadOnly && !isNewOrder) atomicUpdateStatus(newStatus);
                           }
                         }}
-                        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer
-                          ${isCompleted ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : ''}
-                          ${isCurrent ? 'bg-blue-600 text-white ring-4 ring-blue-200 shadow-lg shadow-blue-300 scale-110' : ''}
-                          ${isFuture ? 'bg-gray-100 text-gray-400 hover:bg-gray-200' : ''}
-                        `}
                         title={step.label}
+                        className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-200 border-2 ${isCompleted
+                          ? 'bg-[#0F6CBD] border-[#0F6CBD] text-white'
+                          : isCurrent
+                            ? 'bg-[#0F6CBD] border-[#0F6CBD] text-white shadow-lg shadow-blue-200/60 scale-110'
+                            : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
+                          }`}
                       >
-                        <span className="material-icons-outlined text-lg">
+                        <span className="material-icons-outlined" style={{ fontSize: 18 }}>
                           {isCompleted ? 'check' : step.icon}
                         </span>
-                      </div>
-                      <p className={`text-[9px] font-bold mt-2 text-center w-20 leading-tight uppercase
-                        ${isCurrent ? 'text-blue-600' : isCompleted ? 'text-blue-400' : 'text-gray-400'}
-                      `}>{step.short}</p>
+                      </button>
+                      <span className={`text-[9px] font-semibold mt-2 text-center uppercase tracking-wider leading-tight ${isCurrent ? 'text-[#0F6CBD]' : isCompleted ? 'text-[#0F6CBD]/70' : 'text-gray-400'
+                        }`} style={{ maxWidth: 64, display: 'block' }}>
+                        {step.short}
+                      </span>
                     </div>
                     {idx < stepperConfig.length - 1 && (
-                      <div className={`flex-1 h-1 rounded-full mx-1 transition-all duration-300 min-w-[20px]
-                        ${idx < currentIdx ? 'bg-blue-500' : 'bg-gray-200'}
-                      `} />
+                      <div className={`flex-1 h-[2px] mx-2 rounded-full transition-all duration-300 ${idx < currentIdx ? 'bg-[#0F6CBD]' : 'bg-gray-200'
+                        }`} />
                     )}
                   </React.Fragment>
                 );
@@ -1233,8 +1241,8 @@ const OrderForm: React.FC = () => {
               <span className="material-icons-outlined text-blue-500">info</span>
               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Informações Gerais</h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-2">
                 <label className="block text-xs font-bold text-blue-500 uppercase mb-2">Pedido <span className="text-red-500">*</span></label>
                 <input
                   disabled={isReadOnly || !!location.state?.fromBudget}
@@ -1244,7 +1252,7 @@ const OrderForm: React.FC = () => {
                   onChange={(e) => setOrderNumber(e.target.value)}
                 />
               </div>
-              <div>
+              <div className="col-span-2">
                 <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Vendedor <span className="text-red-500">*</span></label>
                 <select
                   disabled={isReadOnly || !!appUser?.salesperson}
@@ -1260,7 +1268,7 @@ const OrderForm: React.FC = () => {
                   <option value="VENDAS 05">VENDAS 05</option>
                 </select>
               </div>
-              <div>
+              <div className="col-span-3">
                 <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Status <span className="text-red-500">*</span></label>
                 <div className="relative flex items-center">
                   <span className="material-icons-outlined absolute left-3 text-gray-400 pointer-events-none z-10">info</span>
@@ -1289,8 +1297,8 @@ const OrderForm: React.FC = () => {
                 </div>
               </div>
 
-              <div className="relative">
-                <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Data do Orçamento <span className="text-red-500">*</span></label>
+              <div className="relative col-span-2">
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Data do Orç. <span className="text-red-500">*</span></label>
                 <div className="flex items-center">
                   <span className="material-icons-outlined absolute left-3 text-gray-400 pointer-events-none">calendar_month</span>
                   {isReadOnly ? (
@@ -1302,7 +1310,7 @@ const OrderForm: React.FC = () => {
                   )}
                 </div>
               </div>
-              <div className="relative">
+              <div className="relative col-span-3">
                 <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Data do Pedido <span className="text-red-500">*</span></label>
                 <div className="flex items-center">
                   <span className="material-icons-outlined absolute left-3 text-gray-400 pointer-events-none">event_available</span>
@@ -1316,7 +1324,7 @@ const OrderForm: React.FC = () => {
                 </div>
               </div>
 
-              <div className="md:col-span-3">
+              <div className="col-span-12 mt-2 pt-4 border-t border-gray-100">
                 <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Emitente</label>
                 <div className="grid grid-cols-3 gap-3">
                   {['CRISTAL', 'ESPIRITO', 'NATUREZA'].map(op => (
@@ -1339,8 +1347,8 @@ const OrderForm: React.FC = () => {
               <span className="material-icons-outlined text-blue-500">person</span>
               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Dados do Cliente</h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="col-span-2">
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-4">
                 <CustomSelect
                   label="Nome / Razão Social *"
                   options={clientsList}
@@ -1358,343 +1366,384 @@ const OrderForm: React.FC = () => {
                   disabled={isReadOnly}
                 />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">CNPJ / CPF</label>
+              <div className="col-span-2">
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">CNPJ / CPF</label>
                 <input className="form-input w-full rounded-lg border-gray-200 text-sm bg-gray-50" value={clientData.doc} readOnly />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Telefone</label>
+              <div className="col-span-2">
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Telefone</label>
                 <input className="form-input w-full rounded-lg border-gray-200 text-sm bg-gray-50" value={clientData.phone} readOnly />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">E-mail Contato</label>
+              <div className="col-span-2">
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">E-mail Contato</label>
                 <input className="form-input w-full rounded-lg border-gray-200 text-sm bg-gray-50" value={clientData.email} readOnly />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">E-mail Financeiro</label>
+              <div className="col-span-2">
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">E-mail Financeiro</label>
                 <input disabled={isReadOnly} className={`form-input w-full rounded-lg border-gray-200 text-sm ${isReadOnly ? 'bg-gray-100' : ''}`} value={clientData.emailFin} onChange={(e) => setClientData({ ...clientData, emailFin: e.target.value })} />
               </div>
             </div>
           </section>
 
-          {items.map((item, index) => (
-            <div key={item.id} id={`item-${item.id}`} className="bg-white shadow-sm rounded-xl border border-gray-200 border-l-8 border-l-blue-500 p-6 transition-all duration-500">
-              <div className="flex justify-between items-center mb-6">
-                <span className="px-3 py-1 rounded-md text-[10px] font-bold bg-gray-900 text-white uppercase">Produto {index + 1}</span>
-                {!isReadOnly && <button onClick={() => removeItem(item.id)} className="text-gray-300 hover:text-red-500"><span className="material-icons-outlined">delete</span></button>}
-              </div>
-
-              <div className="mb-6">
-                <CustomSelect
-                  label="Produto *"
-                  options={productsList}
-                  onSelect={(v) => updateItem(item.id, 'productName', v.name)}
-                  onAdd={() => setActiveModal('PRODUTO')}
-                  error={errors.includes(`productName-${index}`)}
-                  disabled={isReadOnly}
-                  onSearch={searchProducts}
-                  placeholder={item.productName || "Selecione..."}
-                />
-              </div>
-
-              <div className="space-y-3">
-                <div className="bg-gray-50 p-4 rounded-xl grid grid-cols-12 gap-3 items-end border border-gray-100">
-                  <div className="col-span-12 md:col-span-6">
-                    <CustomSelect
-                      label="Fornecedor Produto"
-                      options={suppliersList}
-                      onSelect={(s) => updateItem(item.id, 'supplier_id', s.id)}
-                      onAdd={() => setActiveModal('FORNECEDOR')}
-                      disabled={isReadOnly}
-                    />
+          {items.map((item, index) => {
+            const isCollapsed = collapsedItems.has(item.id);
+            return (
+              <div key={item.id} id={`item-${item.id}`} className="bg-white rounded-xl border border-gray-100 transition-all duration-300 hover:border-blue-200" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
+                {/* Product Header - always visible, clickable to collapse */}
+                <div
+                  className="flex justify-between items-center px-4 py-3 cursor-pointer select-none"
+                  onClick={() => toggleItemCollapse(item.id)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-1.5 h-6 bg-[#0F6CBD] rounded-full"></div>
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Produto {index + 1}</span>
+                    {isCollapsed && item.productName && (
+                      <span className="text-[13px] font-bold text-gray-700 ml-2">{item.productName}</span>
+                    )}
+                    {isCollapsed && item.productName && (
+                      <span className="text-[11px] text-gray-400 font-medium">· {item.quantity} un</span>
+                    )}
                   </div>
-                  <div className="col-span-4 md:col-span-2">
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Qtd *</label>
-                    <input
-                      type="number"
-                      disabled={isReadOnly}
-                      className={`form-input w-full rounded-lg text-center font-bold ${errors.includes(`quantity-${index}`) ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300'} ${isReadOnly ? 'bg-gray-100' : ''}`}
-                      value={item.quantity}
-                      onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 0)}
-                    />
+                  <div className="flex items-center gap-3">
+                    {isCollapsed && item.productName && (
+                      <span className="text-[13px] font-semibold text-[#0F6CBD]">{formatCurrency(calculateItemTotal(item))}</span>
+                    )}
+                    {!isReadOnly && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
+                        className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                      >
+                        <span className="material-icons-outlined text-[18px]">delete</span>
+                      </button>
+                    )}
+                    <span className={`material-icons-outlined text-gray-400 text-[18px] transition-transform duration-200 ${isCollapsed ? '' : 'rotate-180'}`}>
+                      expand_more
+                    </span>
                   </div>
-                  <div className="col-span-4 md:col-span-2">
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Preço Unit *</label>
-                    <input
-                      disabled={isReadOnly}
-                      className={`form-input w-full rounded-lg text-right ${errors.includes(`priceUnit-${index}`) ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300'} ${isReadOnly ? 'bg-gray-100' : ''}`}
-                      placeholder="R$ 0,00"
-                      value={formatCurrency(item.priceUnit)}
-                      onChange={(e) => updateItem(item.id, 'priceUnit', parseCurrencyToNumber(e.target.value))}
-                    />
-                  </div>
-                  <div className="col-span-4 md:col-span-2 text-right">
-                    <label className="block text-[10px] font-bold text-blue-400 uppercase mb-1">Custo Prod.</label>
-                    <div className="py-2 font-bold text-blue-600">{formatCurrency(item.quantity * item.priceUnit)}</div>
-                  </div>
-
-                  {/* Real Unit Price Management */}
-                  {!isNewOrder && (
-                    <div className="col-span-12 mt-4 pt-4 border-t border-gray-200">
-                      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-                        <div className="col-span-12 md:col-span-5">
-                          <div className="flex items-center gap-2">
-                            <span className="material-icons-outlined text-gray-400 text-sm">payments</span>
-                            <label className="block text-[10px] font-bold text-gray-400 uppercase">Valor Real Unitário</label>
-                          </div>
-                          {item.supplier_payment_date && (
-                            <div className="mt-1 flex items-center gap-1 text-[9px] text-blue-500 font-bold bg-blue-50 px-2 py-0.5 rounded-full w-fit border border-blue-100 uppercase tracking-tighter">
-                              <span className="material-icons-outlined text-[10px]">event</span>
-                              Previsão de pagamento Pgto: {formatDate(item.supplier_payment_date)}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="col-span-6 md:col-span-3 flex gap-2 items-center">
-                          <input
-                            disabled={item.priceUnitPaid}
-                            className={`form-input w-full text-sm py-1.5 rounded-lg text-right font-bold ${item.priceUnitPaid ? 'bg-green-50 text-green-700 border-green-200' : 'border-gray-300'}`}
-                            placeholder="R$ 0,00"
-                            value={formatCurrency(item.realPriceUnit)}
-                            onChange={(e) => updateItem(item.id, 'realPriceUnit', parseCurrencyToNumber(e.target.value))}
-                          />
-                          <button
-                            onClick={() => {
-                              if (!item.priceUnitPaid) {
-                                setConfirmCostPaymentModal({
-                                  itemId: item.id,
-                                  field: 'priceUnit',
-                                  label: 'Preço Unitário do Produto',
-                                  amount: item.realPriceUnit
-                                });
-                              }
-                            }}
-                            disabled={item.priceUnitPaid}
-                            className={`p-2 rounded-lg transition-all ${item.priceUnitPaid ? 'bg-green-500 text-white shadow-sm' : 'bg-gray-200 text-gray-400 hover:bg-blue-500 hover:text-white'}`}
-                            title={item.priceUnitPaid ? "Pago" : "Confirmar Pagamento"}
-                          >
-                            <span className="material-icons-outlined text-base">check</span>
-                          </button>
-                        </div>
-
-                        <div className="col-span-6 md:col-span-4 pl-3 border-l border-gray-100">
-                          <p className="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Custo Total Real</p>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-sm font-bold text-gray-700">{formatCurrency((item.realPriceUnit || 0) * item.quantity)}</span>
-                            <span className="text-[9px] text-gray-400">({item.quantity} un × {formatCurrency(item.realPriceUnit || 0)})</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
-                {['custoPersonalizacao', 'layoutCost', 'transpFornecedor', 'transpCliente', 'despesaExtra'].map(f => {
-                  const labelMap: any = {
-                    custoPersonalizacao: '1ª Parcela Personalização',
-                    transpFornecedor: 'Transp Fornecedor',
-                    transpCliente: 'Transp Cliente',
-                    despesaExtra: 'Despesa Extra',
-                    layoutCost: '1ª Parcela Layout'
-                  };
-                  const realFieldMap: any = {
-                    custoPersonalizacao: 'realCustoPersonalizacao',
-                    transpFornecedor: 'realTranspFornecedor',
-                    transpCliente: 'realTranspCliente',
-                    despesaExtra: 'realDespesaExtra',
-                    layoutCost: 'realLayoutCost'
-                  };
-                  const paidFieldMap: any = {
-                    custoPersonalizacao: 'custoPersonalizacaoPaid',
-                    transpFornecedor: 'transpFornecedorPaid',
-                    transpCliente: 'transpClientePaid',
-                    despesaExtra: 'despesaExtraPaid',
-                    layoutCost: 'layoutCostPaid'
-                  };
+                {/* Collapsible content */}
+                {!isCollapsed && (
+                  <div className="px-5 pb-5">
 
-                  const supplierFieldMap: any = {
-                    custoPersonalizacao: 'customization_supplier_id',
-                    transpFornecedor: 'transport_supplier_id',
-                    transpCliente: 'client_transport_supplier_id',
-                    despesaExtra: 'extra_supplier_id',
-                    layoutCost: 'layout_supplier_id'
-                  };
+                    <div className="mb-6">
+                      <CustomSelect
+                        label="Produto *"
+                        options={productsList}
+                        onSelect={(v) => {
+                          updateItem(item.id, 'productName', v.name);
+                          updateItem(item.id, 'priceUnit', v.unit_price || 0); // Automatic price
+                        }}
+                        onAdd={() => setIsProductModalOpen(true)}
+                        error={errors.includes(`productName-${index}`)}
+                        disabled={isReadOnly}
+                        onSearch={searchProducts}
+                        value={item.productName}
+                        placeholder="Selecione..."
+                      />
+                    </div>
 
-                  const isPaid = (item as any)[paidFieldMap[f]];
-                  const supplierId = (item as any)[supplierFieldMap[f]];
+                    <div className="space-y-3">
+                      <div className="bg-gray-50 p-4 rounded-xl grid grid-cols-12 gap-4 items-end border border-gray-100">
+                        <div className="col-span-6">
+                          <CustomSelect
+                            label="Fornecedor Produto"
+                            options={suppliersList}
+                            onSelect={(s) => updateItem(item.id, 'supplier_id', s.id)}
+                            onAdd={() => setActiveModal('FORNECEDOR')}
+                            disabled={isReadOnly}
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Qtd *</label>
+                          <input
+                            type="number"
+                            disabled={isReadOnly}
+                            className={`form-input w-full rounded-lg text-center font-bold ${errors.includes(`quantity-${index}`) ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300'} ${isReadOnly ? 'bg-gray-100' : ''}`}
+                            value={item.quantity}
+                            onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 0)}
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Preço Unit *</label>
+                          <input
+                            disabled={isReadOnly}
+                            className={`form-input w-full rounded-lg text-right ${errors.includes(`priceUnit-${index}`) ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300'} ${isReadOnly ? 'bg-gray-100' : ''}`}
+                            placeholder="R$ 0,00"
+                            value={formatCurrency(item.priceUnit)}
+                            onChange={(e) => updateItem(item.id, 'priceUnit', parseCurrencyToNumber(e.target.value))}
+                          />
+                        </div>
+                        <div className="col-span-2 text-right">
+                          <label className="block text-[10px] font-bold text-blue-400 uppercase mb-1">Custo Prod.</label>
+                          <div className="py-2 font-bold text-blue-600">{formatCurrency(item.quantity * item.priceUnit)}</div>
+                        </div>
 
-                  return (
-                    <div key={f} className="grid grid-cols-1 md:grid-cols-12 bg-gray-50 p-3 rounded-xl border border-gray-100 gap-3 items-center">
-                      <div className="col-span-12 md:col-span-5">
-                        <CustomSelect
-                          label={labelMap[f].toUpperCase()}
-                          options={suppliersList}
-                          onSelect={(s) => updateItem(item.id, supplierFieldMap[f], s.id)}
-                          value={suppliersList.find(s => s.id === supplierId)?.name || ''}
-                          onAdd={() => setActiveModal('FORNECEDOR')}
-                          disabled={isReadOnly}
-                        />
+                        {/* Real Unit Price Management */}
+                        {!isNewOrder && (
+                          <div className="col-span-12 mt-4 pt-4 border-t border-gray-200">
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                              <div className="col-span-12 md:col-span-5">
+                                <div className="flex items-center gap-2">
+                                  <span className="material-icons-outlined text-gray-400 text-sm">payments</span>
+                                  <label className="block text-[10px] font-bold text-gray-400 uppercase">Valor Real Unitário</label>
+                                </div>
+                                {item.supplier_payment_date && (
+                                  <div className="mt-1 flex items-center gap-1 text-[9px] text-blue-500 font-bold bg-blue-50 px-2 py-0.5 rounded-full w-fit border border-blue-100 uppercase tracking-tighter">
+                                    <span className="material-icons-outlined text-[10px]">event</span>
+                                    Previsão de pagamento Pgto: {formatDate(item.supplier_payment_date)}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="col-span-6 md:col-span-3 flex gap-2 items-center">
+                                <input
+                                  disabled={item.priceUnitPaid}
+                                  className={`form-input w-full text-sm py-1.5 rounded-lg text-right font-bold ${item.priceUnitPaid ? 'bg-green-50 text-green-700 border-green-200' : 'border-gray-300'}`}
+                                  placeholder="R$ 0,00"
+                                  value={formatCurrency(item.realPriceUnit)}
+                                  onChange={(e) => updateItem(item.id, 'realPriceUnit', parseCurrencyToNumber(e.target.value))}
+                                />
+                                <button
+                                  onClick={() => {
+                                    if (!item.priceUnitPaid) {
+                                      setConfirmCostPaymentModal({
+                                        itemId: item.id,
+                                        field: 'priceUnit',
+                                        label: 'Preço Unitário do Produto',
+                                        amount: item.realPriceUnit
+                                      });
+                                    }
+                                  }}
+                                  disabled={item.priceUnitPaid}
+                                  className={`p-2 rounded-lg transition-all ${item.priceUnitPaid ? 'bg-green-500 text-white shadow-sm' : 'bg-gray-200 text-gray-400 hover:bg-blue-500 hover:text-white'}`}
+                                  title={item.priceUnitPaid ? "Pago" : "Confirmar Pagamento"}
+                                >
+                                  <span className="material-icons-outlined text-base">check</span>
+                                </button>
+                              </div>
+
+                              <div className="col-span-6 md:col-span-4 pl-3 border-l border-gray-100">
+                                <p className="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Custo Total Real</p>
+                                <div className="flex items-baseline gap-2">
+                                  <span className="text-sm font-bold text-gray-700">{formatCurrency((item.realPriceUnit || 0) * item.quantity)}</span>
+                                  <span className="text-[9px] text-gray-400">({item.quantity} un × {formatCurrency(item.realPriceUnit || 0)})</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="col-span-6 md:col-span-3">
-                        <input
-                          disabled={isReadOnly}
-                          className={`form-input w-full text-sm border-gray-300 rounded-lg text-right font-bold ${isReadOnly ? 'bg-gray-100' : ''}`}
-                          placeholder="R$ 0,00"
-                          value={formatCurrency((item as any)[f])}
-                          onChange={(e) => updateItem(item.id, f, parseCurrencyToNumber(e.target.value))}
-                        />
-                      </div>
 
-                      {/* Coluna Gestão */}
-                      {!isNewOrder && (
-                        <div className="col-span-6 md:col-span-4 flex items-center gap-2 border-l border-gray-200 pl-3">
-                          <div className="flex-1">
-                            <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Valor Real</label>
-                            <input
-                              disabled={isPaid}
-                              className={`form-input w-full text-xs py-1 rounded-lg text-right font-bold ${isPaid ? 'bg-green-50 text-green-700 border-green-200' : 'border-gray-300'}`}
-                              placeholder="R$ 0,00"
-                              value={formatCurrency((item as any)[realFieldMap[f]])}
-                              onChange={(e) => updateItem(item.id, realFieldMap[f], parseCurrencyToNumber(e.target.value))}
-                            />
-                            {(item as any)[`${f.replace('custo', 'customization').replace('transp', 'transport').replace('layoutCost', 'layout').replace('despesaExtra', 'extra')}_payment_date`] && (
-                              <div className="mt-1 flex items-center gap-1 text-[9px] text-blue-500 font-bold bg-blue-50 px-2 py-0.5 rounded-full w-fit border border-blue-100 uppercase tracking-tighter">
-                                <span className="material-icons-outlined text-[10px]">event</span>
-                                Previsão de pagamento Pgto: {formatDate((item as any)[`${f.replace('custo', 'customization').replace('transp', 'transport').replace('layoutCost', 'layout').replace('despesaExtra', 'extra')}_payment_date`])}
+                      {['custoPersonalizacao', 'layoutCost', 'transpFornecedor', 'transpCliente', 'despesaExtra'].map(f => {
+                        const labelMap: any = {
+                          custoPersonalizacao: 'Custo De Personalização',
+                          transpFornecedor: 'Transp Fornecedor',
+                          transpCliente: 'Transp Cliente',
+                          despesaExtra: 'Despesa Extra',
+                          layoutCost: 'Pagamento De Layout'
+                        };
+                        const realFieldMap: any = {
+                          custoPersonalizacao: 'realCustoPersonalizacao',
+                          transpFornecedor: 'realTranspFornecedor',
+                          transpCliente: 'realTranspCliente',
+                          despesaExtra: 'realDespesaExtra',
+                          layoutCost: 'realLayoutCost'
+                        };
+                        const paidFieldMap: any = {
+                          custoPersonalizacao: 'custoPersonalizacaoPaid',
+                          transpFornecedor: 'transpFornecedorPaid',
+                          transpCliente: 'transpClientePaid',
+                          despesaExtra: 'despesaExtraPaid',
+                          layoutCost: 'layoutCostPaid'
+                        };
+
+                        const supplierFieldMap: any = {
+                          custoPersonalizacao: 'customization_supplier_id',
+                          transpFornecedor: 'transport_supplier_id',
+                          transpCliente: 'client_transport_supplier_id',
+                          despesaExtra: 'extra_supplier_id',
+                          layoutCost: 'layout_supplier_id'
+                        };
+
+                        const isPaid = (item as any)[paidFieldMap[f]];
+                        const supplierId = (item as any)[supplierFieldMap[f]];
+
+                        return (
+                          <div key={f} className="grid grid-cols-12 bg-gray-50 p-3 rounded-xl border border-gray-100 gap-4 items-center">
+                            <div className="col-span-4">
+                              <CustomSelect
+                                label={labelMap[f].toUpperCase()}
+                                options={suppliersList}
+                                onSelect={(s) => updateItem(item.id, supplierFieldMap[f], s.id)}
+                                value={suppliersList.find(s => s.id === supplierId)?.name || ''}
+                                onAdd={() => setActiveModal('FORNECEDOR')}
+                                disabled={isReadOnly}
+                              />
+                            </div>
+                            <div className="col-span-2">
+                              <input
+                                disabled={isReadOnly}
+                                className={`form-input w-full text-sm border-gray-300 rounded-lg text-right font-bold ${isReadOnly ? 'bg-gray-100' : ''}`}
+                                placeholder="R$ 0,00"
+                                value={formatCurrency((item as any)[f])}
+                                onChange={(e) => updateItem(item.id, f, parseCurrencyToNumber(e.target.value))}
+                              />
+                            </div>
+
+                            {/* Coluna Gestão */}
+                            {!isNewOrder && (
+                              <div className="col-span-6 flex items-center gap-4 border-l border-gray-200 pl-4 w-full">
+                                <div className="flex-1">
+                                  <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Valor Real</label>
+                                  <input
+                                    disabled={isPaid}
+                                    className={`form-input w-full text-xs py-1 rounded-lg text-right font-bold ${isPaid ? 'bg-green-50 text-green-700 border-green-200' : 'border-gray-300'}`}
+                                    placeholder="R$ 0,00"
+                                    value={formatCurrency((item as any)[realFieldMap[f]])}
+                                    onChange={(e) => updateItem(item.id, realFieldMap[f], parseCurrencyToNumber(e.target.value))}
+                                  />
+                                  {(item as any)[`${f.replace('custo', 'customization').replace('transp', 'transport').replace('layoutCost', 'layout').replace('despesaExtra', 'extra')}_payment_date`] && (
+                                    <div className="mt-1 flex items-center gap-1 text-[9px] text-blue-500 font-bold bg-blue-50 px-2 py-0.5 rounded-full w-fit border border-blue-100 uppercase tracking-tighter">
+                                      <span className="material-icons-outlined text-[10px]">event</span>
+                                      Previsão de pagamento Pgto: {formatDate((item as any)[`${f.replace('custo', 'customization').replace('transp', 'transport').replace('layoutCost', 'layout').replace('despesaExtra', 'extra')}_payment_date`])}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="pt-4">
+                                  <button
+                                    onClick={() => {
+                                      if (!isPaid) {
+                                        setConfirmCostPaymentModal({
+                                          itemId: item.id,
+                                          field: f,
+                                          label: labelMap[f],
+                                          amount: (item as any)[realFieldMap[f]]
+                                        });
+                                      }
+                                    }}
+                                    disabled={isPaid}
+                                    className={`p-3 rounded-lg transition-all ${isPaid ? 'bg-green-500 text-white shadow-sm' : 'bg-gray-200 text-gray-400 hover:bg-blue-500 hover:text-white'}`}
+                                    title={isPaid ? "Pago" : "Confirmar Pagamento"}
+                                  >
+                                    <span className="material-icons-outlined text-base">check</span>
+                                  </button>
+                                </div>
                               </div>
                             )}
                           </div>
-                          <div className="pt-4">
-                            <button
-                              onClick={() => {
-                                if (!isPaid) {
-                                  setConfirmCostPaymentModal({
-                                    itemId: item.id,
-                                    field: f,
-                                    label: labelMap[f],
-                                    amount: (item as any)[realFieldMap[f]]
-                                  });
-                                }
-                              }}
-                              disabled={isPaid}
-                              className={`p-3 rounded-lg transition-all ${isPaid ? 'bg-green-500 text-white shadow-sm' : 'bg-gray-200 text-gray-400 hover:bg-blue-500 hover:text-white'}`}
-                              title={isPaid ? "Pago" : "Confirmar Pagamento"}
-                            >
-                              <span className="material-icons-outlined text-base">check</span>
-                            </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Cost Summaries & Projection */}
+                    <div className="mt-6 bg-blue-50/50 rounded-xl border border-blue-100 p-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* Left: Totals */}
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-gray-200">
+                            <span className="text-[10px] font-bold text-gray-500 uppercase">Custo de Cálculo</span>
+                            <span className="text-lg font-bold text-gray-700">
+                              {formatCurrency((item.quantity * item.priceUnit) + item.custoPersonalizacao + item.transpFornecedor + item.transpCliente + item.despesaExtra + item.layoutCost)}
+                            </span>
+                          </div>
+                          {/* Custo Real removido */}
+                        </div>
+
+                        {/* Right: Projection Calculator */}
+                        {/* Removed as requested */}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex gap-4 items-center bg-gray-50 rounded-xl p-4 border border-gray-200">
+                      <div className="flex-[2] border-r border-gray-200 pr-4">
+                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Fator de Cálculo</p>
+                        <select disabled={isReadOnly} className="form-select bg-white border-gray-300 text-gray-700 font-bold rounded-lg w-full text-sm" value={item.fator} onChange={(e) => updateItem(item.id, 'fator', parseFloat(e.target.value))}>
+                          {factorsList.length > 0 ? (
+                            factorsList.map(f => {
+                              const multiplier = 1 + (f.tax_percent + f.contingency_percent + f.margin_percent) / 100;
+                              return <option key={f.id} value={multiplier}>{f.name} ({multiplier.toFixed(2)}x)</option>;
+                            })
+                          ) : (
+                            <option value={1.35}>MARGEM PADRÃO (1.35x)</option>
+                          )}
+                        </select>
+                      </div>
+
+                      <div className="flex-1 border-r border-gray-200 pr-4">
+                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Saldo Extra (%)</p>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            disabled={isReadOnly}
+                            className="form-input bg-white border-gray-300 text-gray-700 font-bold rounded-lg w-full text-right pr-8 text-sm"
+                            placeholder="0%"
+                            value={item.extraPct}
+                            onChange={(e) => updateItem(item.id, 'extraPct', parseFloat(e.target.value) || 0)}
+                          />
+                          <span className="absolute right-3 top-2 text-gray-400 text-sm">%</span>
+                        </div>
+                        {item.extraPct > 0 && (
+                          <div className="mt-1 flex justify-end items-center gap-1">
+                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Valor Extra:</span>
+                            <span className="text-[11px] font-black text-blue-600">
+                              {formatCurrency(calculateItemTotal(item) * (item.extraPct / 100))}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex-1 border-r border-gray-200 pr-4">
+                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">BV (%)</p>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            disabled={isReadOnly}
+                            className="form-input bg-white border-gray-300 text-gray-700 font-bold rounded-lg w-full text-right pr-8 text-sm"
+                            placeholder="0%"
+                            value={item.bvPct}
+                            onChange={(e) => updateItem(item.id, 'bvPct', parseFloat(e.target.value) || 0)}
+                          />
+                          <span className="absolute right-3 top-2 text-gray-400 text-sm">%</span>
+                        </div>
+                        {item.bvPct > 0 && (
+                          <div className="mt-1 flex justify-end items-center gap-1">
+                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Valor BV:</span>
+                            <span className="text-[11px] font-black text-blue-600">
+                              {formatCurrency(calculateItemTotal(item) * (item.bvPct / 100))}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col gap-3 text-right w-full md:w-auto md:pl-4">
+                        <div
+                          onClick={() => openPriceAdjustment(item.id, 'unit', calculateItemTotal(item) / (item.quantity || 1))}
+                          className={`cursor-pointer hover:bg-white p-2 rounded-lg transition-colors group relative border border-transparent hover:border-blue-100 ${isReadOnly ? 'pointer-events-none' : ''}`}
+                        >
+                          {!isReadOnly && <span className="material-icons-outlined absolute -top-2 -left-2 text-blue-500 opacity-0 group-hover:opacity-100 bg-white border border-blue-200 rounded-full p-0.5 text-[10px] shadow-sm">edit</span>}
+                          <div className="flex justify-between items-center text-gray-500 gap-4">
+                            <span className="text-[10px] font-bold uppercase tracking-wider">Venda Unitária</span>
+                            <span className="text-lg font-bold text-gray-800 decoration-dashed underline underline-offset-4 decoration-gray-300 group-hover:decoration-blue-500">{formatCurrency(calculateItemTotal(item) / (item.quantity || 1))}</span>
                           </div>
                         </div>
-                      )}
+                        <div
+                          onClick={() => openPriceAdjustment(item.id, 'total', calculateItemTotal(item))}
+                          className={`cursor-pointer hover:bg-white p-3 rounded-lg transition-colors group relative border border-transparent hover:border-blue-100 ${isReadOnly ? 'pointer-events-none' : ''}`}
+                        >
+                          {!isReadOnly && <span className="material-icons-outlined absolute -top-2 -left-2 text-blue-500 opacity-0 group-hover:opacity-100 bg-white border border-blue-200 rounded-full p-0.5 text-[10px] shadow-sm">edit</span>}
+                          <div className="flex justify-between items-end gap-6">
+                            <span className="text-[11px] font-black uppercase text-gray-800">Total Venda do Item</span>
+                            <span className="text-3xl font-black text-blue-600 leading-none decoration-dashed underline underline-offset-4 decoration-blue-200 group-hover:decoration-blue-500">{formatCurrency(calculateItemTotal(item))}</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  );
-                })}
+                  </div>
+                )}
               </div>
-
-              {/* Cost Summaries & Projection */}
-              <div className="mt-6 bg-blue-50/50 rounded-xl border border-blue-100 p-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* Left: Totals */}
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-gray-200">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase">Custo de Cálculo</span>
-                      <span className="text-lg font-bold text-gray-700">
-                        {formatCurrency((item.quantity * item.priceUnit) + item.custoPersonalizacao + item.transpFornecedor + item.transpCliente + item.despesaExtra + item.layoutCost)}
-                      </span>
-                    </div>
-                    {/* Custo Real removido */}
-                  </div>
-
-                  {/* Right: Projection Calculator */}
-                  {/* Removed as requested */}
-                </div>
-              </div>
-
-              <div className="mt-6 flex flex-col md:flex-row gap-4 items-center bg-gray-50 rounded-xl p-6 border border-gray-200 overflow-hidden relative">
-                <div className="flex-1 w-full border-b md:border-b-0 md:border-r border-gray-200 pb-4 md:pb-0 md:pr-4">
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Fator de Cálculo</p>
-                  <select disabled={isReadOnly} className="form-select bg-white border-gray-300 text-gray-700 font-bold rounded-lg w-full text-sm" value={item.fator} onChange={(e) => updateItem(item.id, 'fator', parseFloat(e.target.value))}>
-                    {factorsList.length > 0 ? (
-                      factorsList.map(f => {
-                        const multiplier = 1 + (f.tax_percent + f.contingency_percent + f.margin_percent) / 100;
-                        return <option key={f.id} value={multiplier}>{f.name} ({multiplier.toFixed(2)}x)</option>;
-                      })
-                    ) : (
-                      <option value={1.35}>MARGEM PADRÃO (1.35x)</option>
-                    )}
-                  </select>
-                </div>
-
-                <div className="flex-1 w-full border-b md:border-b-0 md:border-r border-gray-200 pb-4 md:pb-0 md:pr-4">
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Saldo Extra (%)</p>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      disabled={isReadOnly}
-                      className="form-input bg-white border-gray-300 text-gray-700 font-bold rounded-lg w-full text-right pr-8 text-sm"
-                      placeholder="0%"
-                      value={item.extraPct}
-                      onChange={(e) => updateItem(item.id, 'extraPct', parseFloat(e.target.value) || 0)}
-                    />
-                    <span className="absolute right-3 top-2 text-gray-400 text-sm">%</span>
-                  </div>
-                  {item.extraPct > 0 && (
-                    <div className="mt-1 flex justify-end items-center gap-1">
-                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Valor Extra:</span>
-                      <span className="text-[11px] font-black text-blue-600">
-                        {formatCurrency(calculateItemTotal(item) * (item.extraPct / 100))}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-1 w-full border-b md:border-b-0 md:border-r border-gray-200 pb-4 md:pb-0 md:pr-4">
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">BV (%)</p>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      disabled={isReadOnly}
-                      className="form-input bg-white border-gray-300 text-gray-700 font-bold rounded-lg w-full text-right pr-8 text-sm"
-                      placeholder="0%"
-                      value={item.bvPct}
-                      onChange={(e) => updateItem(item.id, 'bvPct', parseFloat(e.target.value) || 0)}
-                    />
-                    <span className="absolute right-3 top-2 text-gray-400 text-sm">%</span>
-                  </div>
-                  {item.bvPct > 0 && (
-                    <div className="mt-1 flex justify-end items-center gap-1">
-                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Valor BV:</span>
-                      <span className="text-[11px] font-black text-blue-600">
-                        {formatCurrency(calculateItemTotal(item) * (item.bvPct / 100))}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-3 text-right w-full md:w-auto md:pl-4">
-                  <div
-                    onClick={() => openPriceAdjustment(item.id, 'unit', calculateItemTotal(item) / (item.quantity || 1))}
-                    className={`cursor-pointer hover:bg-white p-2 rounded-lg transition-colors group relative border border-transparent hover:border-blue-100 ${isReadOnly ? 'pointer-events-none' : ''}`}
-                  >
-                    {!isReadOnly && <span className="material-icons-outlined absolute -top-2 -left-2 text-blue-500 opacity-0 group-hover:opacity-100 bg-white border border-blue-200 rounded-full p-0.5 text-[10px] shadow-sm">edit</span>}
-                    <div className="flex justify-between items-center text-gray-500 gap-4">
-                      <span className="text-[10px] font-bold uppercase tracking-wider">Venda Unitária</span>
-                      <span className="text-lg font-bold text-gray-800 decoration-dashed underline underline-offset-4 decoration-gray-300 group-hover:decoration-blue-500">{formatCurrency(calculateItemTotal(item) / (item.quantity || 1))}</span>
-                    </div>
-                  </div>
-                  <div
-                    onClick={() => openPriceAdjustment(item.id, 'total', calculateItemTotal(item))}
-                    className={`cursor-pointer hover:bg-white p-3 rounded-lg transition-colors group relative border border-transparent hover:border-blue-100 ${isReadOnly ? 'pointer-events-none' : ''}`}
-                  >
-                    {!isReadOnly && <span className="material-icons-outlined absolute -top-2 -left-2 text-blue-500 opacity-0 group-hover:opacity-100 bg-white border border-blue-200 rounded-full p-0.5 text-[10px] shadow-sm">edit</span>}
-                    <div className="flex justify-between items-end gap-6">
-                      <span className="text-[11px] font-black uppercase text-gray-800">Total Venda do Item</span>
-                      <span className="text-3xl font-black text-blue-600 leading-none decoration-dashed underline underline-offset-4 decoration-blue-200 group-hover:decoration-blue-500">{formatCurrency(calculateItemTotal(item))}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
 
           {!isReadOnly && (
             <button onClick={addItem} className="w-full py-5 border-2 border-dashed border-blue-200 rounded-2xl text-blue-400 font-bold text-sm uppercase hover:bg-blue-50 flex items-center justify-center gap-2">
@@ -1781,23 +1830,32 @@ const OrderForm: React.FC = () => {
         <div className="lg:col-span-4 relative">
           <div className="space-y-6 sticky top-20">
             {/* Card Financeiro Principal */}
-            <div className="bg-blue-500 shadow-2xl rounded-[1.5rem] overflow-hidden text-white border-none">
-              <div className="p-8 text-center bg-transparent">
-                <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] mb-2 opacity-80">Valor Total de Venda</p>
-                <h2 className="text-6xl font-black tracking-tight text-white">{formatCurrency(totalPedido)}</h2>
-                <p className="text-[11px] font-bold uppercase tracking-widest mt-2 bg-white/20 inline-block px-3 py-1 rounded-full">
-                  A receber: {formatCurrency(totalPedido - parseCurrencyToNumber(recebimentoEntrada) - parseCurrencyToNumber(recebimentoRestante))}
-                </p>
+            <div className="relative bg-white shadow-[0_8px_32px_rgba(0,0,0,0.04)] rounded-3xl overflow-hidden border border-gray-100">
+              {/* Subtle blue accent on the left or top */}
+              <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-[#0F6CBD]"></div>
+
+              <div className="px-8 py-6 text-center relative z-10 border-b border-gray-50 bg-blue-50/5">
+                <p className="text-[10px] font-black text-blue-600/60 uppercase tracking-[0.2em] mb-2">Total Geral do Pedido</p>
+                <h2 className="text-4xl lg:text-4xl font-black tracking-tight text-[#0F6CBD] mb-4">{formatCurrency(totalPedido)}</h2>
+                <div className="inline-flex items-center gap-2 bg-white px-4 py-1.5 rounded-full border border-blue-50 shadow-sm">
+                  <div className="w-1 h-1 rounded-full bg-blue-500"></div>
+                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400">
+                    Pendente: <span className="text-blue-600 font-black">{formatCurrency(totalPedido - parseCurrencyToNumber(recebimentoEntrada) - parseCurrencyToNumber(recebimentoRestante))}</span>
+                  </p>
+                </div>
               </div>
 
-              <div className="p-6 pt-0 space-y-6 bg-blue-600/90">
-                <div className="pt-6">
-                  <label className="block text-[11px] font-black text-blue-50 uppercase tracking-widest mb-3">1ª Parcela</label>
+              <div className="p-6 space-y-6 bg-white rounded-b-[1.5rem] relative z-10">
+                <div>
+                  <label className="flex items-center gap-1.5 text-[11px] font-black text-gray-500 uppercase tracking-widest mb-3">
+                    <span className="material-icons-outlined text-[14px] text-blue-500">payments</span>
+                    1ª Parcela
+                  </label>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <input
                         disabled={!canEditPayment}
-                        className="form-input w-full bg-white/10 border-white/20 text-white rounded-lg px-3 py-3 font-bold text-base focus:ring-0 focus:border-white/40 placeholder:text-white/40"
+                        className="form-input w-full bg-white border-gray-200 text-gray-900 rounded-lg px-4 py-2.5 font-black text-lg focus:ring-4 focus:ring-blue-50 focus:border-blue-500 placeholder:text-gray-300 shadow-sm transition-all"
                         placeholder="R$ 0,00"
                         value={recebimentoEntrada}
                         onChange={(e) => setRecebimentoEntrada(formatCurrency(parseCurrencyToNumber(e.target.value)))}
@@ -1805,14 +1863,14 @@ const OrderForm: React.FC = () => {
                     </div>
                     <div className="relative w-40">
                       {!canEditPayment ? (
-                        <div className="form-input w-full bg-white/10 border-white/20 text-white rounded-lg px-3 py-3 font-bold text-sm">
+                        <div className="flex items-center justify-center w-full bg-gray-50 border border-gray-200 text-gray-600 rounded-lg px-3 py-2.5 font-bold text-sm shadow-sm h-[46px]">
                           {formatDate(dataEntrada)}
                         </div>
                       ) : (
                         <input
                           type="date"
                           lang="pt-BR"
-                          className="form-input w-full bg-white/10 border-white/20 text-white rounded-lg px-3 py-3 font-bold text-sm focus:ring-0 focus:border-white/40"
+                          className="form-input w-full bg-white border-gray-200 text-gray-700 rounded-lg px-3 py-2.5 font-bold text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 shadow-sm h-[46px]"
                           value={dataEntrada}
                           onChange={(e) => setDataEntrada(e.target.value)}
                         />
@@ -1824,20 +1882,23 @@ const OrderForm: React.FC = () => {
                         if (isReadOnly && !isNewOrder && !entradaConfirmed) setConfirmPayModal('entrada');
                       }}
                       disabled={(entradaConfirmed) || (isReadOnly && isNewOrder)}
-                      className={`p-3 rounded-lg transition-all flex items-center justify-center shrink-0 border border-white/20 ${entradaConfirmed ? 'bg-green-500 border-green-400' : (isReadOnly && !isNewOrder ? 'bg-gray-200 text-gray-400 hover:bg-blue-500 hover:text-white' : 'bg-white/10 hover:bg-white/20')}`}
+                      className={`h-[46px] w-[46px] rounded-lg transition-all flex items-center justify-center shrink-0 border shadow-sm ${entradaConfirmed ? 'bg-green-100 border-green-200 text-green-700' : (isReadOnly && !isNewOrder ? 'bg-gray-100 border-gray-200 text-gray-400 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200' : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-500')}`}
                     >
-                      <span className="material-icons-outlined text-base">{entradaConfirmed ? 'check_circle' : (isReadOnly && !isNewOrder ? 'check' : 'payments')}</span>
+                      <span className="material-icons-outlined text-[20px]">{entradaConfirmed ? 'check_circle' : (isReadOnly && !isNewOrder ? 'check' : 'check')}</span>
                     </button>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-black text-blue-50 uppercase tracking-widest mb-3">2ª Parcela</label>
+                  <label className="flex items-center gap-1.5 text-[11px] font-black text-gray-500 uppercase tracking-widest mb-3">
+                    <span className="material-icons-outlined text-[14px] text-blue-500">wallet</span>
+                    2ª Parcela
+                  </label>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <input
                         disabled={!canEditPayment}
-                        className="form-input w-full bg-white/10 border-white/20 text-white rounded-lg px-3 py-3 font-bold text-base focus:ring-0 focus:border-white/40 placeholder:text-white/40"
+                        className="form-input w-full bg-white border-gray-200 text-gray-900 rounded-lg px-4 py-2.5 font-black text-lg focus:ring-4 focus:ring-blue-50 focus:border-blue-500 placeholder:text-gray-300 shadow-sm transition-all"
                         placeholder="R$ 0,00"
                         value={recebimentoRestante}
                         onChange={(e) => setRecebimentoRestante(formatCurrency(parseCurrencyToNumber(e.target.value)))}
@@ -1845,14 +1906,14 @@ const OrderForm: React.FC = () => {
                     </div>
                     <div className="relative w-40">
                       {!canEditPayment ? (
-                        <div className="form-input w-full bg-white/10 border-white/20 text-white rounded-lg px-3 py-3 font-bold text-sm">
+                        <div className="flex items-center justify-center w-full bg-gray-50 border border-gray-200 text-gray-600 rounded-lg px-3 py-2.5 font-bold text-sm shadow-sm h-[46px]">
                           {formatDate(dataRestante)}
                         </div>
                       ) : (
                         <input
                           type="date"
                           lang="pt-BR"
-                          className="form-input w-full bg-white/10 border-white/20 text-white rounded-lg px-3 py-3 font-bold text-sm focus:ring-0 focus:border-white/40"
+                          className="form-input w-full bg-white border-gray-200 text-gray-700 rounded-lg px-3 py-2.5 font-bold text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 shadow-sm h-[46px]"
                           value={dataRestante}
                           onChange={(e) => setDataRestante(e.target.value)}
                         />
@@ -1864,9 +1925,9 @@ const OrderForm: React.FC = () => {
                         if (isReadOnly && !isNewOrder && !restanteConfirmed) setConfirmPayModal('restante');
                       }}
                       disabled={(restanteConfirmed) || (isReadOnly && isNewOrder)}
-                      className={`p-3 rounded-lg transition-all flex items-center justify-center shrink-0 border border-white/20 ${restanteConfirmed ? 'bg-green-500 border-green-400' : (isReadOnly && !isNewOrder ? 'bg-gray-200 text-gray-400 hover:bg-blue-500 hover:text-white' : 'bg-white/10 hover:bg-white/20')}`}
+                      className={`h-[46px] w-[46px] rounded-lg transition-all flex items-center justify-center shrink-0 border shadow-sm ${restanteConfirmed ? 'bg-green-100 border-green-200 text-green-700' : (isReadOnly && !isNewOrder ? 'bg-gray-100 border-gray-200 text-gray-400 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200' : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-500')}`}
                     >
-                      <span className="material-icons-outlined text-base">{restanteConfirmed ? 'check_circle' : (isReadOnly && !isNewOrder ? 'check' : 'wallet')}</span>
+                      <span className="material-icons-outlined text-[20px]">{restanteConfirmed ? 'check_circle' : (isReadOnly && !isNewOrder ? 'check' : 'check')}</span>
                     </button>
                   </div>
                 </div>
@@ -1892,29 +1953,74 @@ const OrderForm: React.FC = () => {
               />
             </div>
 
-            <div className="bg-white shadow-sm rounded-xl p-6 border border-gray-200">
-              <div className="flex items-center gap-2 mb-6 text-blue-500">
-                <span className="material-icons-outlined">history</span>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Histórico</h3>
+            <div className="bg-white/90 backdrop-blur-sm rounded-xl border border-gray-200/80 p-5" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="material-icons-outlined text-[#0F6CBD] text-[18px]">history_toggle_off</span>
+                  <h3 className="text-[11px] font-semibold uppercase tracking-widest text-gray-500">Histórico</h3>
+                </div>
               </div>
-              <div className="space-y-3 max-h-[500px] overflow-y-auto mb-4 pr-2">
+
+              {/* Timeline */}
+              <div className="max-h-[440px] overflow-y-auto mb-4 pr-1" style={{ scrollbarWidth: 'thin' }}>
                 {logs.length === 0 ? (
-                  <div className="text-center text-gray-300 py-4"><p className="text-[10px] font-bold uppercase">Sem registros</p></div>
+                  <div className="text-center text-gray-300 py-6">
+                    <span className="material-icons-outlined text-3xl mb-2">history</span>
+                    <p className="text-[10px] font-medium uppercase tracking-wider">Sem registros</p>
+                  </div>
                 ) : (
-                  logs.map((l, i) => (
-                    <div key={i} className="bg-gray-50 p-2 rounded-lg border border-gray-100 animate-in slide-in-from-right duration-300">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-[9px] font-black text-blue-500 uppercase">{l.user}</span>
-                        <span className="text-[9px] text-gray-400">{l.time}</span>
-                      </div>
-                      <p className="text-[10px] text-gray-600 font-medium leading-tight">{l.msg}</p>
+                  <div className="relative">
+                    {/* Central line */}
+                    <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gray-100 -translate-x-1/2" />
+                    <div className="space-y-3">
+                      {logs.map((l, i) => {
+                        const isCristal = l.user.toLowerCase().includes('cristal');
+                        const isEven = i % 2 === 0;
+                        const dotColor = isCristal ? 'bg-emerald-500' : 'bg-[#0F6CBD]';
+                        return (
+                          <div key={i} className={`flex items-start gap-2 relative ${isEven ? 'flex-row-reverse' : 'flex-row'}`}>
+                            {/* Content card */}
+                            <div className={`flex-1 max-w-[45%] ${isEven ? 'text-right' : 'text-left'}`}>
+                              <div className={`inline-block bg-white border border-gray-100 rounded-xl px-3 py-2.5 shadow-sm text-left w-full`}>
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                  <span className={`text-[9px] font-semibold uppercase tracking-wide truncate ${isCristal ? 'text-emerald-600' : 'text-[#0F6CBD]'
+                                    }`}>
+                                    {l.user.split('@')[0]}
+                                  </span>
+                                  <span className="text-[9px] text-gray-400 whitespace-nowrap flex-shrink-0">{l.time}</span>
+                                </div>
+                                <p className="text-[11px] text-gray-700 leading-snug">{l.msg}</p>
+                              </div>
+                            </div>
+                            {/* Dot */}
+                            <div className="flex-shrink-0 flex items-start justify-center" style={{ width: 16, paddingTop: 10 }}>
+                              <div className={`w-3 h-3 rounded-full border-2 border-white shadow-sm ${dotColor}`} />
+                            </div>
+                            {/* Spacer */}
+                            <div className="flex-1 max-w-[45%]" />
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))
+                  </div>
                 )}
               </div>
-              <div className="mt-4 pt-4 border-t border-gray-100 flex gap-2">
-                <input className="form-input flex-1 rounded-lg border-gray-200 text-xs" placeholder="Adicionar nota..." value={historia} onChange={(e) => setHistoria(e.target.value)} />
-                <button onClick={() => { addLog(historia); setHistoria(''); }} disabled={!historia} className="p-2 bg-blue-500 text-white rounded-lg disabled:opacity-50"><span className="material-icons-outlined text-sm">send</span></button>
+
+              <div className="pt-3 border-t border-gray-100 flex gap-2">
+                <input
+                  className="form-input flex-1 rounded-lg border-gray-200 text-xs"
+                  placeholder="Adicionar nota..."
+                  value={historia}
+                  onChange={(e) => setHistoria(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && historia) { addLog(historia); setHistoria(''); } }}
+                />
+                <button
+                  onClick={() => { addLog(historia); setHistoria(''); }}
+                  disabled={!historia}
+                  className="p-2 bg-[#0F6CBD] text-white rounded-lg disabled:opacity-40 hover:bg-[#0c5aa5] transition-colors"
+                >
+                  <span className="material-icons-outlined text-sm">send</span>
+                </button>
               </div>
             </div>
 
@@ -1923,8 +2029,8 @@ const OrderForm: React.FC = () => {
                 <span className="material-icons-outlined">storefront</span>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Comercial</h3>
               </div>
-              <div className="space-y-4">
-                <div>
+              <div className="grid grid-cols-12 gap-4">
+                <div className="col-span-4">
                   <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Faturamento *</label>
                   <select
                     disabled={isReadOnly}
@@ -1942,8 +2048,8 @@ const OrderForm: React.FC = () => {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Data Saída do Fornecedor *</label>
+                <div className="col-span-4">
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Saída do Fornec.</label>
                   {isReadOnly ? (
                     <div className="form-input w-full rounded-lg text-sm border-gray-200 bg-gray-100 font-bold text-gray-700 py-2">
                       {formatDate(supplierDepartureDate)}
@@ -1958,8 +2064,8 @@ const OrderForm: React.FC = () => {
                     />
                   )}
                 </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Data Limite Recebimento *</label>
+                <div className="col-span-4">
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Limite Receb.</label>
                   {isReadOnly ? (
                     <div className="form-input w-full rounded-lg text-sm border-gray-200 bg-gray-100 font-bold text-gray-700 py-2">
                       {formatDate(dataLimite)}
@@ -1974,7 +2080,7 @@ const OrderForm: React.FC = () => {
                     />
                   )}
                 </div>
-                <div>
+                <div className="col-span-4">
                   <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nº NF</label>
                   <input
                     disabled={isReadOnly}
@@ -1984,8 +2090,8 @@ const OrderForm: React.FC = () => {
                     onChange={(e) => setInvoiceNumber(e.target.value)}
                   />
                 </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Ordem de Compra</label>
+                <div className="col-span-4">
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Req. de Compra</label>
                   <input
                     disabled={isReadOnly}
                     className={`form-input w-full rounded-lg border-gray-200 text-sm ${isReadOnly ? 'bg-gray-100' : ''}`}
@@ -1995,7 +2101,7 @@ const OrderForm: React.FC = () => {
                   />
                 </div>
                 {/* Novo Elemento LAYOUT */}
-                <div>
+                <div className="col-span-4">
                   <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">LAYOUT</label>
                   <input
                     disabled={isReadOnly}

@@ -379,7 +379,7 @@ const OrderBalancePage: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+            <div className="max-w-[1920px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-20">
                 <div className="text-center">
                     <span className="material-icons-outlined text-6xl text-blue-400 animate-spin mb-4">sync</span>
                     <p className="text-gray-500 font-medium">Carregando dados...</p>
@@ -389,425 +389,319 @@ const OrderBalancePage: React.FC = () => {
     }
 
     return (
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+        <div className="max-w-[1920px] w-full mx-auto px-4 py-4 space-y-4">
             {/* Header */}
-            <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => navigate(-1)} className="p-2 rounded-full bg-white shadow-sm border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors">
-                        <span className="material-icons-outlined text-xl">arrow_back</span>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <button onClick={() => navigate(-1)} className="p-1.5 rounded bg-white shadow-sm border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors">
+                        <span className="material-icons-outlined text-base">arrow_back</span>
                     </button>
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3 uppercase tracking-tight">
-                            <span className="material-icons-outlined text-blue-500 text-3xl">analytics</span>
-                            Saldo de Pedidos
+                        <h1 className="text-xl font-black text-gray-900 flex items-center gap-2 uppercase tracking-tighter leading-none">
+                            <span className="material-icons-outlined text-blue-600 text-2xl">analytics</span>
+                            SALDO DE PEDIDOS
                         </h1>
-                        <p className="text-xs text-gray-400 mt-1">{filteredOrders.length} pedidos encontrados</p>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">{filteredOrders.length} pedidos encontrados</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
-                    <button onClick={exportAllData} className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-600 font-bold text-xs rounded-lg hover:bg-green-100 transition-colors uppercase">
-                        <span className="material-icons-outlined text-sm">download</span>
-                        Exportar CSV
+                <div className="flex items-center gap-2">
+                    <button onClick={exportAllData} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white font-black text-[10px] rounded shadow-sm hover:bg-emerald-700 transition-colors uppercase tracking-widest leading-none">
+                        <span className="material-icons-outlined text-xs">download</span>
+                        EXPORTAR
                     </button>
-                    <button onClick={fetchOrders} className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 font-bold text-xs rounded-lg hover:bg-blue-100 transition-colors uppercase">
-                        <span className="material-icons-outlined text-sm">refresh</span>
-                        Atualizar
+                    <button onClick={fetchOrders} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white font-black text-[10px] rounded shadow-sm hover:bg-blue-700 transition-colors uppercase tracking-widest leading-none">
+                        <span className="material-icons-outlined text-xs">refresh</span>
+                        ATUALIZAR
                     </button>
                 </div>
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-                <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Valor Total Vendas</p>
-                    <p className="text-xl font-black text-gray-900">{formatCurrency(summaryStats.totalSale)}</p>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+                <div className="bg-white rounded border border-gray-200 p-2.5 shadow-sm border-t-2 border-t-gray-400">
+                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Vendas Totais</p>
+                    <p className="text-sm font-black text-gray-900">{formatCurrency(summaryStats.totalSale)}</p>
                 </div>
-                <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Custo Estimado</p>
-                    <p className="text-xl font-black text-gray-700">{formatCurrency(summaryStats.totalEstimatedCost)}</p>
+                <div className="bg-white rounded border border-gray-200 p-2.5 shadow-sm border-t-2 border-t-blue-400">
+                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Custo Real Total</p>
+                    <p className="text-sm font-black text-slate-700">{formatCurrency(summaryStats.totalRealCost)}</p>
                 </div>
-                <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Custo Real</p>
-                    <p className="text-xl font-black text-slate-600">{formatCurrency(summaryStats.totalRealCost)}</p>
+                <div className={`rounded border p-2.5 shadow-sm border-t-2 ${summaryStats.totalBalance >= 0 ? 'bg-emerald-50/30 border-emerald-200 border-t-emerald-500' : 'bg-red-50/30 border-red-200 border-t-red-500'}`}>
+                    <p className={`text-[8px] font-black uppercase tracking-widest mb-0.5 ${summaryStats.totalBalance >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>Saldo Geral</p>
+                    <p className={`text-sm font-black ${summaryStats.totalBalance >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatCurrency(summaryStats.totalBalance)}</p>
                 </div>
-                <div className="bg-white rounded-xl border border-green-200 p-4 shadow-sm">
-                    <p className="text-[10px] font-bold text-green-500 uppercase mb-1">Total Recebido</p>
-                    <p className="text-xl font-black text-green-600">{formatCurrency(summaryStats.totalReceived)}</p>
+                <div className="bg-white rounded border border-green-200 p-2.5 shadow-sm border-t-2 border-t-green-500">
+                    <p className="text-[8px] font-black text-green-500 uppercase tracking-widest mb-0.5">Recebido</p>
+                    <p className="text-sm font-black text-green-600">{formatCurrency(summaryStats.totalReceived)}</p>
                 </div>
-                <div className="bg-white rounded-xl border border-orange-200 p-4 shadow-sm">
-                    <p className="text-[10px] font-bold text-orange-500 uppercase mb-1">A Receber</p>
-                    <p className="text-xl font-black text-orange-600">{formatCurrency(summaryStats.totalPending)}</p>
+                <div className="bg-white rounded border border-orange-200 p-2.5 shadow-sm border-t-2 border-t-orange-500">
+                    <p className="text-[8px] font-black text-orange-500 uppercase tracking-widest mb-0.5">A Receber</p>
+                    <p className="text-sm font-black text-orange-600">{formatCurrency(summaryStats.totalPending)}</p>
                 </div>
-                <div className={`rounded-xl border p-4 shadow-sm ${summaryStats.totalBalance >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
-                    <p className={`text-[10px] font-bold uppercase mb-1 ${summaryStats.totalBalance >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>Saldo Geral</p>
-                    <p className={`text-xl font-black ${summaryStats.totalBalance >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatCurrency(summaryStats.totalBalance)}</p>
-                </div>
-            </div>
-
-            {/* Payment Status Mini Cards */}
-            <div className="grid grid-cols-3 gap-4 mb-8">
-                <div
-                    onClick={() => setFilterPayment(filterPayment === 'PAID' ? 'ALL' : 'PAID')}
-                    className={`rounded-xl border p-3 flex items-center gap-3 cursor-pointer transition-all ${filterPayment === 'PAID' ? 'bg-green-50 border-green-400 ring-2 ring-green-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
-                >
-                    <span className="material-icons-outlined text-green-500 text-2xl">check_circle</span>
-                    <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase">Pagos</p>
-                        <p className="text-lg font-black text-green-600">{summaryStats.paidOrders}</p>
-                    </div>
-                </div>
-                <div
-                    onClick={() => setFilterPayment(filterPayment === 'PARTIAL' ? 'ALL' : 'PARTIAL')}
-                    className={`rounded-xl border p-3 flex items-center gap-3 cursor-pointer transition-all ${filterPayment === 'PARTIAL' ? 'bg-yellow-50 border-yellow-400 ring-2 ring-yellow-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
-                >
-                    <span className="material-icons-outlined text-yellow-500 text-2xl">pending</span>
-                    <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase">Parciais</p>
-                        <p className="text-lg font-black text-yellow-600">{summaryStats.partialOrders}</p>
-                    </div>
-                </div>
-                <div
-                    onClick={() => setFilterPayment(filterPayment === 'PENDING' ? 'ALL' : 'PENDING')}
-                    className={`rounded-xl border p-3 flex items-center gap-3 cursor-pointer transition-all ${filterPayment === 'PENDING' ? 'bg-red-50 border-red-400 ring-2 ring-red-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
-                >
-                    <span className="material-icons-outlined text-red-400 text-2xl">cancel</span>
-                    <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase">Pendentes</p>
-                        <p className="text-lg font-black text-red-500">{summaryStats.pendingOrders}</p>
+                <div className="bg-white rounded border border-gray-200 p-2.5 shadow-sm">
+                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1.5 line-clamp-1">Status Pagamento</p>
+                    <div className="flex gap-1">
+                        <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[9px] font-black">{summaryStats.paidOrders}P</span>
+                        <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded text-[9px] font-black">{summaryStats.partialOrders}A</span>
+                        <span className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-[9px] font-black">{summaryStats.pendingOrders}X</span>
                     </div>
                 </div>
             </div>
 
             {/* Filters */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 shadow-sm">
-                <div className="flex flex-wrap gap-3 items-end">
+            <div className="bg-white rounded border border-gray-200 p-2.5 shadow-sm">
+                <div className="flex flex-wrap gap-2 items-end">
                     <div className="flex-1 min-w-[200px]">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Buscar</label>
+                        <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">BUSCAR</label>
                         <div className="relative">
-                            <span className="material-icons-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">search</span>
+                            <span className="material-icons-outlined absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">search</span>
                             <input
-                                className="form-input w-full rounded-lg border-gray-200 text-sm pl-9"
-                                placeholder="Nº pedido, cliente, vendedor, produto..."
+                                className="form-input w-full rounded border-gray-300 text-xs pl-8 h-8 font-bold focus:ring-0 focus:border-blue-500"
+                                placeholder="Pedido, cliente, vendedor..."
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
                             />
                         </div>
                     </div>
-                    <div className="w-44">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Status</label>
-                        <select className="form-select w-full rounded-lg border-gray-200 text-xs" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                            <option value="ALL">Todos</option>
-                            {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+                    <div className="w-32">
+                        <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">STATUS</label>
+                        <select className="form-select w-full rounded border-gray-300 text-[10px] h-8 font-bold py-0 pr-6" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                            <option value="ALL">TODOS</option>
+                            {statuses.slice(0, 8).map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                     </div>
-                    <div className="w-36">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Vendedor</label>
-                        <select className="form-select w-full rounded-lg border-gray-200 text-xs" value={filterSeller} onChange={e => setFilterSeller(e.target.value)}>
-                            <option value="ALL">Todos</option>
+                    <div className="w-28">
+                        <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">VENDEDOR</label>
+                        <select className="form-select w-full rounded border-gray-300 text-[10px] h-8 font-bold py-0 pr-6" value={filterSeller} onChange={e => setFilterSeller(e.target.value)}>
+                            <option value="ALL">TODOS</option>
                             {sellers.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                     </div>
-                    <div className="w-36">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Emitente</label>
-                        <select className="form-select w-full rounded-lg border-gray-200 text-xs" value={filterIssuer} onChange={e => setFilterIssuer(e.target.value)}>
-                            <option value="ALL">Todos</option>
-                            {issuers.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
+                    <div className="w-24">
+                        <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">DE</label>
+                        <input type="date" className="form-input w-full rounded border-gray-300 text-[10px] h-8 px-2" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} />
                     </div>
-                    <div className="w-32">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Data De</label>
-                        <input type="date" className="form-input w-full rounded-lg border-gray-200 text-xs" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} />
-                    </div>
-                    <div className="w-32">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Data Até</label>
-                        <input type="date" className="form-input w-full rounded-lg border-gray-200 text-xs" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} />
+                    <div className="w-24">
+                        <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">ATÉ</label>
+                        <input type="date" className="form-input w-full rounded border-gray-300 text-[10px] h-8 px-2" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} />
                     </div>
                     {hasFilters && (
-                        <button onClick={clearFilters} className="text-xs text-red-500 hover:text-red-700 font-bold flex items-center gap-1 pb-2">
-                            <span className="material-icons-outlined text-sm">filter_alt_off</span>
-                            Limpar
+                        <button onClick={clearFilters} className="h-8 px-2 text-[10px] text-red-500 hover:text-red-700 font-black flex items-center gap-1 uppercase tracking-widest">
+                            <span className="material-icons-outlined text-xs">filter_alt_off</span>
+                            LIMPAR
                         </button>
                     )}
                 </div>
             </div>
 
             {/* Table */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                {/* Table Header */}
-                <div className="grid grid-cols-12 bg-gray-50 border-b border-gray-200 px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider items-center">
-                    <div className="col-span-1 cursor-pointer hover:text-gray-600" onClick={() => toggleSort('order_number')}>
-                        Pedido <SortIcon field="order_number" />
-                    </div>
-                    <div className="col-span-2">Cliente</div>
-                    <div className="col-span-1 cursor-pointer hover:text-gray-600" onClick={() => toggleSort('order_date')}>
-                        Data <SortIcon field="order_date" />
-                    </div>
-                    <div className="col-span-1">Status</div>
-                    <div className="col-span-1 text-right cursor-pointer hover:text-gray-600" onClick={() => toggleSort('total_amount')}>
-                        Venda <SortIcon field="total_amount" />
-                    </div>
-                    <div className="col-span-1 text-right">Custo Est.</div>
-                    <div className="col-span-1 text-right">Custo Real</div>
-                    <div className="col-span-1 text-right">Recebido</div>
-                    <div className="col-span-1 text-right">A Receber</div>
-                    <div className="col-span-1 text-right cursor-pointer hover:text-gray-600" onClick={() => toggleSort('balance')}>
-                        Saldo <SortIcon field="balance" />
-                    </div>
-                    <div className="col-span-1 text-center">Ações</div>
-                </div>
+            <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50/50">
+                            <tr className="text-[8px] font-black text-gray-400 uppercase tracking-widest">
+                                <th className="px-3 py-2 text-left cursor-pointer hover:text-gray-600" onClick={() => toggleSort('order_number')}>
+                                    <div className="flex items-center">Pedido <SortIcon field="order_number" /></div>
+                                </th>
+                                <th className="px-3 py-2 text-left">Cliente / Emitente</th>
+                                <th className="px-3 py-2 text-left cursor-pointer hover:text-gray-600" onClick={() => toggleSort('order_date')}>
+                                    <div className="flex items-center">Data <SortIcon field="order_date" /></div>
+                                </th>
+                                <th className="px-3 py-2 text-left">Status</th>
+                                <th className="px-3 py-2 text-right cursor-pointer hover:text-gray-600" onClick={() => toggleSort('total_amount')}>
+                                    <div className="flex items-center justify-end">Venda <SortIcon field="total_amount" /></div>
+                                </th>
+                                <th className="px-3 py-2 text-right">Custo Real</th>
+                                <th className="px-3 py-2 text-right">Recebido</th>
+                                <th className="px-3 py-2 text-right">A Receber</th>
+                                <th className="px-3 py-2 text-right cursor-pointer hover:text-gray-600" onClick={() => toggleSort('balance')}>
+                                    <div className="flex items-center justify-end">Saldo <SortIcon field="balance" /></div>
+                                </th>
+                                <th className="px-3 py-2 text-center w-16">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                            {filteredOrders.length === 0 ? (
+                                <tr>
+                                    <td colSpan={10} className="p-10 text-center">
+                                        <span className="material-icons-outlined text-4xl text-gray-200 mb-2">search_off</span>
+                                        <p className="text-gray-400 text-[10px] font-black uppercase">Nenhum pedido encontrado</p>
+                                    </td>
+                                </tr>
+                            ) : (
+                                filteredOrders.map(order => {
+                                    const saleValue = getOrderSaleValue(order);
+                                    const realCost = getOrderRealCost(order.items);
+                                    const received = getOrderReceivedAmount(order);
+                                    const pending = getOrderPendingAmount(order);
+                                    const balance = getOrderBalance(order);
+                                    const isExpanded = expandedOrder === order.id;
+                                    const costProgress = getCostPaidCount(order.items);
 
-                {/* Table Body */}
-                {filteredOrders.length === 0 ? (
-                    <div className="p-12 text-center">
-                        <span className="material-icons-outlined text-6xl text-gray-200 mb-4">search_off</span>
-                        <p className="text-gray-400 font-medium">Nenhum pedido encontrado com os filtros aplicados.</p>
-                    </div>
-                ) : (
-                    filteredOrders.map(order => {
-                        const saleValue = getOrderSaleValue(order);
-                        const estimatedCost = getOrderEstimatedCost(order.items);
-                        const realCost = getOrderRealCost(order.items);
-                        const received = getOrderReceivedAmount(order);
-                        const pending = getOrderPendingAmount(order);
-                        const balance = getOrderBalance(order);
-                        const paymentStatus = getPaymentStatus(order);
-                        const isExpanded = expandedOrder === order.id;
-                        const costProgress = getCostPaidCount(order.items);
-
-                        return (
-                            <React.Fragment key={order.id}>
-                                {/* Row */}
-                                <div
-                                    className={`grid grid-cols-12 px-4 py-3 items-center border-b border-gray-100 text-sm hover:bg-gray-50 transition-colors cursor-pointer ${isExpanded ? 'bg-blue-50/50' : ''}`}
-                                    onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
-                                >
-                                    <div className="col-span-1">
-                                        <span className="font-bold text-blue-600 text-xs">{order.order_number}</span>
-                                        <p className="text-[10px] text-gray-400">{order.salesperson}</p>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <p className="font-semibold text-gray-800 text-xs truncate">{order.client_name}</p>
-                                        <p className="text-[10px] text-gray-400">{order.issuer}</p>
-                                    </div>
-                                    <div className="col-span-1 text-xs text-gray-600">{formatDate(order.order_date)}</div>
-                                    <div className="col-span-1">
-                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold border ${statusColors[order.status] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                                            <span className="material-icons-outlined text-[10px]">{statusIcons[order.status] || 'help'}</span>
-                                            {order.status?.replace('AGUARDANDO PAGAMENTO ', 'AGU. ').replace('FATURAMENTO', 'FAT.').replace('2 PARCELA', '2ª PARC.')}
-                                        </span>
-                                    </div>
-                                    <div className="col-span-1 text-right font-bold text-gray-900 text-xs">{formatCurrency(saleValue)}</div>
-                                    <div className="col-span-1 text-right text-xs text-gray-500">{formatCurrency(estimatedCost)}</div>
-                                    <div className="col-span-1 text-right text-xs text-slate-600 font-medium">
-                                        {formatCurrency(realCost)}
-                                        {(() => {
-                                            const margin = saleValue > 0 ? ((saleValue - realCost) / saleValue) * 100 : 0;
-                                            return (
-                                                <span className={`block text-[9px] font-bold ${margin >= 30 ? 'text-green-500' : margin >= 15 ? 'text-yellow-500' : 'text-red-500'}`}>
-                                                    {margin.toFixed(0)}% margem
-                                                </span>
-                                            );
-                                        })()}
-                                    </div>
-                                    <div className="col-span-1 text-right">
-                                        <span className="text-xs font-bold text-green-600">{formatCurrency(received)}</span>
-                                        {paymentStatus === 'PAID' && <span className="material-icons-outlined text-green-500 text-xs ml-1">check_circle</span>}
-                                    </div>
-                                    <div className="col-span-1 text-right">
-                                        <span className={`text-xs font-bold ${pending > 0 ? 'text-orange-600' : 'text-green-600'}`}>{formatCurrency(pending)}</span>
-                                    </div>
-                                    <div className="col-span-1 text-right">
-                                        <span className={`text-xs font-black ${balance >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(balance)}</span>
-                                    </div>
-                                    <div className="col-span-1 text-center flex justify-center gap-1">
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); navigate(`/pedido/${order.id}?mode=view`); }}
-                                            className="p-1.5 rounded-lg text-gray-400 hover:bg-blue-50 hover:text-blue-500 transition-colors"
-                                            title="Visualizar Pedido"
-                                        >
-                                            <span className="material-icons-outlined text-sm">visibility</span>
-                                        </button>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); setExpandedOrder(isExpanded ? null : order.id); }}
-                                            className={`p-1.5 rounded-lg transition-colors ${isExpanded ? 'text-blue-500 bg-blue-50' : 'text-gray-400 hover:bg-gray-100'}`}
-                                            title="Expandir Detalhes"
-                                        >
-                                            <span className="material-icons-outlined text-sm">{isExpanded ? 'expand_less' : 'expand_more'}</span>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Expanded Detail */}
-                                {isExpanded && (
-                                    <div className="bg-slate-50 border-b-2 border-blue-200 px-6 py-5 animate-in slide-in-from-top-2 duration-200">
-                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                            {/* Items Table */}
-                                            <div className="lg:col-span-2">
-                                                <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center gap-2">
-                                                    <span className="material-icons-outlined text-sm text-blue-500">inventory</span>
-                                                    Itens do Pedido ({order.items.length})
-                                                </h4>
-                                                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                                                    <div className="grid grid-cols-12 bg-gray-100 px-3 py-2 text-[9px] font-bold text-gray-400 uppercase">
-                                                        <div className="col-span-3">Produto</div>
-                                                        <div className="col-span-1 text-center">Qtd</div>
-                                                        <div className="col-span-2 text-right">Custo Unit.</div>
-                                                        <div className="col-span-2 text-right">Real Unit.</div>
-                                                        <div className="col-span-2 text-right">Venda</div>
-                                                        <div className="col-span-2 text-center">Pago?</div>
-                                                    </div>
-                                                    {order.items.map((item, idx) => {
-                                                        const itemCosts = [
-                                                            { label: 'Produto', est: item.unit_price * item.quantity, real: (item.real_unit_price || 0) * item.quantity, paid: item.unit_price_paid },
-                                                            { label: 'Personalização', est: item.customization_cost, real: item.real_customization_cost || 0, paid: item.customization_paid },
-                                                            { label: 'Transp. Forn.', est: item.supplier_transport_cost, real: item.real_supplier_transport_cost || 0, paid: item.supplier_transport_paid },
-                                                            { label: 'Transp. Cliente', est: item.client_transport_cost, real: item.real_client_transport_cost || 0, paid: item.client_transport_paid },
-                                                            { label: 'Despesa Extra', est: item.extra_expense, real: item.real_extra_expense || 0, paid: item.extra_expense_paid },
-                                                            { label: 'Layout', est: item.layout_cost, real: item.real_layout_cost || 0, paid: item.layout_paid },
-                                                        ].filter(c => c.est > 0 || c.real > 0);
-
-                                                        const totalEstItem = itemCosts.reduce((a, c) => a + c.est, 0);
-                                                        const totalRealItem = itemCosts.reduce((a, c) => a + c.real, 0);
-
+                                    return (
+                                        <React.Fragment key={order.id}>
+                                            <tr
+                                                className={`hover:bg-blue-50/30 transition-colors cursor-pointer group ${isExpanded ? 'bg-blue-50/50' : ''}`}
+                                                onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
+                                            >
+                                                <td className="px-3 py-1.5 whitespace-nowrap">
+                                                    <a href={`/pedido/${order.id}?mode=view`} onClick={(e) => e.stopPropagation()} className="text-xs font-black text-blue-600 hover:underline">
+                                                        #{order.order_number}
+                                                    </a>
+                                                    <p className="text-[8px] text-gray-400 font-black uppercase mt-0.5">{order.salesperson}</p>
+                                                </td>
+                                                <td className="px-3 py-1.5 whitespace-nowrap">
+                                                    <p className="text-xs font-black text-gray-800 uppercase leading-none truncate max-w-[150px]">{order.client_name}</p>
+                                                    <p className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">{order.issuer}</p>
+                                                </td>
+                                                <td className="px-3 py-1.5 whitespace-nowrap text-[10px] text-gray-600 font-bold">{formatDate(order.order_date)}</td>
+                                                <td className="px-3 py-1.5 whitespace-nowrap">
+                                                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black uppercase shadow-sm ${statusColors[order.status] || 'bg-gray-100 text-gray-600'}`}>
+                                                        {order.status?.replace('AGUARDANDO PAGAMENTO ', 'AGU. ').replace('FATURAMENTO', 'FAT.').replace('2 PARCELA', '2ª PARC.')}
+                                                    </span>
+                                                </td>
+                                                <td className="px-3 py-1.5 text-right whitespace-nowrap text-xs font-black text-gray-900">{formatCurrency(saleValue)}</td>
+                                                <td className="px-3 py-1.5 text-right whitespace-nowrap">
+                                                    <span className="text-xs font-black text-slate-700">{formatCurrency(realCost)}</span>
+                                                    {(() => {
+                                                        const margin = saleValue > 0 ? ((saleValue - realCost) / saleValue) * 100 : 0;
                                                         return (
-                                                            <React.Fragment key={item.id || idx}>
-                                                                <div className="grid grid-cols-12 px-3 py-2 items-center border-b border-gray-50 text-xs">
-                                                                    <div className="col-span-3 font-medium text-gray-800 truncate">{item.product_name || 'Item ' + (idx + 1)}</div>
-                                                                    <div className="col-span-1 text-center text-gray-600">{item.quantity}</div>
-                                                                    <div className="col-span-2 text-right text-gray-500">{formatCurrency(totalEstItem)}</div>
-                                                                    <div className="col-span-2 text-right font-medium text-slate-700">{formatCurrency(totalRealItem)}</div>
-                                                                    <div className="col-span-2 text-right font-bold text-blue-600">{formatCurrency(item.total_item_value || 0)}</div>
-                                                                    <div className="col-span-2 text-center">
-                                                                        {itemCosts.every(c => c.paid) ? (
-                                                                            <span className="text-green-500 font-bold text-[10px] flex items-center justify-center gap-1">
-                                                                                <span className="material-icons-outlined text-xs">check_circle</span>Sim
-                                                                            </span>
-                                                                        ) : (
-                                                                            <span className="text-orange-500 font-bold text-[10px]">
-                                                                                {itemCosts.filter(c => c.paid).length}/{itemCosts.length}
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
+                                                            <span className={`block text-[8px] font-black uppercase mt-0.5 ${margin >= 30 ? 'text-green-500' : margin >= 15 ? 'text-orange-500' : 'text-red-500'}`}>
+                                                                {margin.toFixed(0)}% MARGEM
+                                                            </span>
+                                                        );
+                                                    })()}
+                                                </td>
+                                                <td className="px-3 py-1.5 text-right whitespace-nowrap">
+                                                    <span className="text-xs font-black text-green-600">{formatCurrency(received)}</span>
+                                                </td>
+                                                <td className="px-3 py-1.5 text-right whitespace-nowrap">
+                                                    <span className={`text-xs font-black ${pending > 0 ? 'text-orange-600' : 'text-green-600'}`}>{formatCurrency(pending)}</span>
+                                                </td>
+                                                <td className="px-3 py-1.5 text-right whitespace-nowrap border-l border-gray-50 bg-gray-50/20">
+                                                    <span className={`text-xs font-black ${balance >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatCurrency(balance)}</span>
+                                                </td>
+                                                <td className="px-3 py-1.5 text-center flex justify-center gap-0.5 whitespace-nowrap">
+                                                    <a
+                                                        href={`/pedido/${order.id}?mode=view`}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="p-1 rounded text-gray-400 hover:text-blue-500 hover:bg-white hover:shadow-sm"
+                                                        title="Ver Pedido"
+                                                    >
+                                                        <span className="material-icons-outlined text-base">visibility</span>
+                                                    </a>
+                                                    <button className="p-1 rounded text-gray-400 group-hover:text-blue-500 transition-all">
+                                                        <span className="material-icons-outlined text-base">{isExpanded ? 'expand_less' : 'expand_more'}</span>
+                                                    </button>
+                                                </td>
+                                            </tr>
+
+                                            {/* Expanded Detail */}
+                                            {isExpanded && (
+                                                <tr>
+                                                    <td colSpan={10} className="px-6 py-4 bg-slate-50 border-y border-blue-100 shadow-inner">
+                                                        <div className="grid grid-cols-12 gap-6">
+                                                            {/* Items Section */}
+                                                            <div className="col-span-8">
+                                                                <div className="flex items-center gap-2 mb-2">
+                                                                    <span className="material-icons-outlined text-sm text-blue-500">inventory_2</span>
+                                                                    <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">DETALHAMENTO DE ITENS ({order.items.length})</h4>
                                                                 </div>
-                                                                {/* Sub-costs */}
-                                                                {itemCosts.map((c, ci) => (
-                                                                    <div key={ci} className="grid grid-cols-12 px-3 py-1 items-center border-b border-gray-50 bg-gray-50/50">
-                                                                        <div className="col-span-3 text-[10px] text-gray-400 pl-4">↳ {c.label}</div>
-                                                                        <div className="col-span-1" />
-                                                                        <div className="col-span-2 text-right text-[10px] text-gray-400">{formatCurrency(c.est)}</div>
-                                                                        <div className="col-span-2 text-right text-[10px] text-gray-500">{formatCurrency(c.real)}</div>
-                                                                        <div className="col-span-2" />
-                                                                        <div className="col-span-2 text-center">
-                                                                            {c.paid ? (
-                                                                                <span className="inline-flex items-center gap-0.5 bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full text-[9px] font-bold">
-                                                                                    <span className="material-icons-outlined text-[10px]">check</span>Pago
-                                                                                </span>
-                                                                            ) : c.real > 0 ? (
-                                                                                <span className="inline-flex items-center gap-0.5 bg-yellow-100 text-yellow-600 px-1.5 py-0.5 rounded-full text-[9px] font-bold">
-                                                                                    Pendente
-                                                                                </span>
-                                                                            ) : (
-                                                                                <span className="text-gray-300 text-[9px]">—</span>
-                                                                            )}
+                                                                <div className="bg-white rounded border border-gray-200 overflow-hidden shadow-sm">
+                                                                    <table className="min-w-full divide-y divide-gray-100">
+                                                                        <thead className="bg-gray-50">
+                                                                            <tr className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">
+                                                                                <th className="px-2 py-1.5 text-left">PRODUTO</th>
+                                                                                <th className="px-2 py-1.5 text-center">QTD</th>
+                                                                                <th className="px-2 py-1.5 text-right">CUSTO EST.</th>
+                                                                                <th className="px-2 py-1.5 text-right">CUSTO REAL</th>
+                                                                                <th className="px-2 py-1.5 text-right">VENDA</th>
+                                                                                <th className="px-2 py-1.5 text-center">PAGO?</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody className="divide-y divide-gray-50">
+                                                                            {order.items.map((item, idx) => {
+                                                                                const itemCosts = [
+                                                                                    { est: item.unit_price * item.quantity, real: (item.real_unit_price || 0) * item.quantity, paid: item.unit_price_paid },
+                                                                                    { est: item.customization_cost, real: item.real_customization_cost || 0, paid: item.customization_paid },
+                                                                                    { est: item.supplier_transport_cost, real: item.real_supplier_transport_cost || 0, paid: item.supplier_transport_paid },
+                                                                                    { est: item.client_transport_cost, real: item.real_client_transport_cost || 0, paid: item.client_transport_paid },
+                                                                                    { est: item.extra_expense, real: item.real_extra_expense || 0, paid: item.extra_expense_paid },
+                                                                                    { est: item.layout_cost, real: item.real_layout_cost || 0, paid: item.layout_paid },
+                                                                                ].filter(c => c.est > 0 || c.real > 0);
+
+                                                                                const totalEstItem = itemCosts.reduce((a, c) => a + c.est, 0);
+                                                                                const totalRealItem = itemCosts.reduce((a, c) => a + c.real, 0);
+
+                                                                                return (
+                                                                                    <tr key={item.id || idx} className="text-[10px]">
+                                                                                        <td className="px-2 py-1.5 font-bold text-gray-800">{item.product_name}</td>
+                                                                                        <td className="px-2 py-1.5 text-center font-bold text-gray-500">{item.quantity}</td>
+                                                                                        <td className="px-2 py-1.5 text-right text-gray-400">{formatCurrency(totalEstItem)}</td>
+                                                                                        <td className="px-2 py-1.5 text-right font-bold text-slate-700">{formatCurrency(totalRealItem)}</td>
+                                                                                        <td className="px-2 py-1.5 text-right font-black text-blue-600">{formatCurrency(item.total_item_value || 0)}</td>
+                                                                                        <td className="px-2 py-1.5 text-center">
+                                                                                            <span className={`px-1 py-0.5 rounded text-[8px] font-black ${itemCosts.every(c => c.paid) ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                                                                                                {itemCosts.filter(c => c.paid).length}/{itemCosts.length}
+                                                                                            </span>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                );
+                                                                            })}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Financial Resumo */}
+                                                            <div className="col-span-4 space-y-3">
+                                                                <div className="flex items-center gap-2 mb-2">
+                                                                    <span className="material-icons-outlined text-sm text-green-500">account_balance_wallet</span>
+                                                                    <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">RESUMO FINANCEIRO</h4>
+                                                                </div>
+
+                                                                <div className="bg-white rounded border border-gray-200 p-2.5 shadow-sm space-y-2">
+                                                                    <div className="flex justify-between items-center text-[10px] border-b border-gray-50 pb-1.5">
+                                                                        <span className="font-bold text-gray-400 uppercase">Resumo Pagamentos</span>
+                                                                        <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-black text-[8px]">{costProgress.paid}/{costProgress.total} Custos Pagos</span>
+                                                                    </div>
+                                                                    <div className="grid grid-cols-2 gap-2">
+                                                                        <div className={`p-2 rounded border ${order.entry_confirmed ? 'bg-green-50/50 border-green-100' : 'bg-gray-50 border-gray-100'}`}>
+                                                                            <p className="text-[8px] font-black text-gray-400 uppercase">Entrada</p>
+                                                                            <p className="text-xs font-black text-gray-800">{formatCurrency(order.entry_amount)}</p>
+                                                                            <p className={`text-[8px] font-bold uppercase mt-1 ${order.entry_confirmed ? 'text-green-600' : 'text-orange-500'}`}>
+                                                                                {order.entry_confirmed ? '✓ Pago' : '⚠ Pendente'}
+                                                                            </p>
+                                                                        </div>
+                                                                        <div className={`p-2 rounded border ${order.remaining_confirmed ? 'bg-green-50/50 border-green-100' : 'bg-gray-50 border-gray-100'}`}>
+                                                                            <p className="text-[8px] font-black text-gray-400 uppercase">Restante</p>
+                                                                            <p className="text-xs font-black text-gray-800">{formatCurrency(order.remaining_amount)}</p>
+                                                                            <p className={`text-[8px] font-bold uppercase mt-1 ${order.remaining_confirmed ? 'text-green-600' : 'text-orange-500'}`}>
+                                                                                {order.remaining_confirmed ? '✓ Pago' : '⚠ Pendente'}
+                                                                            </p>
                                                                         </div>
                                                                     </div>
-                                                                ))}
-                                                            </React.Fragment>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-
-                                            {/* Payment Summary */}
-                                            <div className="space-y-4">
-                                                <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center gap-2">
-                                                    <span className="material-icons-outlined text-sm text-green-500">account_balance_wallet</span>
-                                                    Resumo Financeiro
-                                                </h4>
-
-                                                {/* Entry */}
-                                                <div className={`rounded-lg border p-3 ${order.entry_confirmed ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}>
-                                                    <div className="flex justify-between items-center">
-                                                        <div>
-                                                            <p className="text-[10px] font-bold uppercase text-gray-400">Entrada</p>
-                                                            <p className="text-lg font-black text-gray-800">{formatCurrency(order.entry_amount)}</p>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            {order.entry_confirmed ? (
-                                                                <div className="flex items-center gap-1 text-green-600">
-                                                                    <span className="material-icons-outlined text-lg">check_circle</span>
-                                                                    <div>
-                                                                        <p className="text-[10px] font-bold uppercase">Pago</p>
-                                                                        <p className="text-[10px] text-gray-400">{formatDate(order.entry_date)}</p>
-                                                                    </div>
                                                                 </div>
-                                                            ) : (
-                                                                <span className="text-yellow-500 font-bold text-xs">PENDENTE</span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
 
-                                                {/* Remaining */}
-                                                <div className={`rounded-lg border p-3 ${order.remaining_confirmed ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}>
-                                                    <div className="flex justify-between items-center">
-                                                        <div>
-                                                            <p className="text-[10px] font-bold uppercase text-gray-400">Restante</p>
-                                                            <p className="text-lg font-black text-gray-800">{formatCurrency(order.remaining_amount)}</p>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            {order.remaining_confirmed ? (
-                                                                <div className="flex items-center gap-1 text-green-600">
-                                                                    <span className="material-icons-outlined text-lg">check_circle</span>
-                                                                    <div>
-                                                                        <p className="text-[10px] font-bold uppercase">Pago</p>
-                                                                        <p className="text-[10px] text-gray-400">{formatDate(order.remaining_date)}</p>
-                                                                    </div>
+                                                                <div className={`rounded border-2 p-3 ${balance >= 0 ? 'border-emerald-200 bg-emerald-50/50' : 'border-red-200 bg-red-50/50'}`}>
+                                                                    <p className={`text-[8px] font-black uppercase mb-1 ${balance >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>Margem de Contribuição Líquida</p>
+                                                                    <p className={`text-2xl font-black ${balance >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{formatCurrency(balance)}</p>
+                                                                    <p className="text-[8px] text-gray-400 font-bold uppercase mt-1">
+                                                                        Recebido ({formatCurrency(received)}) - Custos ({formatCurrency(realCost)})
+                                                                    </p>
                                                                 </div>
-                                                            ) : (
-                                                                <span className="text-yellow-500 font-bold text-xs">PENDENTE</span>
-                                                            )}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Cost Progress */}
-                                                <div className="bg-white rounded-lg border border-gray-200 p-3">
-                                                    <p className="text-[10px] font-bold uppercase text-gray-400 mb-2">Progresso de Pagamento de Custos</p>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="flex-1 bg-gray-200 h-2 rounded-full overflow-hidden">
-                                                            <div
-                                                                className="h-full bg-blue-500 rounded-full transition-all duration-500"
-                                                                style={{ width: `${costProgress.total > 0 ? (costProgress.paid / costProgress.total) * 100 : 0}%` }}
-                                                            />
-                                                        </div>
-                                                        <span className="text-xs font-bold text-gray-600">{costProgress.paid}/{costProgress.total}</span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Balance Card */}
-                                                <div className={`rounded-lg border-2 p-4 ${balance >= 0 ? 'border-emerald-300 bg-emerald-50' : 'border-red-300 bg-red-50'}`}>
-                                                    <p className={`text-[10px] font-bold uppercase mb-1 ${balance >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>Saldo do Pedido</p>
-                                                    <p className={`text-3xl font-black ${balance >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatCurrency(balance)}</p>
-                                                    <p className="text-[10px] text-gray-400 mt-1">Recebido ({formatCurrency(received)}) - Custos Reais ({formatCurrency(realCost)})</p>
-                                                </div>
-
-                                                {/* Billing Info */}
-                                                <div className="bg-gray-50 rounded-lg border border-gray-200 p-3">
-                                                    <p className="text-[10px] font-bold uppercase text-gray-400 mb-2">Info Comercial</p>
-                                                    <div className="space-y-1 text-xs text-gray-600">
-                                                        <p><span className="font-bold text-gray-700">Faturamento:</span> {order.billing_type || '—'}</p>
-                                                        <p><span className="font-bold text-gray-700">Vencimento:</span> {formatDate(order.payment_due_date)}</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </React.Fragment>
-                        );
-                    })
-                )}
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </React.Fragment>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );

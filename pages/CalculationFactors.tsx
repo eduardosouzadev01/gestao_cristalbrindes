@@ -40,7 +40,7 @@ const CalculationFactors: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="max-w-[1920px] w-full mx-auto px-4 sm:px-6 lg:px-8">
       <div className="md:flex md:items-center md:justify-between mb-8">
         <div className="flex-1 min-w-0">
           <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate flex items-center gap-3">
@@ -55,7 +55,7 @@ const CalculationFactors: React.FC = () => {
       </div>
 
       <div className="bg-white shadow-lg rounded-xl overflow-hidden border border-gray-100">
-        <div className="border-b border-gray-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="border-b border-gray-200 px-2 py-2 text-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-2">
             <span className="bg-blue-100 text-blue-500 py-1 px-3 rounded-md text-xs font-bold uppercase">Total</span>
             <span className="text-gray-900 font-semibold">{factors.length} Fatores</span>
@@ -69,16 +69,16 @@ const CalculationFactors: React.FC = () => {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-1/4">Nome do Fator</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-1/2">Descrição</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Multiplicador</th>
-              <th className="relative px-6 py-4"></th>
+              <th className="px-2 py-2 text-sm text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-1/4">Nome do Fator</th>
+              <th className="px-2 py-2 text-sm text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-1/2">Descrição</th>
+              <th className="px-2 py-2 text-sm text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Multiplicador</th>
+              <th className="relative px-2 py-2 text-sm"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {factors.map((f, i) => (
               <tr key={i} className="hover:bg-gray-50 transition-colors">
-                <td className="px-6 py-4">
+                <td className="px-2 py-2 text-sm">
                   <div className="flex items-center">
                     <div className={`h-10 w-10 rounded-lg flex items-center justify-center bg-indigo-50 text-indigo-600`}><span className="material-symbols-outlined">percent</span></div>
                     <div className="ml-4">
@@ -88,9 +88,9 @@ const CalculationFactors: React.FC = () => {
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4"><p className="text-sm text-gray-500 line-clamp-2">{f.description}</p></td>
-                <td className="px-6 py-4"><span className="inline-flex px-3 py-1 rounded-full text-sm font-bold bg-blue-50 text-blue-700">{calculateMultiplier(f)}</span></td>
-                <td className="px-6 py-4 text-right">
+                <td className="px-2 py-2 text-sm"><p className="text-sm text-gray-500 line-clamp-2">{f.description}</p></td>
+                <td className="px-2 py-2 text-sm"><span className="inline-flex px-3 py-1 rounded-full text-sm font-bold bg-blue-50 text-blue-700">{calculateMultiplier(f)}</span></td>
+                <td className="px-2 py-2 text-sm text-right">
                   <Link to={`/configuracoes/fatores/editar/${f.id}`} className="text-gray-400 hover:text-blue-500 mx-2 inline-block"><span className="material-symbols-outlined">edit</span></Link>
                   <button onClick={() => deleteFactor(f.id, f.name)} className="text-gray-400 hover:text-red-600 mx-2"><span className="material-symbols-outlined">delete</span></button>
                 </td>

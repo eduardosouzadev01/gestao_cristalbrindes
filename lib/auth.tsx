@@ -27,160 +27,30 @@ export interface AppUser {
   salesperson?: string; // Maps to VENDAS 01, VENDAS 02, etc.
 }
 
-// Predefined users
-const PREDEFINED_USERS: Record<string, AppUser> = {
-  'cristalbrindes@cristalbrindes.com.br': {
-    email: 'cristalbrindes@cristalbrindes.com.br',
-    name: 'Gestão',
-    permissions: {
-      fullAccess: true,
-      viewAllOrders: true,
-      viewOwnOrdersOnly: false,
-      cadastros: true,
-      produtos: true,
-      canDelete: true,
-      crmPerformance: true,
-      crmFinanceiro: true,
-      financeiro: {
-        contasReceber: true,
-        contasPagar: true,
-      },
-      comissoes: true,
-      relatorios: true,
-      fatores: true,
-    },
-  },
-  'adm01@cristalbrindes.com.br': {
-    email: 'adm01@cristalbrindes.com.br',
-    name: 'Administrativo',
-    permissions: {
-      fullAccess: false,
-      viewAllOrders: true,
-      viewOwnOrdersOnly: false,
-      cadastros: true,
-      produtos: true,
-      canDelete: true,
-      crmPerformance: true,
-      crmFinanceiro: false,
-      financeiro: {
-        contasReceber: true,
-        contasPagar: false,
-      },
-      comissoes: false,
-      relatorios: false,
-      fatores: false,
-    },
-  },
-  'vendas01@cristalbrindes.com.br': {
-    email: 'vendas01@cristalbrindes.com.br',
-    name: 'Vendas 01',
-    salesperson: 'VENDAS 01',
-    permissions: {
-      fullAccess: false,
-      viewAllOrders: false,
-      viewOwnOrdersOnly: true,
-      cadastros: true,
-      produtos: true,
-      canDelete: false,
-      crmPerformance: false,
-      crmFinanceiro: false,
-      financeiro: {
-        contasReceber: false,
-        contasPagar: false,
-      },
-      comissoes: false,
-      relatorios: false,
-      fatores: false,
-    },
-  },
-  'vendas02@cristalbrindes.com.br': {
-    email: 'vendas02@cristalbrindes.com.br',
-    name: 'Vendas 02',
-    salesperson: 'VENDAS 02',
-    permissions: {
-      fullAccess: false,
-      viewAllOrders: false,
-      viewOwnOrdersOnly: true,
-      cadastros: true,
-      produtos: true,
-      canDelete: false,
-      crmPerformance: false,
-      crmFinanceiro: false,
-      financeiro: {
-        contasReceber: false,
-        contasPagar: false,
-      },
-      comissoes: false,
-      relatorios: false,
-      fatores: false,
-    },
-  },
-  'vendas03@cristalbrindes.com.br': {
-    email: 'vendas03@cristalbrindes.com.br',
-    name: 'Vendas 03',
-    salesperson: 'VENDAS 03',
-    permissions: {
-      fullAccess: false,
-      viewAllOrders: false,
-      viewOwnOrdersOnly: true,
-      cadastros: true,
-      produtos: true,
-      canDelete: false,
-      crmPerformance: false,
-      crmFinanceiro: false,
-      financeiro: {
-        contasReceber: false,
-        contasPagar: false,
-      },
-      comissoes: false,
-      relatorios: false,
-      fatores: false,
-    },
-  },
-  'vendas04@cristalbrindes.com.br': {
-    email: 'vendas04@cristalbrindes.com.br',
-    name: 'Vendas 04',
-    salesperson: 'VENDAS 04',
-    permissions: {
-      fullAccess: false,
-      viewAllOrders: false,
-      viewOwnOrdersOnly: true,
-      cadastros: true,
-      produtos: true,
-      canDelete: false,
-      crmPerformance: false,
-      crmFinanceiro: false,
-      financeiro: {
-        contasReceber: false,
-        contasPagar: false,
-      },
-      comissoes: false,
-      relatorios: false,
-      fatores: false,
-    },
-  },
-  'vendas05@cristalbrindes.com.br': {
-    email: 'vendas05@cristalbrindes.com.br',
-    name: 'Vendas 05',
-    salesperson: 'VENDAS 05',
-    permissions: {
-      fullAccess: false,
-      viewAllOrders: false,
-      viewOwnOrdersOnly: true,
-      cadastros: true,
-      produtos: true,
-      canDelete: false,
-      crmPerformance: false,
-      crmFinanceiro: false,
-      financeiro: {
-        contasReceber: false,
-        contasPagar: false,
-      },
-      comissoes: false,
-      relatorios: false,
-      fatores: false,
-    },
-  },
+// Logic to fetch user profile from DB
+const fetchUserProfile = async (userId: string): Promise<AppUser | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (error || !data) {
+      console.error('Error fetching profile:', error);
+      return null;
+    }
+
+    return {
+      email: data.email,
+      name: data.name,
+      salesperson: data.salesperson_id,
+      permissions: data.permissions as UserPermissions,
+    };
+  } catch (err) {
+    console.error('Unexpected error fetching profile:', err);
+    return null;
+  }
 };
 
 interface AuthContextType {
@@ -212,14 +82,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Check existing session
       const { data: { session } } = await supabase.auth.getSession();
 
-      if (session?.user?.email) {
-        const userEmail = session.user.email.toLowerCase();
-        const predefined = PREDEFINED_USERS[userEmail];
+      if (session?.user?.id) {
+        const profile = await fetchUserProfile(session.user.id);
 
-        if (predefined) {
-          setAppUser(predefined);
+        if (profile) {
+          setAppUser(profile);
         } else {
-          // Invalid user session
+          // No profile found in DB, even if authenticated in Supabase
           await supabase.auth.signOut();
           setAppUser(null);
         }
@@ -252,20 +121,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return { success: false, error: 'Erro ao obter dados do usuário.' };
     }
 
-    // 2. Verificar permissões no mapa local (baseado no e-mail)
-    const userEmail = data.user.email.toLowerCase();
-    const predefinedUser = PREDEFINED_USERS[userEmail];
+    // 2. Buscar perfil no banco de dados
+    const profile = await fetchUserProfile(data.user.id);
 
-    if (!predefinedUser) {
-      // Se logou no Supabase mas não está no nosso mapa de permissões
-      // Podemos negar o acesso ou dar um acesso padrão (sem permissões)
+    if (!profile) {
       await supabase.auth.signOut();
-      return { success: false, error: 'E-mail autenticado mas não autorizado no sistema. Contate o administrador.' };
+      return { success: false, error: 'Perfil de usuário não encontrado no sistema. Contate o administrador.' };
     }
 
-    const userWithAuth = { ...predefinedUser };
-    setAppUser(userWithAuth);
-    localStorage.setItem('app_user', JSON.stringify(userWithAuth));
+    setAppUser(profile);
+    localStorage.setItem('app_user', JSON.stringify(profile));
     return { success: true };
   };
 

@@ -26,9 +26,12 @@ import PayablesPage from './pages/PayablesPage';
 import LoginPage from './pages/LoginPage';
 import BudgetList from './pages/BudgetList';
 import BudgetForm from './pages/BudgetForm';
+import ProposalList from './pages/ProposalList';
+import ProposalDetail from './pages/ProposalDetail';
 import ManagementPage from './pages/ManagementPage';
 import ProductsPage from './pages/ProductsPage';
 import FinancialDashboardPage from './pages/FinancialDashboardPage';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 
 import NotificationCenter from './src/components/NotificationCenter';
 
@@ -42,7 +45,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; permission?: string 
 
   if (permission && !hasPermission(permission)) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      <div className="max-w-[1920px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="text-center">
           <span className="material-icons-outlined text-red-400 text-6xl mb-4">lock</span>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Acesso Restrito</h2>
@@ -77,41 +80,50 @@ const Header: React.FC = () => {
   };
 
   const menuStructure = [
-    { name: 'CRM & Gestão', path: '/crm', permission: 'pedidos' },
+    { name: 'CRM & Gestão', path: '/crm', permission: 'pedidos', icon: 'hub' },
     {
       name: 'Comercial',
       permission: 'pedidos',
       path: '#',
+      icon: 'storefront',
       subItems: [
-        { name: 'Orçamentos', path: '/orcamentos', permission: 'pedidos' },
-        { name: 'Pedidos', path: '/pedidos', permission: 'pedidos' }
+        { name: 'Orçamentos', path: '/orcamentos', permission: 'pedidos', icon: 'request_quote' },
+        { name: 'Propostas', path: '/propostas', permission: 'pedidos', icon: 'description' },
+        { name: 'Pedidos', path: '/pedidos', permission: 'pedidos', icon: 'receipt_long' }
       ]
     },
     {
       name: 'Financeiro',
       permission: 'financeiro',
       path: '#',
+      icon: 'account_balance',
       subItems: [
-        { name: 'Painel Financeiro', path: '/painel-financeiro', permission: 'financeiro.receber' },
-        { name: 'Pedidos & Recebíveis', path: '/pedidos-recebiveis', permission: 'financeiro.receber' },
-        { name: 'Contas a Pagar', path: '/payables', permission: 'financeiro.pagar' },
-        { name: 'Comissões', path: '/comissoes', permission: 'comissoes' }
+        { name: 'Painel Financeiro', path: '/painel-financeiro', permission: 'financeiro.receber', icon: 'dashboard' },
+        { name: 'Pedidos & Recebíveis', path: '/pedidos-recebiveis', permission: 'financeiro.receber', icon: 'payments' },
+        { name: 'Contas a Pagar', path: '/payables', permission: 'financeiro.pagar', icon: 'credit_card_off' },
+        { name: 'Comissões', path: '/comissoes', permission: 'comissoes', icon: 'monetization_on' }
       ]
     },
     {
       name: 'Cadastros',
       permission: 'cadastros',
       path: '#',
+      icon: 'manage_accounts',
       subItems: [
-        { name: 'Clientes', path: '/clientes', permission: 'cadastros' },
-        { name: 'Fornecedores', path: '/fornecedores', permission: 'cadastros' },
-        { name: 'Produtos', path: '/produtos', permission: 'produtos' },
-        { name: 'Fatores', path: '/configuracoes', permission: 'fatores' }
+        { name: 'Clientes', path: '/clientes', permission: 'cadastros', icon: 'groups' },
+        { name: 'Fornecedores', path: '/fornecedores', permission: 'cadastros', icon: 'local_shipping' },
+        { name: 'Produtos', path: '/produtos', permission: 'produtos', icon: 'inventory_2' },
+        { name: 'Fatores', path: '/configuracoes', permission: 'fatores', icon: 'tune' }
       ]
     }
   ];
 
   const getInitials = () => {
+    if (appUser?.salesperson) {
+      const sp = appUser.salesperson.trim().toUpperCase();
+      if (sp.length <= 3) return sp;
+      return sp.substring(0, 3);
+    }
     if (!appUser?.name) return 'U';
     const parts = appUser.name.split(' ');
     if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
@@ -119,9 +131,15 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="bg-white border-b-2 border-gray-200 sticky top-0 z-50 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-14">
+    <header className="sticky top-0 z-50" style={{
+      background: 'rgba(255,255,255,0.88)',
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
+      borderBottom: '1px solid rgba(209,213,219,0.6)',
+      boxShadow: '0 1px 12px rgba(0,0,0,0.06)'
+    }}>
+      <div className="max-w-[1920px] w-full mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-[52px]">
           <div className="flex items-center">
             <button
               onClick={() => {
@@ -133,43 +151,55 @@ const Header: React.FC = () => {
               }}
               className="flex-shrink-0 flex items-center gap-2 mr-8 hover:opacity-80 transition-opacity"
             >
-              <span className="material-icons-outlined text-[#0078D4] text-2xl">diamond</span>
-              <span className="font-bold text-[15px] text-[#323130]">Cristal Brindes</span>
+              <div className="w-7 h-7 rounded-lg bg-[#0F6CBD] flex items-center justify-center">
+                <span className="material-icons-outlined text-white text-[16px]">diamond</span>
+              </div>
+              <span className="font-semibold text-[13px] text-[#111827] tracking-tight">Cristal Brindes</span>
             </button>
-            <nav className="hidden sm:ml-4 sm:flex sm:space-x-1 h-full items-center">
+            <nav className="hidden sm:ml-2 sm:flex sm:space-x-0 h-full items-center">
               {menuStructure.map((item) => {
                 if (!hasPermission(item.permission)) return null;
                 const hasSub = item.subItems && item.subItems.some(sub => hasPermission(sub.permission));
+                const active = isActive(item.path) && item.path !== '#';
 
                 return (
                   <div key={item.name} className="relative h-full flex items-center group">
                     <Link
                       to={item.path}
-                      className={`inline-flex items-center px-3 py-1.5 rounded-md text-[13px] font-semibold transition-all h-auto mx-0.5 ${isActive(item.path) && item.path !== '#'
-                        ? 'bg-[#EBF3FC] text-[#0078D4]'
-                        : 'text-[#605E5C] hover:bg-[#F3F2F1] hover:text-[#323130]'
+                      className={`relative inline-flex items-center gap-1.5 px-3 h-full text-[13px] font-medium transition-all ${active
+                        ? 'text-[#0F6CBD]'
+                        : 'text-[#4B5563] hover:text-[#111827]'
                         }`}
                       onClick={e => { if (item.path === '#') e.preventDefault(); }}
                     >
+                      {active && (
+                        <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-[#0F6CBD] rounded-t-full" />
+                      )}
                       {item.name}
                       {hasSub && (
-                        <span className="ml-1 material-icons-outlined text-[14px] group-hover:rotate-180 transition-transform">expand_more</span>
+                        <span className="material-icons-outlined text-[14px] opacity-50 group-hover:opacity-100 group-hover:rotate-180 transition-all duration-200">expand_more</span>
                       )}
                     </Link>
 
                     {hasSub && (
-                      <div className="hidden group-hover:block absolute top-full left-0 w-56 bg-white border border-[#E1DFDD] shadow-lg rounded-lg py-1.5 z-50 mt-0">
-                        {item.subItems?.map(sub => (
-                          hasPermission(sub.permission) && (
-                            <Link
-                              key={sub.name}
-                              to={sub.path}
-                              className="block px-4 py-2.5 text-[13px] text-[#323130] hover:bg-[#F3F2F1] font-medium transition-colors"
-                            >
-                              {sub.name}
-                            </Link>
-                          )
-                        ))}
+                      <div className="hidden group-hover:flex flex-col absolute top-full left-0 w-52 z-50 pt-1">
+                        <div className="bg-white/95 backdrop-blur-xl border border-gray-200/80 shadow-xl rounded-xl py-1.5 overflow-hidden">
+                          {item.subItems?.map(sub => (
+                            hasPermission(sub.permission) && (
+                              <Link
+                                key={sub.name}
+                                to={sub.path}
+                                className={`flex items-center gap-2.5 px-4 py-2.5 text-[13px] transition-colors ${location.pathname.startsWith(sub.path)
+                                  ? 'bg-[#EBF3FC] text-[#0F6CBD] font-medium'
+                                  : 'text-[#374151] hover:bg-gray-50 hover:text-[#111827]'
+                                  }`}
+                              >
+                                <span className="material-icons-outlined text-[15px] opacity-60">{(sub as any).icon || 'circle'}</span>
+                                {sub.name}
+                              </Link>
+                            )
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -177,13 +207,13 @@ const Header: React.FC = () => {
               })}
             </nav>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <NotificationCenter />
 
             <div className="relative">
               <button
                 onClick={() => setShowMenu(!showMenu)}
-                className="h-9 w-9 rounded-full bg-[#0078D4] hover:bg-[#106EBE] flex items-center justify-center text-white text-xs font-bold focus:outline-none cursor-pointer transition-colors"
+                className="h-8 w-8 rounded-full bg-[#0F6CBD] hover:bg-[#0c5aa5] flex items-center justify-center text-white text-[11px] font-bold focus:outline-none cursor-pointer transition-all ring-2 ring-white/50"
               >
                 {getInitials()}
               </button>
@@ -191,26 +221,26 @@ const Header: React.FC = () => {
               {showMenu && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)}></div>
-                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl py-1 z-20 border border-[#E1DFDD]">
-                    <div className="px-4 py-3 border-b border-[#EDEBE9] flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-[#DEECF9] text-[#0078D4] flex items-center justify-center text-sm font-bold">
+                  <div className="absolute right-0 mt-2 w-60 bg-white/95 backdrop-blur-xl rounded-xl shadow-2xl py-1 z-20 border border-gray-200/60 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-full bg-[#EBF3FC] text-[#0F6CBD] flex items-center justify-center text-sm font-bold flex-shrink-0">
                         {getInitials()}
                       </div>
                       <div className="overflow-hidden">
-                        <p className="text-sm font-semibold text-[#323130] truncate">{appUser?.name || 'Usuário'}</p>
-                        <p className="text-xs text-[#605E5C] truncate">{appUser?.email}</p>
+                        <p className="text-sm font-semibold text-[#111827] truncate">{appUser?.name || 'Usuário'}</p>
+                        <p className="text-[11px] text-[#6B7280] truncate">{appUser?.email}</p>
                       </div>
                     </div>
                     {appUser?.salesperson && (
-                      <div className="px-4 py-2.5 border-b border-[#EDEBE9] bg-[#FAF9F8]">
-                        <p className="text-[10px] uppercase font-bold text-[#A19F9D] mb-0.5">Vendedor</p>
-                        <p className="text-sm font-semibold text-[#0078D4]">{appUser.salesperson}</p>
+                      <div className="px-4 py-2.5 border-b border-gray-100 bg-[#F9FAFB]">
+                        <p className="text-[10px] uppercase font-semibold text-[#9CA3AF] mb-0.5 tracking-wider">Vendedor</p>
+                        <p className="text-sm font-semibold text-[#0F6CBD]">{appUser.salesperson}</p>
                       </div>
                     )}
                     <div className="p-1.5">
                       <button
                         onClick={handleLogout}
-                        className="w-full text-left px-3 py-2 text-sm text-[#A4262C] hover:bg-[#FDF3F4] rounded-md font-medium flex items-center gap-2 transition-colors"
+                        className="w-full text-left px-3 py-2 text-sm text-[#DC2626] hover:bg-red-50 rounded-lg font-medium flex items-center gap-2 transition-colors"
                       >
                         <span className="material-icons-outlined text-sm">logout</span> Sair
                       </button>
@@ -228,7 +258,7 @@ const Header: React.FC = () => {
 
 const Footer: React.FC = () => (
   <footer className="bg-white border-t border-[#EDEBE9] mt-auto">
-    <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+    <div className="max-w-[1920px] w-full mx-auto py-4 px-4 sm:px-6 lg:px-8">
       <p className="text-center text-xs text-[#A19F9D]">© 2026 Cristal Brindes. Todos os direitos reservados.</p>
     </div>
   </footer>
@@ -247,7 +277,7 @@ const AppLayout: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen flex flex-col">
       <Header />
       <main className="flex-1 py-6">
         <Routes>
@@ -258,6 +288,8 @@ const AppLayout: React.FC = () => {
           <Route path="/orcamentos" element={<ProtectedRoute permission="pedidos"><BudgetList /></ProtectedRoute>} />
           <Route path="/orcamento/novo" element={<ProtectedRoute permission="pedidos"><BudgetForm /></ProtectedRoute>} />
           <Route path="/orcamento/:id" element={<ProtectedRoute permission="pedidos"><BudgetForm /></ProtectedRoute>} />
+          <Route path="/propostas" element={<ProtectedRoute permission="pedidos"><ProposalList /></ProtectedRoute>} />
+          <Route path="/proposta/:id" element={<ProtectedRoute permission="pedidos"><ProposalDetail /></ProtectedRoute>} />
           <Route path="/crm" element={<ProtectedRoute permission="pedidos"><ManagementPage /></ProtectedRoute>} />
           <Route path="/produtos" element={<ProtectedRoute permission="produtos"><ProductsPage /></ProtectedRoute>} />
           <Route path="/clientes" element={<ProtectedRoute permission="cadastros"><ClientList /></ProtectedRoute>} />
@@ -279,7 +311,6 @@ const AppLayout: React.FC = () => {
           <Route path="*" element={appUser?.salesperson ? <Navigate to="/crm" replace /> : <OrderList />} />
         </Routes>
       </main>
-      <Footer />
     </div>
   );
 };
@@ -290,7 +321,9 @@ const App: React.FC = () => {
       <HashRouter>
         <AuthProvider>
           <Toaster position="top-right" richColors />
-          <AppLayout />
+          <ErrorBoundary>
+            <AppLayout />
+          </ErrorBoundary>
         </AuthProvider>
       </HashRouter>
     </QueryClientProvider>

@@ -101,7 +101,7 @@ const NotificationCenter: React.FC = () => {
                         const alertId = `payment-alert-entry-${o.id}`;
                         alerts.push({
                             id: alertId,
-                            title: isOverdue ? `⚠️ Entrada VENCIDA - #${o.order_number}` : `💰 Entrada próxima do vencimento - #${o.order_number}`,
+                            title: isOverdue ? `⚠️ Entrada VENCIDA - #${o.order_number}` : `💰 Entrada próxima - #${o.order_number}`,
                             message: `${o.partners?.name || 'Cliente'} — R$ ${o.entry_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ${isOverdue ? 'venceu em' : 'vence em'} ${new Date(dueDate + 'T12:00:00').toLocaleDateString('pt-BR')}`,
                             type: isOverdue ? 'danger' : 'warning',
                             read: readAlertIds.includes(alertId),
@@ -118,7 +118,7 @@ const NotificationCenter: React.FC = () => {
                         const alertId = `payment-alert-remaining-${o.id}`;
                         alerts.push({
                             id: alertId,
-                            title: isOverdue ? `⚠️ Restante VENCIDO - #${o.order_number}` : `💰 Restante próximo do vencimento - #${o.order_number}`,
+                            title: isOverdue ? `⚠️ Restante VENCIDO - #${o.order_number}` : `💰 Restante próximo - #${o.order_number}`,
                             message: `${o.partners?.name || 'Cliente'} — R$ ${o.remaining_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ${isOverdue ? 'venceu em' : 'vence em'} ${new Date(dueDate + 'T12:00:00').toLocaleDateString('pt-BR')}`,
                             type: isOverdue ? 'danger' : 'warning',
                             read: readAlertIds.includes(alertId),
@@ -129,7 +129,54 @@ const NotificationCenter: React.FC = () => {
                 }
             });
 
-            return alerts;
+            // 💳 Company Expenses Alerts
+            const { data: expenses } = await supabase
+                .from('company_expenses')
+                .select('*')
+                .eq('paid', false)
+                .lte('due_date', thresholdStr);
+
+            if (expenses) {
+                expenses.forEach(e => {
+                    const isOverdue = e.due_date < todayStr;
+                    const alertId = `expense-alert-${e.id}`;
+                    alerts.push({
+                        id: alertId,
+                        title: isOverdue ? `💳 Despesa VENCIDA - ${e.description}` : `📅 Despesa próxima - ${e.description}`,
+                        message: `R$ ${e.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ${isOverdue ? 'vencida em' : 'vence em'} ${new Date(e.due_date + 'T12:00:00').toLocaleDateString('pt-BR')}`,
+                        type: isOverdue ? 'danger' : 'warning',
+                        read: readAlertIds.includes(alertId),
+                        link: `/payables`,
+                        created_at: new Date().toISOString()
+                    });
+                });
+            }
+
+            // 📦 Supplier Costs Alerts
+            const { data: itemCosts } = await supabase
+                .from('order_items')
+                .select('id, product_name, unit_price, real_unit_price, supplier_payment_date, unit_price_paid, orders(order_number)')
+                .eq('unit_price_paid', false)
+                .not('supplier_payment_date', 'is', null)
+                .lte('supplier_payment_date', thresholdStr);
+
+            if (itemCosts) {
+                itemCosts.forEach((i: any) => {
+                    const isOverdue = i.supplier_payment_date < todayStr;
+                    const alertId = `cost-alert-${i.id}`;
+                    alerts.push({
+                        id: alertId,
+                        title: isOverdue ? `📦 Custo VENCIDO - #${i.orders?.order_number}` : `🚛 Custo próximo - #${i.orders?.order_number}`,
+                        message: `${i.product_name} — R$ ${(i.real_unit_price || i.unit_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ${isOverdue ? 'venceu em' : 'vence em'} ${new Date(i.supplier_payment_date + 'T12:00:00').toLocaleDateString('pt-BR')}`,
+                        type: isOverdue ? 'danger' : 'warning',
+                        read: readAlertIds.includes(alertId),
+                        link: `/payables`,
+                        created_at: new Date().toISOString()
+                    });
+                });
+            }
+
+            return alerts.sort((a, b) => b.title.includes('VENCID') ? 1 : -1);
         } catch {
             return [];
         }

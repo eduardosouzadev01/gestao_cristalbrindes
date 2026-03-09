@@ -1,5 +1,5 @@
 
-import { supabase } from './lib/supabase';
+import { supabase } from '../../lib/supabase';
 
 // SQL command to create the table if it doesn't exist
 const CREATE_CRM_LEADS_TABLE_SQL = `

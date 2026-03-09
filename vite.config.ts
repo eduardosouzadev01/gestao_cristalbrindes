@@ -56,14 +56,13 @@ export default defineConfig(({ mode }) => {
   return {
     base: './', // Use caminhos relativos para garantir compatibilidade em qualquer subdiretório
     server: {
-      port: 3005,
+      port: 3000,
       host: '0.0.0.0',
+      watch: {
+        usePolling: true,
+      }
     },
     plugins: [react(), proxyPlugin()],
-    define: {
-      'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
-    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

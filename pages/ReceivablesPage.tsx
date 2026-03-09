@@ -72,7 +72,7 @@ const ReceivablesPage: React.FC = () => {
             orderId: order.id,
             orderNumber: order.order_number,
             clientName: order.partners?.name || 'Cliente Removido',
-            description: 'ENTRADA',
+            description: '1ª PARCELA',
             amount: order.entry_amount,
             dueDate: order.entry_date || order.order_date,
             isPaid: order.entry_confirmed,
@@ -88,7 +88,7 @@ const ReceivablesPage: React.FC = () => {
             orderId: order.id,
             orderNumber: order.order_number,
             clientName: order.partners?.name || 'Cliente Removido',
-            description: 'RESTANTE',
+            description: '2ª PARCELA',
             amount: order.remaining_amount,
             dueDate: order.remaining_date || order.payment_due_date || order.order_date,
             isPaid: order.remaining_confirmed,
@@ -127,7 +127,7 @@ const ReceivablesPage: React.FC = () => {
     if (!window.confirm(`Confirmar recebimento de ${item.description} do pedido #${item.orderNumber}?`)) return;
 
     try {
-      const type = item.description === 'ENTRADA' ? 'entry' : 'remaining';
+      const type = item.description === '1ª PARCELA' ? 'entry' : 'remaining';
       const updateData = type === 'entry' ? { entry_confirmed: true } : { remaining_confirmed: true };
 
       const { error } = await supabase.from('orders').update(updateData).eq('id', item.orderId);
@@ -189,7 +189,7 @@ const ReceivablesPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-[1920px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 uppercase tracking-tight flex items-center gap-2">
@@ -348,16 +348,16 @@ const ReceivablesPage: React.FC = () => {
                   onClick={() => navigate(`/pedido/${item.orderId}`)}
                   className={`transition-colors cursor-pointer group ${overdue ? 'bg-red-50 hover:bg-red-100' : 'odd:bg-white even:bg-gray-50 hover:bg-blue-50'}`}
                 >
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-2 py-2 text-sm whitespace-nowrap">
                     <div className="flex flex-col">
                       <span className={`text-sm font-bold ${overdue ? 'text-red-700' : 'text-gray-900 group-hover:text-blue-700'}`}>{formatDate(item.dueDate)}</span>
                       {overdue && <span className="text-[10px] font-black text-red-600 animate-pulse uppercase mt-1">Vencido</span>}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-2 py-2 text-sm whitespace-nowrap">
                     <div className="flex flex-col">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-blue-600">#{item.orderNumber}</span>
+                        <a href={`/pedido/${item.orderId}`} onClick={(e) => e.stopPropagation()} className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline transition-colors">#{item.orderNumber}</a>
                         {item.issuer && (
                           <span className={`px-1 py-0.5 rounded text-[8px] font-black uppercase ${item.issuer === 'CRISTAL' ? 'bg-blue-100 text-blue-700' :
                             item.issuer === 'ESPIRITO' ? 'bg-orange-100 text-orange-700' :
@@ -370,15 +370,15 @@ const ReceivablesPage: React.FC = () => {
                       <span className="text-xs text-gray-500 truncate max-w-[200px]">{item.clientName}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${item.description === 'ENTRADA' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'}`}>
+                  <td className="px-2 py-2 text-sm whitespace-nowrap">
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${item.description === '1ª PARCELA' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'}`}>
                       {item.description}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-900">
+                  <td className="px-2 py-2 text-sm whitespace-nowrap text-right text-sm font-bold text-gray-900">
                     {item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                  <td className="px-2 py-2 text-sm whitespace-nowrap text-center">
                     {item.isPaid ? (
                       <span className="px-2 py-1 inline-flex text-[10px] leading-5 font-bold rounded-full bg-green-100 text-green-800 uppercase">
                         PAGO {item.paidDate ? formatDate(item.paidDate) : ''}
@@ -393,7 +393,7 @@ const ReceivablesPage: React.FC = () => {
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                  <td className="px-2 py-2 text-sm whitespace-nowrap text-center">
                     {!item.isPaid && (
                       <button
                         onClick={() => confirmPayment(item)}

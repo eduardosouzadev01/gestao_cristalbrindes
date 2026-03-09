@@ -43,17 +43,27 @@ const COLOR_MAP: Record<string, string> = {
     TRANSPARENTE: '#e5e7eb',
 };
 
-// ─── Proxy helper ── fetches via /api/proxy/* so Vite handles CORS ───
 async function proxyFetch(
-    proxyPath: string,
+    proxyPath: string, // Not strictly used by Edge Proxy, kept for signature compatibility
     targetUrl: string,
 ): Promise<Response> {
-    const url = `/api/proxy/${proxyPath}?url=${encodeURIComponent(targetUrl)}`;
-    const res = await fetch(url);
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+    // URL da nossa Edge Function que serve de proxy
+    const url = `${supabaseUrl}/functions/v1/proxy-api?url=${encodeURIComponent(targetUrl)}`;
+
+    const res = await fetch(url, {
+        headers: {
+            'Authorization': `Bearer ${supabaseKey}`,
+            'x-client-info': 'cristal-brindes-web'
+        }
+    });
+
     if (!res.ok) {
         const text = await res.text().catch(() => '');
         throw new Error(
-            `Proxy ${proxyPath} error ${res.status}: ${text.slice(0, 200)}`,
+            `Edge Proxy error ${res.status}: ${text.slice(0, 200)}`,
         );
     }
     return res;

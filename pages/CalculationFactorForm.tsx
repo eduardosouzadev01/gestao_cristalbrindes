@@ -95,7 +95,7 @@ const CalculationFactorForm: React.FC = () => {
 
       <div className="space-y-6">
         <div className="bg-white shadow-lg rounded-xl overflow-hidden border border-gray-100">
-          <div className="px-6 py-4 border-b bg-gray-50">
+          <div className="px-2 py-2 text-sm border-b bg-gray-50">
             <h3 className="text-lg font-medium text-gray-900">Informações Básicas</h3>
             <p className="text-sm text-gray-500">Defina o nome e a finalidade deste fator.</p>
           </div>
@@ -112,7 +112,7 @@ const CalculationFactorForm: React.FC = () => {
         </div>
 
         <div className="bg-white shadow-lg rounded-xl overflow-hidden border border-gray-100">
-          <div className="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
+          <div className="px-2 py-2 text-sm border-b bg-gray-50 flex justify-between items-center">
             <div>
               <h3 className="text-lg font-medium text-gray-900">Composição do Cálculo</h3>
               <p className="text-sm text-gray-500">Insira as porcentagens para compor o multiplicador.</p>

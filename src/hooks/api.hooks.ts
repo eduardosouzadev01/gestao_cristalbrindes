@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from './api';
+import { supabase } from '../../lib/supabase';
 
 // Exemplo da nova arquitetura (Item 2 das Melhorias)
 // Aqui extraímos a lógica do componente para React Query, assim ganhando Cache, isPending, isError automáticos.

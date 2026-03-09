@@ -10,6 +10,7 @@ import { useAuth } from '../lib/auth';
 import { maskPhone, maskCpfCnpj } from '../src/utils/maskUtils';
 import { GenerateOrderModal } from '../src/components/modals/GenerateOrderModal';
 import { QuickSupplierModal, NewSupplierData } from '../src/components/modals/QuickSupplierModal';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
 
 // --- Custom Select Wrapper ---
@@ -163,6 +164,41 @@ const BudgetForm: React.FC = () => {
         removeItem,
         duplicateItem
     } = useOrderItems([]);
+
+    // Drag and drop reorder
+    const onDragEnd = (result: DropResult) => {
+        if (!result.destination) return;
+        const reordered = Array.from(items);
+        const [moved] = reordered.splice(result.source.index, 1);
+        reordered.splice(result.destination.index, 0, moved);
+        setItems(reordered);
+    };
+
+    // Cross-field validation: value without supplier OR supplier without value
+    const validateItemsForAction = (approvedItems: any[]): boolean => {
+        const costFields = [
+            { key: 'custoPersonalizacao', suppKey: 'customization_supplier_id', label: 'Personalização' },
+            { key: 'layoutCost', suppKey: 'layout_supplier_id', label: 'Layout' },
+            { key: 'transpFornecedor', suppKey: 'transport_supplier_id', label: 'Frete Fornecedor' },
+            { key: 'transpCliente', suppKey: 'client_transport_supplier_id', label: 'Frete Cliente' }
+        ];
+        for (const item of approvedItems) {
+            const itemName = item.productName || 'Item sem produto';
+            for (const field of costFields) {
+                const hasValue = (item[field.key] || 0) > 0;
+                const hasSupplier = !!item[field.suppKey];
+                if (hasValue && !hasSupplier) {
+                    toast.error(`"${itemName}": O campo "${field.label}" tem valor, mas o fornecedor não foi selecionado.`);
+                    return false;
+                }
+                if (!hasValue && hasSupplier) {
+                    toast.error(`"${itemName}": O fornecedor de "${field.label}" foi selecionado, mas o valor está em branco.`);
+                    return false;
+                }
+            }
+        }
+        return true;
+    };
 
     useEffect(() => {
         loadBaseData();
@@ -509,29 +545,96 @@ const BudgetForm: React.FC = () => {
             return;
         }
 
+        if (!validateItemsForAction(approvedItems)) return;
+
         setIsCommercialModalOpen(true);
     };
 
-    const confirmGenerateOrder = async () => {
-        if (!commercialData.payment_term || !commercialData.supplier_deadline || !commercialData.shipping_deadline) {
-            toast.error('Preencha os campos obrigatórios do comercial antes de continuar.');
+    const handleGenerateProposal = async () => {
+        if (!id || budgetNumber === 'AUTO') {
+            toast.error('Salve o orçamento antes de gerar a proposta.');
             return;
         }
 
         const approvedItems = items.filter(it => it.isApproved);
+        if (approvedItems.length === 0) {
+            toast.error('Selecione pelo menos um item (marcando "Aprovar Item") para gerar a proposta.');
+            return;
+        }
 
+        if (!validateItemsForAction(approvedItems)) return;
+
+        setLoading(true);
+        try {
+            // Snapshot of items with their final selling price + product metadata
+            const productNames = approvedItems.map(it => it.productName).filter(Boolean);
+            let productMap: Record<string, any> = {};
+            if (productNames.length > 0) {
+                const { data: productsData } = await supabase
+                    .from('products')
+                    .select('name, description, image_url, code, color')
+                    .in('name', productNames);
+                if (productsData) {
+                    productsData.forEach((p: any) => { productMap[p.name] = p; });
+                }
+            }
+
+            const itemsSnapshot = approvedItems.map(it => {
+                const productMeta = productMap[it.productName] || {};
+                return {
+                    id: it.id,
+                    product_name: it.productName,
+                    quantity: it.quantity,
+                    unit_price: it.priceUnit,
+                    calculation_factor: it.fator,
+                    total_item_value: calculateItemTotal(it),
+                    product_description: productMeta.description || '',
+                    product_image_url: productMeta.image_url || '',
+                    product_code: productMeta.code || '',
+                    product_color: productMeta.color || ''
+                };
+            });
+
+            const totalAmount = itemsSnapshot.reduce((sum, it) => sum + it.total_item_value, 0);
+
+            const { data, error } = await supabase
+                .from('proposals')
+                .insert([{
+                    budget_id: id,
+                    proposal_number: budgetNumber,
+                    client_id: clientData.id || null,
+                    salesperson: vendedor,
+                    items: itemsSnapshot,
+                    total_amount: totalAmount,
+                    issuer: issuer
+                }])
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            toast.success('Proposta gerada com sucesso!');
+            navigate(`/proposta/${data.id}`);
+        } catch (error: any) {
+            toast.error('Erro ao gerar proposta: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const confirmGenerateOrder = async () => {
         setIsCommercialModalOpen(false);
         navigate('/pedido/novo', {
             state: {
                 fromBudget: {
+                    budgetId: id,
+                    budgetNumber: budgetNumber,
                     issuer: issuer,
                     vendedor: vendedor,
-                    budgetNumber: budgetNumber,
-                    budget_date: dataOrcamento,
                     clientData: clientData,
-                    budgetId: id
+                    budget_date: dataOrcamento
                 },
-                items: approvedItems,
+                items: items.filter(it => it.isApproved),
                 commercialData: commercialData
             }
         });
@@ -623,133 +726,129 @@ const BudgetForm: React.FC = () => {
     };
 
     return (
-        <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-            <div className="md:flex md:items-center md:justify-between mb-8">
-                <div className="flex-1 flex items-center">
-                    <button onClick={() => navigate('/orcamentos')} className="mr-4 p-2 rounded-full bg-white shadow-sm border border-gray-200 text-gray-500 hover:bg-gray-50">
-                        <span className="material-icons-outlined text-xl">arrow_back</span>
+        <div className="max-w-[1920px] w-full mx-auto px-4 py-4 space-y-4">
+            <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center">
+                    <button onClick={() => navigate('/orcamentos')} className="mr-3 p-1.5 rounded-full bg-white shadow-sm border border-gray-200 text-gray-500 hover:bg-gray-50">
+                        <span className="material-icons-outlined text-lg">arrow_back</span>
                     </button>
-                    <h2 className="text-2xl font-bold text-gray-900 sm:text-3xl flex items-center gap-3 uppercase tracking-tighter">
-                        <span className="material-icons-outlined text-blue-500 text-3xl">description</span>
+                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2 uppercase tracking-tighter">
+                        <span className="material-icons-outlined text-blue-500 text-2xl">description</span>
                         {id && id !== 'novo' ? 'EDITAR ORÇAMENTO' : 'NOVO ORÇAMENTO'}
                     </h2>
                 </div>
-                <div className="flex gap-3 items-center">
-                    {/* Auto-save indicators removed as requested */}
+                <div className="flex gap-2 items-center">
                     {status === 'PROPOSTA ACEITA' ? (
-                        <div className="flex gap-3">
-                            <button onClick={duplicateBudget} disabled={loading} className="px-6 py-3 rounded-lg shadow-sm text-sm font-bold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition-all uppercase flex items-center gap-2">
+                        <div className="flex gap-2">
+                            <button onClick={duplicateBudget} disabled={loading} className="px-3 py-1.5 rounded-lg shadow-sm text-[10px] font-bold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition-all uppercase flex items-center gap-1">
                                 <span className="material-icons-outlined text-sm">content_copy</span> Duplicar
                             </button>
-                            <button disabled className="px-6 py-3 rounded-lg shadow-sm text-sm font-bold text-gray-500 bg-gray-100 border border-gray-200 cursor-not-allowed uppercase flex items-center gap-2">
+                            <button disabled className="px-3 py-1.5 rounded-lg shadow-sm text-[10px] font-bold text-gray-500 bg-gray-100 border border-gray-200 cursor-not-allowed uppercase flex items-center gap-1">
                                 <span className="material-icons-outlined text-sm">lock</span> Pedido Gerado
                             </button>
                         </div>
                     ) : (
                         <>
-                            <button onClick={duplicateBudget} disabled={loading} className="px-6 py-3 rounded-lg shadow-sm text-sm font-bold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition-all uppercase">
+                            <button onClick={duplicateBudget} disabled={loading} className="h-9 px-4 rounded-lg shadow-sm text-[10px] font-black text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition-all uppercase flex items-center justify-center gap-2 active:scale-95 leading-none">
+                                <span className="material-icons-outlined text-base">content_copy</span>
                                 Duplicar
                             </button>
-                            <button onClick={() => saveBudget(false)} disabled={loading} className="px-6 py-3 rounded-lg shadow-sm text-sm font-bold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition-all uppercase">
-                                {loading && !isAutoSaving ? 'Salvando...' : 'Salvar Orçamento'}
+                            <button onClick={() => saveBudget(false)} disabled={loading} className="h-9 px-6 rounded-lg shadow-sm text-[10px] font-black text-white bg-green-600 hover:bg-green-700 transition-all uppercase flex items-center justify-center gap-2 active:scale-95 leading-none">
+                                <span className="material-icons-outlined text-base">save</span>
+                                {loading && !isAutoSaving ? 'Salvando...' : 'Salvar'}
                             </button>
-                            <button onClick={handleGenerateOrderClick} className="px-6 py-3 rounded-lg shadow-sm text-sm font-bold text-white bg-blue-500 hover:bg-blue-600 transition-all uppercase flex items-center gap-2">
-                                <span className="material-icons-outlined text-sm">shopping_cart</span> Gerar Pedido
+                            <button onClick={handleGenerateProposal} className="h-9 px-4 rounded-lg shadow-sm text-[10px] font-black text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition-all uppercase flex items-center justify-center gap-2 active:scale-95 leading-none">
+                                <span className="material-icons-outlined text-base">picture_as_pdf</span>
+                                Proposta
+                            </button>
+                            <button onClick={handleGenerateOrderClick} className="h-9 px-4 rounded-lg shadow-sm text-[10px] font-black text-white bg-blue-500 hover:bg-blue-600 transition-all uppercase flex items-center justify-center gap-2 active:scale-95 leading-none">
+                                <span className="material-icons-outlined text-base">shopping_cart</span>
+                                Gerar Pedido
                             </button>
                         </>
                     )}
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div className="grid grid-cols-12 gap-4">
                 {/* Informações Gerais */}
-                <section className="bg-white shadow-sm rounded-xl border border-gray-200 p-6 flex flex-col h-full">
-                    <div className="flex items-center gap-2 mb-6 border-b border-gray-100 pb-4">
-                        <span className="material-icons-outlined text-blue-500">info</span>
-                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Informações Gerais</h3>
+                <section className="col-span-12 xl:col-span-5 bg-white shadow-sm rounded-lg border border-gray-200 p-3">
+                    <div className="flex items-center gap-2 mb-2 border-b border-gray-100 pb-1">
+                        <span className="material-icons-outlined text-blue-500 text-sm">info</span>
+                        <h3 className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Geral</h3>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">
-                        <div>
-                            <label className="block text-xs font-bold text-blue-500 uppercase mb-2">Pedido <span className="text-red-500">*</span></label>
+                    <div className="grid grid-cols-12 gap-2">
+                        <div className="col-span-3">
+                            <label className="block text-[9px] font-bold text-blue-600 uppercase mb-0.5">Nº Orçamento</label>
                             <input
-                                className={`form-input block w-full text-center rounded-lg font-bold py-2 border-blue-500 ${budgetNumber === 'AUTO' ? 'bg-blue-50 text-blue-500' : ''}`}
-                                placeholder="GERADO AUTO"
+                                className={`form-input block w-full text-center rounded border-gray-300 font-bold py-1 text-xs ${budgetNumber === 'AUTO' ? 'bg-blue-50 text-blue-600 border-blue-200' : ''}`}
+                                placeholder="AUTO"
                                 value={budgetNumber || ''}
                                 readOnly={budgetNumber === 'AUTO' || (!!id && id !== 'novo') || status === 'PROPOSTA ACEITA'}
                                 onChange={e => setBudgetNumber(e.target.value)}
                             />
                         </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Vendedor <span className="text-red-500">*</span></label>
+                        <div className="col-span-3">
+                            <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Vendedor</label>
                             <select
-                                className={`form-select block w-full py-2 rounded-lg text-sm font-bold border-gray-300 disabled:bg-gray-100 ${isSeller ? 'bg-gray-100' : ''}`}
+                                className={`form-select block w-full py-1 rounded text-xs font-bold border-gray-300 ${isSeller ? 'bg-gray-50 text-gray-500' : ''}`}
                                 value={vendedor}
                                 onChange={e => setVendedor(e.target.value)}
                                 disabled={status === 'PROPOSTA ACEITA' || isSeller}
                             >
-                                <option value="">SELECIONE...</option>
-                                <option value="VENDAS 01">VENDAS 01</option>
-                                <option value="VENDAS 02">VENDAS 02</option>
-                                <option value="VENDAS 03">VENDAS 03</option>
-                                <option value="VENDAS 04">VENDAS 04</option>
-                                <option value="VENDAS 05">VENDAS 05</option>
+                                <option value="">...</option>
+                                <option value="VENDAS 01">V01</option>
+                                <option value="VENDAS 02">V02</option>
+                                <option value="VENDAS 03">V03</option>
+                                <option value="VENDAS 04">V04</option>
+                                <option value="VENDAS 05">V05</option>
                             </select>
                         </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Status <span className="text-red-500">*</span></label>
-                            <select className="form-select block w-full py-2 rounded-lg text-sm border-gray-300" value={status || ''} onChange={e => setStatus(e.target.value)} disabled={status === 'PROPOSTA ACEITA'}>
-                                <option value="EM ABERTO">EM ABERTO</option>
-                                <option value="EM NEGOCIAÇÃO">EM NEGOCIAÇÃO</option>
-                                <option value="PROPOSTA ENVIADA">PROPOSTA ENVIADA</option>
-                                <option value="PROPOSTA ACEITA">PROPOSTA ACEITA</option>
-                                <option value="PROPOSTA RECUSADA">PROPOSTA RECUSADA</option>
-                                <option value="CANCELADO">CANCELADO</option>
+                        <div className="col-span-3">
+                            <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Status</label>
+                            <select className="form-select block w-full py-1 rounded text-xs border-gray-300 font-medium" value={status || ''} onChange={e => setStatus(e.target.value)} disabled={status === 'PROPOSTA ACEITA'}>
+                                <option value="EM ABERTO">ABERTO</option>
+                                <option value="EM NEGOCIAÇÃO">NEGOC.</option>
+                                <option value="PROPOSTA ENVIADA">ENVIADA</option>
+                                <option value="PROPOSTA ACEITA">ACEITA</option>
+                                <option value="PROPOSTA RECUSADA">RECUS.</option>
+                                <option value="CANCELADO">CANCEL.</option>
                             </select>
                         </div>
-
-                        <div className="relative">
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Data do Orçamento <span className="text-red-500">*</span></label>
-                            <div className="flex items-center">
-                                <span className="material-icons-outlined absolute left-3 text-gray-400 pointer-events-none">calendar_month</span>
-                                <input type="date" className="form-input block w-full pl-10 rounded-lg text-sm border-gray-300" value={dataOrcamento || ''} onChange={e => setDataOrcamento(e.target.value)} disabled={status === 'PROPOSTA ACEITA'} />
-                            </div>
+                        <div className="col-span-3">
+                            <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Data</label>
+                            <input type="date" className="form-input block w-full py-1 rounded text-xs border-gray-300" value={dataOrcamento || ''} onChange={e => setDataOrcamento(e.target.value)} disabled={status === 'PROPOSTA ACEITA'} />
                         </div>
-                        <div className="relative">
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Data do Pedido <span className="text-red-500">*</span></label>
-                            <div className="flex items-center">
-                                <span className="material-icons-outlined absolute left-3 text-gray-400 pointer-events-none">event_available</span>
-                                <input type="date" className="form-input block w-full pl-10 rounded-lg text-sm border-gray-300" value={dataPedido || ''} onChange={e => setDataPedido(e.target.value)} disabled={status === 'PROPOSTA ACEITA'} />
-                            </div>
-                        </div>
-
-                        <div className="sm:col-span-2 mt-auto pt-4">
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Emitente</label>
-                            <div className="grid grid-cols-3 gap-3">
-                                {['CRISTAL', 'ESPIRITO', 'NATUREZA'].map(op => (
-                                    <button
-                                        key={op}
-                                        onClick={() => setIssuer(op)}
-                                        className={`py-2 px-2 border-2 rounded-lg font-bold text-[9px] transition-all uppercase ${issuer === op ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-gray-100 text-gray-400'} ${status === 'PROPOSTA ACEITA' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                        disabled={status === 'PROPOSTA ACEITA'}
-                                    >
-                                        {op === 'ESPIRITO' ? 'ESPÍRITO BRINDES' : op === 'CRISTAL' ? 'CRISTAL BRINDES' : 'NATUREZA BRINDES'}
-                                    </button>
-                                ))}
+                        <div className="col-span-12 mt-1">
+                            <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded border border-gray-100">
+                                <span className="text-[9px] font-bold text-gray-400 uppercase mr-2">Emitente:</span>
+                                <div className="flex gap-1.5 flex-1">
+                                    {['CRISTAL', 'ESPIRITO', 'NATUREZA'].map(op => (
+                                        <button
+                                            key={op}
+                                            onClick={() => setIssuer(op)}
+                                            className={`flex-1 py-1 px-2 border rounded font-black text-[9px] transition-all uppercase ${issuer === op ? 'border-blue-500 bg-blue-500 text-white shadow-sm' : 'border-gray-200 bg-white text-gray-400 hover:border-gray-300'} ${status === 'PROPOSTA ACEITA' ? 'opacity-50' : ''}`}
+                                            disabled={status === 'PROPOSTA ACEITA'}
+                                        >
+                                            {op === 'ESPIRITO' ? 'ESPÍRITO' : op === 'CRISTAL' ? 'CRISTAL' : 'NATUREZA'}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     </div>
                 </section>
 
                 {/* Dados do Cliente */}
-                <section className="bg-white shadow-sm rounded-xl border border-gray-200 p-6 flex flex-col h-full">
-                    <div className="flex items-center gap-2 mb-6 border-b border-gray-100 pb-4">
-                        <span className="material-icons-outlined text-blue-500">person</span>
-                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Dados do Cliente</h3>
+                <section className="col-span-12 xl:col-span-7 bg-white shadow-sm rounded-lg border border-gray-200 p-3">
+                    <div className="flex items-center gap-2 mb-2 border-b border-gray-100 pb-1">
+                        <span className="material-icons-outlined text-blue-500 text-sm">person</span>
+                        <h3 className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Cliente</h3>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="col-span-2">
+                    <div className="grid grid-cols-12 gap-2">
+                        <div className="col-span-5">
                             <CustomSelect
-                                label="Nome / Razão Social *"
+                                label="Nome / Razão Social"
                                 options={clientsList}
                                 onSelect={c => setClientData({ id: c.id, name: c.name, doc: c.doc, phone: c.phone, email: c.email, emailFin: c.financial_email })}
                                 onAdd={() => navigate('/cadastros')}
@@ -757,263 +856,223 @@ const BudgetForm: React.FC = () => {
                                 disabled={isClientLocked || status === 'PROPOSTA ACEITA'}
                             />
                         </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">CNPJ / CPF</label>
-                            <input className="form-input w-full rounded-lg border-gray-200 text-sm bg-gray-50" value={clientData.doc || ''} readOnly />
+                        <div className="col-span-3">
+                            <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">CNPJ / CPF</label>
+                            <input className="form-input w-full rounded border-gray-200 text-xs bg-gray-50 py-1 font-mono" value={clientData.doc || ''} readOnly />
                         </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Telefone</label>
-                            <input className="form-input w-full rounded-lg border-gray-200 text-sm bg-gray-50" value={clientData.phone || ''} readOnly />
+                        <div className="col-span-4">
+                            <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Celular / WhatsApp</label>
+                            <input className="form-input w-full rounded border-gray-200 text-xs bg-gray-50 py-1" value={clientData.phone || ''} readOnly />
                         </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">E-mail Contato</label>
-                            <input className="form-input w-full rounded-lg border-gray-200 text-sm bg-gray-50" value={clientData.email || ''} readOnly />
+                        <div className="col-span-6">
+                            <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">E-mail Comercial</label>
+                            <input className="form-input w-full rounded border-gray-200 text-xs bg-gray-50 py-1" value={clientData.email || ''} readOnly />
                         </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">E-mail Financeiro</label>
-                            <input className="form-input w-full rounded-lg border-gray-200 text-sm" value={clientData.emailFin || ''} onChange={e => setClientData({ ...clientData, emailFin: e.target.value })} disabled={status === 'PROPOSTA ACEITA'} />
+                        <div className="col-span-6">
+                            <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">E-mail Financeiro</label>
+                            <input className="form-input w-full rounded border-gray-200 text-xs py-1" value={clientData.emailFin || ''} onChange={e => setClientData({ ...clientData, emailFin: e.target.value })} disabled={status === 'PROPOSTA ACEITA'} />
                         </div>
                     </div>
                 </section>
             </div>
 
-            {/* Produtos */}
-            <section className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-bold text-gray-400 uppercase flex items-center gap-2">
+            {/* Itens */}
+            <section className="space-y-2">
+                <div className="flex items-center justify-between px-1">
+                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
                         <span className="material-icons-outlined text-sm">inventory_2</span> Itens do Orçamento
                     </h3>
+                    <div className="text-[10px] font-bold text-gray-400">
+                        Total Geral: <span className="text-blue-600 text-sm font-black">{formatCurrency(items.reduce((sum, it) => sum + calculateItemTotal(it), 0))}</span>
+                    </div>
                 </div>
 
-                {items.map((it, idx) => (
-                    <div key={it.id} className={`bg-white shadow-sm rounded-xl border border-gray-200 transition-all overflow-hidden ${it.isApproved ? 'ring-2 ring-green-500 ring-opacity-50' : 'hover:shadow-md'}`}>
-                        {/* Header do Item */}
-                        <div className={`px-6 py-3 border-b flex justify-between items-center ${it.isApproved ? 'bg-green-50 border-green-100' : 'bg-gray-50 border-gray-100'}`}>
-                            <div className="flex items-center gap-3">
-                                <span className="bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded uppercase">Item {idx + 1}</span>
-                                <span className={`text-xs font-bold uppercase ${it.isApproved ? 'text-green-700' : 'text-gray-500'}`}>
-                                    {it.productName || 'Novo Produto'}
-                                </span>
+                <DragDropContext onDragEnd={onDragEnd}>
+                    <Droppable droppableId="budget-items">
+                        {(provided) => (
+                            <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-2">
+                                {items.map((it, idx) => (
+                                    <Draggable key={String(it.id)} draggableId={String(it.id)} index={idx} isDragDisabled={status === 'PROPOSTA ACEITA'}>
+                                        {(dragProvided, snapshot) => (
+                                            <div
+                                                ref={dragProvided.innerRef}
+                                                {...dragProvided.draggableProps}
+                                                className={`bg-white shadow-sm rounded-lg border transition-all overflow-hidden ${snapshot.isDragging ? 'shadow-xl ring-2 ring-blue-400 rotate-[0.5deg]' :
+                                                    it.isApproved ? 'border-green-500 ring-1 ring-green-100' : 'border-gray-200'
+                                                    }`}
+                                            >
+                                                {/* Compact Header for Item */}
+                                                <div className={`px-2 py-1 border-b flex justify-between items-center ${it.isApproved ? 'bg-green-50/50 border-green-100' : 'bg-gray-50 border-gray-100'}`}>
+                                                    <div className="flex items-center gap-2">
+                                                        {/* Drag Handle */}
+                                                        <div
+                                                            {...dragProvided.dragHandleProps}
+                                                            className={`p-0.5 rounded cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 transition-colors ${status === 'PROPOSTA ACEITA' ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                                            title="Arraste para reordenar"
+                                                        >
+                                                            <span className="material-icons-outlined text-base">drag_indicator</span>
+                                                        </div>
+                                                        <span className="bg-gray-800 text-white text-[9px] font-black px-1.5 py-0.5 rounded leading-none">ITEM {idx + 1}</span>
+                                                        <span className={`text-[11px] font-black uppercase tracking-tight ${it.isApproved ? 'text-green-700' : 'text-gray-600'}`}>
+                                                            {it.productName || 'Escolher Produto...'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <label className={`flex items-center gap-1.5 px-2 py-0.5 rounded border transition-all select-none ${it.isApproved ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300 cursor-pointer'} ${status === 'PROPOSTA ACEITA' ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                                            <input type="checkbox" className="w-3 h-3 rounded text-green-600 focus:ring-0" checked={it.isApproved} onChange={e => updateItem(it.id, 'isApproved', e.target.checked)} disabled={status === 'PROPOSTA ACEITA'} />
+                                                            <span className="text-[8px] font-black uppercase">Aprovar</span>
+                                                        </label>
+                                                        <div className="h-4 w-[1px] bg-gray-200"></div>
+                                                        <button onClick={() => duplicateItem(it)} disabled={status === 'PROPOSTA ACEITA'} className={`p-1 rounded hover:bg-white hover:shadow-sm transition-all ${status === 'PROPOSTA ACEITA' ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-blue-600'}`}>
+                                                            <span className="material-icons-outlined text-base">content_copy</span>
+                                                        </button>
+                                                        <button onClick={() => removeItem(it.id)} disabled={status === 'PROPOSTA ACEITA'} className={`p-1 rounded hover:bg-white hover:shadow-sm transition-all ${status === 'PROPOSTA ACEITA' ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-red-500'}`}>
+                                                            <span className="material-icons-outlined text-base">delete</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="p-2.5">
+                                                    <div className="grid grid-cols-12 gap-3">
+                                                        {/* Definição Base */}
+                                                        <div className="col-span-12 lg:col-span-8 flex flex-col gap-2">
+                                                            <div className="grid grid-cols-12 gap-2 pb-2 border-b border-gray-50">
+                                                                <div className="col-span-5">
+                                                                    <CustomSelect label="Produto" options={productsList} onSelect={p => {
+                                                                        updateItem(it.id, 'productName', p.name);
+                                                                        let supplierName = null;
+                                                                        const lowerName = p.name.toLowerCase();
+                                                                        if (p.source) supplierName = p.source.toUpperCase();
+                                                                        else if (lowerName.includes('xbz')) supplierName = 'XBZ';
+                                                                        else if (lowerName.includes('asia') || lowerName.includes('ásia')) supplierName = 'ASIA';
+                                                                        else if (lowerName.includes('spot')) supplierName = 'SPOT';
+                                                                        if (supplierName) {
+                                                                            const found = suppliersList.find(s => s.name?.toUpperCase() === supplierName);
+                                                                            if (found) updateItem(it.id, 'supplier_id', found.id);
+                                                                        }
+                                                                    }} onAdd={() => { }} value={it.productName || ''} onSearch={searchProducts} disabled={status === 'PROPOSTA ACEITA'} />
+                                                                </div>
+                                                                <div className="col-span-3">
+                                                                    <CustomSelect label="Fornecedor Principal" options={suppliersList} onSelect={s => updateItem(it.id, 'supplier_id', s.id)} onAdd={() => { setIsSupplierModalOpen(true); }} placeholder="Selec..." disabled={status === 'PROPOSTA ACEITA'} value={suppliersList.find(s => s.id === it.supplier_id)?.name || ''} />
+                                                                </div>
+                                                                <div className="col-span-2">
+                                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5 text-center">Quantidade</label>
+                                                                    <input type="number" className="form-input w-full rounded border-gray-300 text-center font-black py-1 text-xs" value={it.quantity || ''} onChange={e => updateItem(it.id, 'quantity', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
+                                                                </div>
+                                                                <div className="col-span-2">
+                                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5 text-right">Custo Unit.</label>
+                                                                    <input className="form-input w-full rounded border-gray-300 text-right font-black py-1 text-xs text-blue-700 bg-blue-50/50" value={formatCurrency(it.priceUnit || 0)} onChange={e => updateItem(it.id, 'priceUnit', parseCurrencyToNumber(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Grid de Custos Adicionais — Fornecedor | Serviço | Valor Unit. */}
+                                                            <div className="bg-gray-50/50 p-2 rounded-md border border-gray-100">
+                                                                <div className="grid grid-cols-12 gap-x-3 gap-y-1.5">
+                                                                    {/* Header — Fornecedor first */}
+                                                                    <div className="col-span-3 text-[8px] font-black text-gray-400 uppercase">Serviço/Frete</div>
+                                                                    <div className="col-span-7 text-[8px] font-black text-gray-400 uppercase">Fornecedor</div>
+                                                                    <div className="col-span-2 text-[8px] font-black text-gray-400 uppercase text-right">Valor Unit.</div>
+
+                                                                    {[
+                                                                        { label: 'Personalização', key: 'custoPersonalizacao', suppKey: 'customization_supplier_id' },
+                                                                        { label: 'Layout', key: 'layoutCost', suppKey: 'layout_supplier_id' },
+                                                                        { label: 'Frete Fornecedor', key: 'transpFornecedor', suppKey: 'transport_supplier_id' },
+                                                                        { label: 'Frete Cliente', key: 'transpCliente', suppKey: 'client_transport_supplier_id' }
+                                                                    ].map(row => {
+                                                                        const hasValue = (it[row.key as keyof typeof it] as number || 0) > 0;
+                                                                        const hasSupplier = !!(it[row.suppKey as keyof typeof it]);
+                                                                        const isIncomplete = (hasValue && !hasSupplier) || (!hasValue && hasSupplier);
+                                                                        return (
+                                                                            <React.Fragment key={row.key}>
+                                                                                <div className="col-span-3 text-[10px] font-bold text-gray-600 flex items-center gap-1">
+                                                                                    {row.label}
+                                                                                    {isIncomplete && <span className="material-icons-outlined text-amber-500 text-xs" title="Preencha ambos: fornecedor e valor">warning</span>}
+                                                                                </div>
+                                                                                <div className="col-span-7">
+                                                                                    <select
+                                                                                        className={`form-select w-full text-[10px] rounded py-0.5 ${isIncomplete && !hasSupplier ? 'border-amber-400 bg-amber-50' : 'border-gray-200'
+                                                                                            }`}
+                                                                                        value={it[row.suppKey as keyof typeof it] as string || ''}
+                                                                                        onChange={e => updateItem(it.id, row.suppKey, e.target.value)}
+                                                                                        disabled={status === 'PROPOSTA ACEITA'}
+                                                                                    >
+                                                                                        <option value="">Selecionar...</option>
+                                                                                        {suppliersList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                                                                    </select>
+                                                                                </div>
+                                                                                <div className="col-span-2">
+                                                                                    <input
+                                                                                        className={`form-input w-full text-[11px] rounded text-right py-0.5 font-bold ${isIncomplete && !hasValue ? 'border-amber-400 bg-amber-50' : 'border-gray-200'
+                                                                                            }`}
+                                                                                        value={formatCurrency(it[row.key as keyof typeof it] as number)}
+                                                                                        onChange={e => updateItem(it.id, row.key, parseCurrencyToNumber(e.target.value))}
+                                                                                        disabled={status === 'PROPOSTA ACEITA'}
+                                                                                    />
+                                                                                </div>
+                                                                            </React.Fragment>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Direita: Cálculos e Totais */}
+                                                        <div className="col-span-12 lg:col-span-4 flex flex-col gap-2">
+                                                            <div className="bg-blue-50/50 p-2.5 rounded-lg border border-blue-100 flex-1 flex flex-col justify-between">
+                                                                <div className="grid grid-cols-2 gap-3">
+                                                                    <div>
+                                                                        <label className="block text-[9px] font-black text-blue-600 uppercase mb-0.5">Fator Multiplic.</label>
+                                                                        <select className="form-select w-full rounded border-blue-200 text-[10px] py-1 font-black bg-white" value={it.fator} onChange={e => updateItem(it.id, 'fator', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'}>
+                                                                            {factors.map(f => (
+                                                                                <option key={f.id} value={1 + (f.tax_percent + f.contingency_percent + f.margin_percent) / 100}>{f.name}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="block text-[9px] font-black text-blue-600 uppercase mb-0.5">Saldo Extra (%)</label>
+                                                                        <input type="number" className="form-input w-full rounded border-blue-200 text-right py-1 text-[10px] font-black bg-white" value={it.extraPct} onChange={e => updateItem(it.id, 'extraPct', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="block text-[9px] font-black text-gray-500 uppercase mb-0.5">BV (%)</label>
+                                                                        <input type="number" className="form-input w-full rounded border-gray-200 text-right py-1 text-[10px] font-bold bg-white" value={it.bvPct} onChange={e => updateItem(it.id, 'bvPct', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
+                                                                    </div>
+                                                                    <div className="flex flex-col justify-end items-end text-right">
+                                                                        <span className="text-[8px] font-bold text-gray-400 uppercase leading-none">Custo Total Item</span>
+                                                                        <span className="text-xs font-black text-gray-700">{formatCurrency((it.quantity * it.priceUnit) + (it.custoPersonalizacao + it.layoutCost + it.transpFornecedor + it.transpCliente + it.despesaExtra))}</span>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="mt-3 pt-2 border-t border-blue-100 space-y-0.5">
+                                                                    <div className="flex justify-between items-center px-1">
+                                                                        <span className="text-[9px] font-extrabold text-blue-400 uppercase">Preço Unit. Venda</span>
+                                                                        <span className="text-[11px] font-black text-gray-800">{formatCurrency((calculateItemTotal(it) / (it.quantity || 1)))}</span>
+                                                                    </div>
+                                                                    <div className="flex justify-between items-baseline bg-blue-600 p-1.5 rounded shadow-sm">
+                                                                        <span className="text-[10px] font-black uppercase text-white tracking-widest">TOTAL VENDA</span>
+                                                                        <span className="text-xl font-black text-white">{formatCurrency(calculateItemTotal(it))}</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </Draggable>
+                                ))}
+                                {provided.placeholder}
                             </div>
-                            <div className="flex items-center gap-2">
-                                <label className={`flex items-center gap-2 bg-white px-3 py-1 rounded border border-gray-200 shadow-sm transition-all ${status === 'PROPOSTA ACEITA' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'}`}>
-                                    <input type="checkbox" className="w-4 h-4 rounded text-green-600 focus:ring-green-500" checked={it.isApproved} onChange={e => updateItem(it.id, 'isApproved', e.target.checked)} disabled={status === 'PROPOSTA ACEITA'} />
-                                    <span className="text-[10px] font-bold uppercase text-gray-600">Aprovar Item</span>
-                                </label>
-                                <div className="h-4 w-px bg-gray-300 mx-2"></div>
-                                <button onClick={() => duplicateItem(it)} disabled={status === 'PROPOSTA ACEITA'} className={`transition-colors tooltip-trigger ${status === 'PROPOSTA ACEITA' ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-blue-600'}`} title="Duplicar">
-                                    <span className="material-icons-outlined text-lg">content_copy</span>
-                                </button>
-                                <button onClick={() => removeItem(it.id)} disabled={status === 'PROPOSTA ACEITA'} className={`transition-colors ${status === 'PROPOSTA ACEITA' ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-red-600'}`} title="Remover">
-                                    <span className="material-icons-outlined text-lg">delete</span>
-                                </button>
-                            </div>
-                        </div>
+                        )}
+                    </Droppable>
+                </DragDropContext>
 
-                        <div className="p-6">
-                            <div className="grid grid-cols-12 gap-6">
-                                {/* Coluna Esquerda: Definição do Produto e Custos */}
-                                <div className="col-span-12 lg:col-span-7 space-y-4">
-                                    {/* Produto e Fornecedor */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="md:col-span-2">
-                                            <CustomSelect label="Produto" options={productsList} onSelect={p => {
-                                                updateItem(it.id, 'productName', p.name);
-
-                                                let supplierName = null;
-                                                if (p.source) {
-                                                    supplierName = p.source.toUpperCase();
-                                                } else {
-                                                    const lowerName = p.name.toLowerCase();
-                                                    if (lowerName.includes('xbz')) supplierName = 'XBZ';
-                                                    else if (lowerName.includes('asia') || lowerName.includes('ásia')) supplierName = 'ASIA';
-                                                    else if (lowerName.includes('spot')) supplierName = 'SPOT';
-                                                }
-
-                                                if (supplierName) {
-                                                    const found = suppliersList.find(s => s.name?.toUpperCase() === supplierName);
-                                                    if (found) {
-                                                        updateItem(it.id, 'supplier_id', found.id);
-                                                    }
-                                                }
-                                            }} onAdd={() => { }} value={it.productName || ''} onSearch={searchProducts} disabled={status === 'PROPOSTA ACEITA'} />
-                                        </div>
-                                        <div className="md:col-span-1">
-                                            <CustomSelect label="Fornecedor" options={suppliersList} onSelect={s => updateItem(it.id, 'supplier_id', s.id)} onAdd={() => { setIsSupplierModalOpen(true); }} placeholder="Fornecedor..." disabled={status === 'PROPOSTA ACEITA'} value={suppliersList.find(s => s.id === it.supplier_id)?.name || ''} />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Qtd</label>
-                                                <input type="number" className="form-input w-full rounded-lg text-center font-bold border-gray-300 focus:border-blue-500 focus:ring-blue-500" value={it.quantity || ''} onChange={e => updateItem(it.id, 'quantity', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Preço Unit.</label>
-                                                <input className="form-input w-full rounded-lg text-right font-bold border-gray-300" value={formatCurrency(it.priceUnit || 0)} onChange={e => updateItem(it.id, 'priceUnit', parseCurrencyToNumber(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Custos Adicionais (Grid Compacto) */}
-                                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-3 flex items-center gap-1">
-                                            <span className="material-icons-outlined text-xs">add_circle_outline</span> Custos Adicionais
-                                        </p>
-                                        <div className="space-y-3">
-                                            {/* Personalização */}
-                                            <div className="grid grid-cols-3 gap-2 items-end">
-                                                <div className="col-span-1">
-                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Personalização</label>
-                                                    <input className="form-input w-full text-xs rounded border-gray-200 text-right" value={formatCurrency(it.custoPersonalizacao)} onChange={e => updateItem(it.id, 'custoPersonalizacao', parseCurrencyToNumber(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
-                                                </div>
-                                                <div className="col-span-2">
-                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Forn. Personalização</label>
-                                                    <select className="form-select w-full text-xs rounded border-gray-200" value={it.customization_supplier_id || ''} onChange={e => updateItem(it.id, 'customization_supplier_id', e.target.value)} disabled={status === 'PROPOSTA ACEITA'}>
-                                                        <option value="">Selecionar...</option>
-                                                        {suppliersList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            {/* Layout */}
-                                            <div className="grid grid-cols-3 gap-2 items-end">
-                                                <div className="col-span-1">
-                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Layout</label>
-                                                    <input className="form-input w-full text-xs rounded border-gray-200 text-right" value={formatCurrency(it.layoutCost)} onChange={e => updateItem(it.id, 'layoutCost', parseCurrencyToNumber(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
-                                                </div>
-                                                <div className="col-span-2">
-                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Forn. Layout</label>
-                                                    <select className="form-select w-full text-xs rounded border-gray-200" value={it.layout_supplier_id || ''} onChange={e => updateItem(it.id, 'layout_supplier_id', e.target.value)} disabled={status === 'PROPOSTA ACEITA'}>
-                                                        <option value="">Selecionar...</option>
-                                                        {suppliersList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            {/* Despesa Extra */}
-                                            <div className="grid grid-cols-3 gap-2 items-end">
-                                                <div className="col-span-1">
-                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Despesa Extra</label>
-                                                    <input className="form-input w-full text-xs rounded border-gray-200 text-right" value={formatCurrency(it.despesaExtra)} onChange={e => updateItem(it.id, 'despesaExtra', parseCurrencyToNumber(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
-                                                </div>
-                                                <div className="col-span-2">
-                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Forn. Desp. Extra</label>
-                                                    <select className="form-select w-full text-xs rounded border-gray-200" value={it.extra_supplier_id || ''} onChange={e => updateItem(it.id, 'extra_supplier_id', e.target.value)} disabled={status === 'PROPOSTA ACEITA'}>
-                                                        <option value="">Selecionar...</option>
-                                                        {suppliersList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            {/* Frete Fornecedor */}
-                                            <div className="grid grid-cols-3 gap-2 items-end">
-                                                <div className="col-span-1">
-                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Frete Forn.</label>
-                                                    <input className="form-input w-full text-xs rounded border-gray-200 text-right" value={formatCurrency(it.transpFornecedor)} onChange={e => updateItem(it.id, 'transpFornecedor', parseCurrencyToNumber(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
-                                                </div>
-                                                <div className="col-span-2">
-                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Forn. Transp. Forn.</label>
-                                                    <select className="form-select w-full text-xs rounded border-gray-200" value={it.transport_supplier_id || ''} onChange={e => updateItem(it.id, 'transport_supplier_id', e.target.value)} disabled={status === 'PROPOSTA ACEITA'}>
-                                                        <option value="">Selecionar...</option>
-                                                        {suppliersList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                                    </select>
-                                                </div>
-                                            </div>
-
-                                            {/* Frete Cliente */}
-                                            <div className="grid grid-cols-3 gap-2 items-end">
-                                                <div className="col-span-1">
-                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Frete Cli.</label>
-                                                    <input className="form-input w-full text-xs rounded border-gray-200 text-right" value={formatCurrency(it.transpCliente)} onChange={e => updateItem(it.id, 'transpCliente', parseCurrencyToNumber(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
-                                                </div>
-                                                <div className="col-span-2">
-                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Forn. Transp. Cli.</label>
-                                                    <select className="form-select w-full text-xs rounded border-gray-200" value={it.client_transport_supplier_id || ''} onChange={e => updateItem(it.id, 'client_transport_supplier_id', e.target.value)} disabled={status === 'PROPOSTA ACEITA'}>
-                                                        <option value="">Selecionar...</option>
-                                                        {suppliersList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                                    </select>
-                                                </div>
-                                            </div>
-
-                                            {/* Total Custo Display */}
-                                            <div className="bg-blue-50 rounded border border-blue-100 flex flex-col justify-center items-end px-3 py-2 mt-2">
-                                                <span className="text-[8px] font-bold text-blue-400 uppercase">Custo Total Item</span>
-                                                <span className="text-sm font-bold text-blue-600">{formatCurrency(items.length > 0 ? (it.quantity * it.priceUnit) + (it.custoPersonalizacao + it.layoutCost + it.transpFornecedor + it.transpCliente + it.despesaExtra) : 0)}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Coluna Direita: Precificação e Resultado */}
-                                <div className="col-span-12 lg:col-span-5 bg-gray-50 rounded-xl p-5 border border-gray-200 flex flex-col justify-between">
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Fator de Multiplicação</label>
-                                            <div className="flex gap-2">
-                                                <select className="form-select w-full rounded-lg border-gray-300 text-sm" value={it.fator} onChange={e => updateItem(it.id, 'fator', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'}>
-                                                    {factors.map(f => (
-                                                        <option key={f.id} value={1 + (f.tax_percent + f.contingency_percent + f.margin_percent) / 100}>{f.name}</option>
-                                                    ))}
-                                                </select>
-                                                <div className="bg-white border border-gray-300 px-3 flex items-center rounded-lg font-bold text-gray-700 min-w-[4rem] justify-center text-sm">
-                                                    {it.fator.toFixed(2)}x
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Saldo Extra (%)</label>
-                                            <div className="relative">
-                                                <input type="number" className="form-input w-full rounded-lg border-gray-300 text-right pr-8 font-bold" value={it.extraPct} onChange={e => updateItem(it.id, 'extraPct', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
-                                                <span className="absolute right-3 top-2 text-gray-400 text-sm">%</span>
-                                            </div>
-                                            {it.extraPct > 0 && (
-                                                <div className="mt-1 flex justify-end items-center gap-1">
-                                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Valor Extra:</span>
-                                                    <span className="text-[11px] font-black text-blue-600">
-                                                        {formatCurrency(calculateItemTotal(it) * (it.extraPct / 100))}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">BV (%)</label>
-                                            <div className="relative">
-                                                <input type="number" className="form-input w-full rounded-lg border-gray-300 text-right pr-8 font-bold" value={it.bvPct} onChange={e => updateItem(it.id, 'bvPct', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
-                                                <span className="absolute right-3 top-2 text-gray-400 text-sm">%</span>
-                                            </div>
-                                            {it.bvPct > 0 && (
-                                                <div className="mt-1 flex justify-end items-center gap-1">
-                                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Valor BV:</span>
-                                                    <span className="text-[11px] font-black text-blue-600">
-                                                        {formatCurrency(calculateItemTotal(it) * (it.bvPct / 100))}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-8 pt-6 border-t border-gray-200 space-y-2">
-                                        <div className="flex justify-between items-center text-gray-500">
-                                            <span className="text-xs font-bold uppercase">Preço Venda (Unit)</span>
-                                            <span className="text-sm font-bold">{formatCurrency((calculateItemTotal(it) / (it.quantity || 1)))}</span>
-                                        </div>
-                                        <div className="flex justify-between items-end">
-                                            <span className="text-sm font-black uppercase text-gray-800">Total Venda</span>
-                                            <span className="text-3xl font-black text-blue-600 leading-none">{formatCurrency(calculateItemTotal(it))}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-
-                {status !== 'PROPOSTA ACEITA' && (
-                    <button onClick={addItem} className="w-full py-4 border-2 border-dashed border-blue-300 rounded-xl text-blue-500 font-bold uppercase hover:bg-blue-50 transition-all flex items-center justify-center gap-2">
-                        <span className="material-icons-outlined">add_circle</span> Adicionar Novo Item ao Pedido
+                {status !== 'PROPOSTA ACEITA' ? (
+                    <button onClick={addItem} className="w-full py-2.5 border-2 border-dashed border-blue-200 rounded-lg text-blue-500 font-black text-xs uppercase hover:bg-blue-50 transition-all flex items-center justify-center gap-2">
+                        <span className="material-icons-outlined text-base">add_circle</span> Adicionar Novo Item
                     </button>
-                )}
-                {status === 'PROPOSTA ACEITA' && (
-                    <div className="w-full py-4 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 font-bold uppercase flex items-center justify-center gap-2 bg-gray-50">
-                        <span className="material-icons-outlined">lock</span> Orçamento aprovado — edição bloqueada
+                ) : (
+                    <div className="w-full py-2.5 border-2 border-dashed border-gray-100 rounded-lg text-gray-400 font-bold text-[10px] uppercase flex items-center justify-center gap-2 bg-gray-50 italic">
+                        <span className="material-icons-outlined text-sm">lock</span> Edição bloqueada por aprovação
                     </div>
                 )}
             </section>

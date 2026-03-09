@@ -25,6 +25,7 @@ interface Order {
     total_amount: number; entry_amount: number; entry_confirmed: boolean; entry_date: string;
     remaining_amount: number; remaining_confirmed: boolean; remaining_date: string;
     entry_forecast_date: string; remaining_forecast_date: string;
+    payment_schedule?: { id: string, amount: number, dueDate: string, confirmed: boolean, label: string }[];
     items: OrderItem[];
 }
 
@@ -46,6 +47,17 @@ const OrdersReceivablesPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Confirmation Modal
+    const [confirmModal, setConfirmModal] = useState<{
+        isOpen: boolean; order: Order | null; type: 'entry' | 'remaining' | 'installment';
+        action: 'pay' | 'revert'; installmentId?: string;
+    }>({ isOpen: false, order: null, type: 'entry', action: 'pay' });
+
+    const [planModal, setPlanModal] = useState<{ isOpen: boolean, order: Order | null }>({ isOpen: false, order: null });
+    const [planForm, setPlanForm] = useState({ count: 2, firstDate: todayStr });
+
     // Filters
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('ALL');
@@ -59,28 +71,32 @@ const OrdersReceivablesPage: React.FC = () => {
     const fetchOrders = async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase.from('orders')
-                .select(`*, partners(name), order_items(*)`)
-                .order('created_at', { ascending: false });
+            const { data, error } = await supabase.from('orders').select(`*, partners(name), order_items(*)`).order('created_at', { ascending: false });
             if (error) throw error;
             setOrders((data || []).map((o: any) => ({
-                ...o, client_name: o.partners?.name || 'N/A',
-                items: o.order_items || []
+                ...o, client_name: o.partners?.name || 'N/A', items: o.order_items || []
             })));
         } catch { toast.error('Erro ao carregar pedidos.'); }
         setLoading(false);
     };
 
     // ---- Helpers ----
-    const getEstimatedCost = (items: OrderItem[]) => items.reduce((a, i) => a + i.quantity * (i.unit_price || 0) + (i.customization_cost || 0) + (i.supplier_transport_cost || 0) + (i.client_transport_cost || 0) + (i.extra_expense || 0) + (i.layout_cost || 0), 0);
-    const getRealCost = (items: OrderItem[]) => items.reduce((a, i) => a + i.quantity * (i.real_unit_price || i.unit_price || 0) + (i.real_customization_cost || i.customization_cost || 0) + (i.real_supplier_transport_cost || i.supplier_transport_cost || 0) + (i.real_client_transport_cost || i.client_transport_cost || 0) + (i.real_extra_expense || i.extra_expense || 0) + (i.real_layout_cost || i.layout_cost || 0), 0);
     const getSaleValue = (o: Order) => o.total_amount || o.items.reduce((a, i) => a + (i.total_item_value || 0), 0);
-    const getReceived = (o: Order) => (o.entry_confirmed ? o.entry_amount || 0 : 0) + (o.remaining_confirmed ? o.remaining_amount || 0 : 0);
+    const getRealCost = (items: OrderItem[]) => items.reduce((a, i) => a + i.quantity * (i.real_unit_price || i.unit_price || 0) + (i.real_customization_cost || i.customization_cost || 0) + (i.real_supplier_transport_cost || i.supplier_transport_cost || 0) + (i.real_client_transport_cost || i.client_transport_cost || 0) + (i.real_extra_expense || i.extra_expense || 0) + (i.real_layout_cost || i.layout_cost || 0), 0);
+    const getReceived = (o: Order) => {
+        const entryPart = o.entry_confirmed ? o.entry_amount || 0 : 0;
+        if (o.payment_schedule && o.payment_schedule.length > 0) {
+            return entryPart + o.payment_schedule.filter(p => p.confirmed).reduce((a, p) => a + p.amount, 0);
+        }
+        return entryPart + (o.remaining_confirmed ? o.remaining_amount || 0 : 0);
+    };
     const getPending = (o: Order) => getSaleValue(o) - getReceived(o);
     const getMargin = (o: Order) => { const s = getSaleValue(o), c = getRealCost(o.items); return s > 0 ? ((s - c) / s) * 100 : 0; };
     const getPayStatus = (o: Order): 'PAID' | 'PARTIAL' | 'PENDING' => {
-        if (o.entry_confirmed && o.remaining_confirmed) return 'PAID';
-        if (o.entry_confirmed || o.remaining_confirmed) return 'PARTIAL';
+        const sale = getSaleValue(o);
+        const received = getReceived(o);
+        if (received >= sale && sale > 0) return 'PAID';
+        if (received > 0) return 'PARTIAL';
         return 'PENDING';
     };
     const getCostPaidCount = (items: OrderItem[]) => {
@@ -90,25 +106,67 @@ const OrdersReceivablesPage: React.FC = () => {
         });
         return { total, paid };
     };
-    const todayStr = new Date().toISOString().split('T')[0];
     const isOverdue = (date: string | null, confirmed: boolean) => date && !confirmed && date < todayStr;
 
-    // ---- Confirm Payment ----
-    const confirmPayment = async (orderId: string, type: 'entry' | 'remaining') => {
-        const label = type === 'entry' ? 'Entrada' : 'Restante';
-        if (!window.confirm(`Confirmar recebimento de ${label}?`)) return;
+    // ---- Actions ----
+    const executePaymentAction = async () => {
+        const { order, type, action, installmentId } = confirmModal;
+        if (!order) return;
+
+        const label = type === 'entry' ? '1ª Parcela' : type === 'remaining' ? 'Parcela Única' : 'Parcela do Plano';
+        const isConfirming = action === 'pay';
+
         try {
-            const update = type === 'entry' ? { entry_confirmed: true } : { remaining_confirmed: true };
-            const { error } = await supabase.from('orders').update(update).eq('id', orderId);
+            let update: any = {};
+            if (type === 'entry') update = { entry_confirmed: isConfirming };
+            else if (type === 'remaining') update = { remaining_confirmed: isConfirming };
+            else if (type === 'installment' && installmentId) {
+                const newSchedule = (order.payment_schedule || []).map(p => p.id === installmentId ? { ...p, confirmed: isConfirming } : p);
+                update = { payment_schedule: newSchedule };
+            }
+
+            const { error } = await supabase.from('orders').update(update).eq('id', order.id);
             if (error) throw error;
-            toast.success(`${label} confirmado!`);
-            setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...update } : o));
+
+            toast.success(`${label} ${isConfirming ? 'confirmada' : 'estornada'}!`);
+            setOrders(prev => prev.map(o => o.id === order.id ? { ...o, ...update } : o));
+            setConfirmModal({ ...confirmModal, isOpen: false });
         } catch (e: any) { toast.error(e.message); }
+    };
+
+    const generatePlan = async () => {
+        if (!planModal.order) return;
+        const o = planModal.order;
+        const count = planForm.count;
+        const perAmount = o.remaining_amount / count;
+        const schedule = [];
+        const baseDate = new Date(planForm.firstDate + 'T12:00:00');
+
+        for (let i = 0; i < count; i++) {
+            const date = new Date(baseDate);
+            date.setMonth(date.getMonth() + i);
+            schedule.push({
+                id: crypto.randomUUID(), amount: perAmount, dueDate: date.toISOString().split('T')[0],
+                confirmed: false, label: `Parcela ${i + 1}/${count}`
+            });
+        }
+        const { error } = await supabase.from('orders').update({ payment_schedule: schedule }).eq('id', o.id);
+        if (error) { toast.error(error.message); return; }
+        setOrders(prev => prev.map(order => order.id === o.id ? { ...order, payment_schedule: schedule } : order));
+        setPlanModal({ isOpen: false, order: null });
+        toast.success('Plano de parcelas gerado!');
+    };
+
+    const deletePlan = async (order: Order) => {
+        if (!confirm('Deseja remover o plano customizado?')) return;
+        const { error } = await supabase.from('orders').update({ payment_schedule: null }).eq('id', order.id);
+        if (error) { toast.error(error.message); return; }
+        setOrders(prev => prev.map(o => o.id === order.id ? { ...o, payment_schedule: null } : o));
+        toast.info('Plano removido.');
     };
 
     // ---- Filtering ----
     const statuses = useMemo(() => [...new Set(orders.map(o => o.status).filter(Boolean))], [orders]);
-
     const filteredOrders = useMemo(() => {
         let result = orders;
         if (searchTerm) {
@@ -123,7 +181,6 @@ const OrdersReceivablesPage: React.FC = () => {
         return result;
     }, [orders, searchTerm, filterStatus, filterIssuer, filterPayment, filterDateFrom, filterDateTo]);
 
-    // ---- Summary ----
     const summary = useMemo(() => ({
         totalVenda: filteredOrders.reduce((a, o) => a + getSaleValue(o), 0),
         totalRecebido: filteredOrders.reduce((a, o) => a + getReceived(o), 0),
@@ -135,31 +192,23 @@ const OrdersReceivablesPage: React.FC = () => {
         exportSimpleCSV(filteredOrders.map(o => ({
             pedido: o.order_number, cliente: o.client_name, vendedor: o.salesperson,
             status: o.status, emissor: o.issuer, data: o.order_date,
-            venda: getSaleValue(o).toFixed(2), custo: getRealCost(o.items).toFixed(2),
-            recebido: getReceived(o).toFixed(2), pendente: getPending(o).toFixed(2),
-            margem: getMargin(o).toFixed(1) + '%'
+            venda: getSaleValue(o).toFixed(2), recebido: getReceived(o).toFixed(2),
+            pendente: getPending(o).toFixed(2), margem: getMargin(o).toFixed(1) + '%'
         })), 'pedidos_recebiveis');
         toast.success('CSV exportado!');
     };
 
-    const hasFilters = searchTerm || filterStatus !== 'ALL' || filterIssuer !== 'ALL' || filterPayment !== 'ALL' || filterDateFrom || filterDateTo;
-    const clearFilters = () => { setSearchTerm(''); setFilterStatus('ALL'); setFilterIssuer('ALL'); setFilterPayment('ALL'); setFilterDateFrom(''); setFilterDateTo(''); };
-
     if (loading) return <div className="flex items-center justify-center h-64"><span className="material-icons-outlined animate-spin text-4xl text-blue-500">sync</span></div>;
 
     return (
-        <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-5">
+        <div className="max-w-[1920px] w-full mx-auto p-4 md:p-6 space-y-5">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div>
-                    <h1 className="text-2xl font-black text-gray-900 flex items-center gap-2">
-                        <span className="material-icons-outlined text-blue-600">receipt_long</span> Pedidos & Recebíveis
-                    </h1>
+                    <h1 className="text-2xl font-black text-gray-900 flex items-center gap-2"><span className="material-icons-outlined text-blue-600">receipt_long</span> Pedidos & Recebíveis</h1>
                     <p className="text-sm text-gray-500">{filteredOrders.length} pedidos • Recebimentos centralizados</p>
                 </div>
-                <button onClick={exportAll} className="flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors">
-                    <span className="material-icons-outlined text-lg">download</span> Exportar CSV
-                </button>
+                <button onClick={exportAll} className="flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors"><span className="material-icons-outlined text-lg">download</span> Exportar CSV</button>
             </div>
 
             {/* Summary Cards */}
@@ -180,22 +229,17 @@ const OrdersReceivablesPage: React.FC = () => {
             {/* Filters */}
             <div className="bg-white rounded-xl border border-gray-200 p-4">
                 <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-                    <div className="md:col-span-2">
-                        <input className="form-input w-full text-sm rounded-lg border-gray-300" placeholder="Buscar pedido, cliente, vendedor..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                    </div>
+                    <div className="md:col-span-2"><input className="form-input w-full text-sm rounded-lg border-gray-300" placeholder="Buscar pedido, cliente, vendedor..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
                     <select className="form-select text-sm rounded-lg border-gray-300" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                         <option value="ALL">Todos Status</option>
                         {statuses.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                     <select className="form-select text-sm rounded-lg border-gray-300" value={filterIssuer} onChange={e => setFilterIssuer(e.target.value)}>
-                        <option value="ALL">Todos Emissores</option>
-                        <option value="CRISTAL">Cristal</option><option value="ESPIRITO">Espírito</option><option value="NATUREZA">Natureza</option>
+                        <option value="ALL">Todos Emissores</option><option value="CRISTAL">Cristal</option><option value="ESPIRITO">Espírito</option><option value="NATUREZA">Natureza</option>
                     </select>
                     <select className="form-select text-sm rounded-lg border-gray-300" value={filterPayment} onChange={e => setFilterPayment(e.target.value)}>
-                        <option value="ALL">Todos Pgtos</option>
-                        <option value="PAID">Pago</option><option value="PARTIAL">Parcial</option><option value="PENDING">Pendente</option>
+                        <option value="ALL">Todos Pgtos</option><option value="PAID">Pago</option><option value="PARTIAL">Parcial</option><option value="PENDING">Pendente</option>
                     </select>
-                    {hasFilters && <button onClick={clearFilters} className="text-xs text-red-500 font-bold hover:underline flex items-center gap-1"><span className="material-icons-outlined text-sm">clear</span>Limpar</button>}
                 </div>
             </div>
 
@@ -209,131 +253,92 @@ const OrdersReceivablesPage: React.FC = () => {
 
                     return (
                         <div key={o.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-sm transition-shadow">
-                            {/* Row */}
-                            <div className="px-4 py-3 flex items-center gap-3 cursor-pointer" onClick={() => setExpandedId(expanded ? null : o.id)}>
-                                <div className="flex-shrink-0">
-                                    <span className={`text-[10px] font-bold px-2 py-1 rounded ${statusColors[o.status] || 'bg-gray-100 text-gray-600'}`}>{o.status}</span>
-                                </div>
+                            <div className="px-2 py-1.5 text-sm flex items-center gap-3 cursor-pointer" onClick={() => setExpandedId(expanded ? null : o.id)}>
+                                <div className="flex-shrink-0"><span className={`text-[10px] font-bold px-2 py-1 rounded ${statusColors[o.status] || 'bg-gray-100 text-gray-600'}`}>{o.status}</span></div>
                                 <div className="flex-1 min-w-0 grid grid-cols-2 md:grid-cols-6 gap-2 items-center">
                                     <div>
-                                        <div className="flex items-center gap-2 mb-0.5">
-                                            <p className="text-sm font-black text-gray-900">#{o.order_number}</p>
-                                            <button onClick={(e) => { e.stopPropagation(); navigate('/pedido/' + o.id); }} className="text-[10px] font-bold bg-blue-50 text-blue-600 hover:bg-blue-100 py-0.5 px-1.5 rounded flex items-center gap-1 transition-colors" title="Abrir Pedido">
-                                                <span className="material-icons-outlined text-[11px]">open_in_new</span>
-                                            </button>
+                                        <div className="flex items-center gap-2 mb-0.5"><p className="text-sm font-black text-gray-900">#{o.order_number}</p>
+                                            <a href={'/pedido/' + o.id} onClick={(e) => e.stopPropagation()} className="text-[10px] font-bold bg-blue-50 text-blue-600 hover:bg-blue-100 py-0.5 px-1.5 rounded flex items-center gap-1 transition-colors" title="Abrir Pedido"><span className="material-icons-outlined text-[11px]">open_in_new</span></a>
                                         </div>
                                         <p className="text-xs text-gray-400">{formatDate(o.order_date)}</p>
                                     </div>
-                                    <div className="hidden md:block">
-                                        <p className="text-sm font-bold text-gray-700 truncate">{o.client_name}</p>
-                                        <p className="text-xs text-gray-400">{o.salesperson}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-sm font-bold text-gray-900">{formatCurrency(getSaleValue(o))}</p>
-                                        <p className="text-xs text-gray-400">Venda</p>
-                                    </div>
+                                    <div className="hidden md:block"><p className="text-sm font-bold text-gray-700 truncate">{o.client_name}</p><p className="text-xs text-gray-400">{o.salesperson}</p></div>
+                                    <div className="text-right"><p className="text-sm font-bold text-gray-900">{formatCurrency(getSaleValue(o))}</p><p className="text-xs text-gray-400">Venda</p></div>
+                                    <div className="text-right hidden md:block"><p className={`text-sm font-bold ${margin >= 25 ? 'text-green-600' : margin >= 10 ? 'text-yellow-600' : 'text-red-600'}`}>{margin.toFixed(1)}%</p><p className="text-xs text-gray-400">Margem</p></div>
                                     <div className="text-right hidden md:block">
-                                        <p className={`text-sm font-bold ${margin >= 25 ? 'text-green-600' : margin >= 10 ? 'text-yellow-600' : 'text-red-600'}`}>{margin.toFixed(1)}%</p>
-                                        <p className="text-xs text-gray-400">Margem</p>
-                                    </div>
-                                    <div className="text-right hidden md:block">
-                                        {/* Payment status */}
-                                        <div className="flex items-center justify-end gap-1">
-                                            <span className={`w-2 h-2 rounded-full ${payStatus === 'PAID' ? 'bg-green-500' : payStatus === 'PARTIAL' ? 'bg-yellow-500' : 'bg-red-500'}`} />
-                                            <span className="text-xs font-bold text-gray-600">{payStatus === 'PAID' ? 'Pago' : payStatus === 'PARTIAL' ? 'Parcial' : 'Pendente'}</span>
-                                        </div>
+                                        <div className="flex items-center justify-end gap-1"><span className={`w-2 h-2 rounded-full ${payStatus === 'PAID' ? 'bg-green-500' : payStatus === 'PARTIAL' ? 'bg-yellow-500' : 'bg-red-500'}`} /><span className="text-xs font-bold text-gray-600">{payStatus === 'PAID' ? 'Pago' : payStatus === 'PARTIAL' ? 'Parcial' : 'Pendente'}</span></div>
                                         <p className="text-xs text-gray-400">{formatCurrency(getPending(o))} pend.</p>
                                     </div>
-                                    <div className="text-right hidden md:block">
-                                        <p className="text-xs text-gray-400">{costInfo.paid}/{costInfo.total} custos pagos</p>
-                                    </div>
+                                    <div className="text-right hidden md:block"><p className="text-xs text-gray-400">{costInfo.paid}/{costInfo.total} custos pagos</p></div>
                                 </div>
                                 <span className="material-icons-outlined text-gray-400 text-lg transition-transform" style={{ transform: expanded ? 'rotate(180deg)' : '' }}>expand_more</span>
                             </div>
 
-                            {/* Expanded Detail */}
                             {expanded && (
-                                <div className="border-t border-gray-100 bg-gray-50 p-4 space-y-4">
-                                    {/* Payment Section */}
+                                <div className="border-t border-gray-100 bg-gray-50 p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {/* Entry */}
+                                        {/* Entry Box */}
                                         {(o.entry_amount || 0) > 0 && (
-                                            <div className={`rounded-lg p-3 border ${o.entry_confirmed ? 'bg-green-50 border-green-200' : isOverdue(o.entry_date, o.entry_confirmed) ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}>
+                                            <div className={`rounded-lg p-3 border ${o.entry_confirmed ? 'bg-green-50 border-green-200 shadow-sm' : isOverdue(o.entry_date, o.entry_confirmed) ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200 shadow-sm'}`}>
                                                 <div className="flex justify-between items-center">
-                                                    <div>
-                                                        <p className="text-[10px] font-bold uppercase text-gray-400">Entrada</p>
-                                                        <p className="text-lg font-black">{formatCurrency(o.entry_amount)}</p>
-                                                        <p className="text-xs text-gray-500">Venc: {formatDate(o.entry_date || o.order_date)}</p>
-                                                    </div>
+                                                    <div><p className="text-[10px] font-bold uppercase text-gray-400">1ª Parcela (Entrada)</p><p className="text-lg font-black text-gray-900">{formatCurrency(o.entry_amount)}</p><p className="text-xs text-gray-500">Venc: {formatDate(o.entry_date || o.order_date)}</p></div>
                                                     {o.entry_confirmed ? (
-                                                        <span className="flex items-center gap-1 text-green-600 text-xs font-bold"><span className="material-icons-outlined text-lg">check_circle</span>Recebido</span>
+                                                        <div className="flex flex-col items-end gap-1"><span className="flex items-center gap-1 text-green-600 text-xs font-bold"><span className="material-icons-outlined text-lg">check_circle</span>PAGO</span><button onClick={() => setConfirmModal({ isOpen: true, order: o, type: 'entry', action: 'revert' })} className="text-[10px] text-red-400 hover:text-red-600 font-bold underline transition-colors">Estornar</button></div>
                                                     ) : (
-                                                        <button onClick={(e) => { e.stopPropagation(); confirmPayment(o.id, 'entry'); }} className="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 transition-colors">Confirmar</button>
+                                                        <button onClick={() => setConfirmModal({ isOpen: true, order: o, type: 'entry', action: 'pay' })} className="px-5 py-2 bg-green-600 text-white text-xs font-black rounded-xl hover:bg-green-700 transition-all shadow-lg shadow-green-200 active:scale-95">CONFIRMAR</button>
                                                     )}
                                                 </div>
-                                                {isOverdue(o.entry_date || o.order_date, o.entry_confirmed) && <p className="text-xs text-red-600 font-bold mt-1">⚠ Vencido</p>}
                                             </div>
                                         )}
-                                        {/* Remaining */}
-                                        {(o.remaining_amount || 0) > 0 && (
-                                            <div className={`rounded-lg p-3 border ${o.remaining_confirmed ? 'bg-green-50 border-green-200' : isOverdue(o.remaining_date, o.remaining_confirmed) ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}>
-                                                <div className="flex justify-between items-center">
-                                                    <div>
-                                                        <p className="text-[10px] font-bold uppercase text-gray-400">Restante</p>
-                                                        <p className="text-lg font-black">{formatCurrency(o.remaining_amount)}</p>
-                                                        <p className="text-xs text-gray-500">Venc: {formatDate(o.remaining_date || o.payment_due_date)}</p>
+
+                                        {/* Installment Plan Rendering */}
+                                        {o.payment_schedule && o.payment_schedule.length > 0 ? (
+                                            <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 space-y-3 shadow-sm">
+                                                <div className="flex items-center justify-between border-b border-blue-100 pb-2">
+                                                    <p className="text-[10px] font-black text-blue-600 uppercase flex items-center gap-1"><span className="material-icons-outlined text-xs">calendar_month</span> Plano de Recebimento</p>
+                                                    <button onClick={() => deletePlan(o)} className="text-[10px] font-bold text-red-500 hover:underline">Remover Plano</button>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    {o.payment_schedule.map(p => (
+                                                        <div key={p.id} className={`flex items-center justify-between p-2 rounded-lg bg-white border ${p.confirmed ? 'border-green-200' : 'border-blue-100 shadow-sm'}`}>
+                                                            <div><p className="text-xs font-bold text-gray-800">{p.label}</p><p className="text-[10px] text-gray-500">{formatDate(p.dueDate)} • {formatCurrency(p.amount)}</p></div>
+                                                            <button onClick={() => setConfirmModal({ isOpen: true, order: o, type: 'installment', action: p.confirmed ? 'revert' : 'pay', installmentId: p.id })} className={`px-3 py-1 text-[10px] font-black rounded-lg transition-all ${p.confirmed ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'}`}>{p.confirmed ? 'PAGO' : 'BAIXAR'}</button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            /* Single Remaining Box */
+                                            (o.remaining_amount || 0) > 0 && (
+                                                <div className={`rounded-xl p-3 border ${o.remaining_confirmed ? 'bg-green-50 border-green-200' : isOverdue(o.remaining_date, o.remaining_confirmed) ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'} shadow-sm`}>
+                                                    <div className="flex justify-between items-start">
+                                                        <div><p className="text-[10px] font-bold uppercase text-gray-400">2ª Parcela (Restante)</p><p className="text-lg font-black text-gray-900">{formatCurrency(o.remaining_amount)}</p><p className="text-xs text-gray-500">Venc: {formatDate(o.remaining_date || o.payment_due_date)}</p></div>
+                                                        <div className="flex flex-col gap-2">
+                                                            {o.remaining_confirmed ? (
+                                                                <div className="flex flex-col items-end gap-1"><span className="flex items-center gap-1 text-green-600 text-xs font-bold"><span className="material-icons-outlined text-lg">check_circle</span>PAGO</span><button onClick={() => setConfirmModal({ isOpen: true, order: o, type: 'remaining', action: 'revert' })} className="text-[10px] text-red-400 hover:text-red-600 font-bold underline transition-colors">Estornar</button></div>
+                                                            ) : (
+                                                                <>
+                                                                    <button onClick={() => setConfirmModal({ isOpen: true, order: o, type: 'remaining', action: 'pay' })} className="px-5 py-2 bg-green-600 text-white text-xs font-black rounded-xl hover:bg-green-700 transition-all shadow-lg shadow-green-200 active:scale-95">CONFIRMAR</button>
+                                                                    <button onClick={() => setPlanModal({ isOpen: true, order: o })} className="flex items-center justify-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 transition-colors py-1"><span className="material-icons-outlined text-xs">style</span> Parcelar Customizado</button>
+                                                                </>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                    {o.remaining_confirmed ? (
-                                                        <span className="flex items-center gap-1 text-green-600 text-xs font-bold"><span className="material-icons-outlined text-lg">check_circle</span>Recebido</span>
-                                                    ) : (
-                                                        <button onClick={(e) => { e.stopPropagation(); confirmPayment(o.id, 'remaining'); }} className="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 transition-colors">Confirmar</button>
-                                                    )}
                                                 </div>
-                                                {isOverdue(o.remaining_date || o.payment_due_date, o.remaining_confirmed) && <p className="text-xs text-red-600 font-bold mt-1">⚠ Vencido</p>}
-                                            </div>
+                                            )
                                         )}
                                     </div>
-
-                                    {/* Items Table */}
-                                    <div>
-                                        <p className="text-[10px] font-bold uppercase text-gray-400 mb-2">Itens do Pedido</p>
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-xs">
-                                                <thead><tr className="text-gray-400 text-[10px] uppercase">
-                                                    <th className="text-left py-1 pr-2">Produto</th>
-                                                    <th className="text-center py-1 px-2">Qtd</th>
-                                                    <th className="text-right py-1 px-2">Custo Est.</th>
-                                                    <th className="text-right py-1 px-2">Custo Real</th>
-                                                    <th className="text-right py-1 px-2">Venda</th>
-                                                    <th className="text-right py-1 px-2">Margem</th>
-                                                </tr></thead>
-                                                <tbody>
-                                                    {o.items.map(i => {
-                                                        const estCost = i.quantity * (i.unit_price || 0) + (i.customization_cost || 0) + (i.supplier_transport_cost || 0) + (i.client_transport_cost || 0) + (i.extra_expense || 0) + (i.layout_cost || 0);
-                                                        const realCost = i.quantity * (i.real_unit_price || i.unit_price || 0) + (i.real_customization_cost || i.customization_cost || 0) + (i.real_supplier_transport_cost || i.supplier_transport_cost || 0) + (i.real_client_transport_cost || i.client_transport_cost || 0) + (i.real_extra_expense || i.extra_expense || 0) + (i.real_layout_cost || i.layout_cost || 0);
-                                                        const sale = i.total_item_value || 0;
-                                                        const m = sale > 0 ? ((sale - realCost) / sale) * 100 : 0;
-                                                        return (
-                                                            <tr key={i.id} className="border-t border-gray-100">
-                                                                <td className="py-2 pr-2 font-bold text-gray-700">{i.product_name}</td>
-                                                                <td className="py-2 px-2 text-center">{i.quantity}</td>
-                                                                <td className="py-2 px-2 text-right font-mono text-gray-500">{formatCurrency(estCost)}</td>
-                                                                <td className="py-2 px-2 text-right font-mono">{formatCurrency(realCost)}</td>
-                                                                <td className="py-2 px-2 text-right font-mono font-bold">{formatCurrency(sale)}</td>
-                                                                <td className={`py-2 px-2 text-right font-bold ${m >= 25 ? 'text-green-600' : m >= 10 ? 'text-yellow-600' : 'text-red-600'}`}>{m.toFixed(1)}%</td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-
-                                    {/* Footer info */}
-                                    <div className="flex flex-wrap gap-3 text-xs text-gray-400">
-                                        <span>Emissor: <strong>{o.issuer}</strong></span>
-                                        <span>Faturamento: <strong>{o.billing_type || '-'}</strong></span>
-                                        <span>Venc: <strong>{formatDate(o.payment_due_date)}</strong></span>
+                                    {/* Items Table simplified */}
+                                    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden text-[11px]">
+                                        <table className="w-full text-xs">
+                                            <thead><tr className="bg-gray-50 border-b border-gray-100 text-[9px] uppercase font-black text-gray-400"><th className="px-3 py-2 text-left">Item</th><th className="px-3 py-2 text-right">Custo Real</th><th className="px-3 py-2 text-right">Venda</th><th className="px-3 py-2 text-right">Margem</th></tr></thead>
+                                            <tbody>{o.items.map(i => {
+                                                const realC = i.quantity * (i.real_unit_price || i.unit_price || 0) + (i.real_customization_cost || i.customization_cost || 0) + (i.real_supplier_transport_cost || i.supplier_transport_cost || 0) + (i.real_client_transport_cost || i.client_transport_cost || 0);
+                                                const sale = i.total_item_value || 0;
+                                                const m = sale > 0 ? ((sale - realC) / sale) * 100 : 0;
+                                                return (<tr key={i.id} className="border-b border-gray-50 last:border-0"><td className="px-3 py-2 font-bold text-gray-700">{i.product_name}</td><td className="px-3 py-2 text-right font-mono">{formatCurrency(realC)}</td><td className="px-3 py-2 text-right font-mono font-bold">{formatCurrency(sale)}</td><td className={`px-3 py-2 text-right font-black ${m >= 25 ? 'text-green-600' : 'text-yellow-600'}`}>{m.toFixed(1)}%</td></tr>);
+                                            })}</tbody>
+                                        </table>
                                     </div>
                                 </div>
                             )}
@@ -342,10 +347,43 @@ const OrdersReceivablesPage: React.FC = () => {
                 })}
             </div>
 
-            {filteredOrders.length === 0 && (
-                <div className="text-center py-16 text-gray-400">
-                    <span className="material-icons-outlined text-5xl mb-2">inbox</span>
-                    <p className="font-bold">Nenhum pedido encontrado</p>
+            {/* Confirmation Modal */}
+            {confirmModal.isOpen && confirmModal.order && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm border border-gray-100 overflow-hidden text-center transform scale-100 transition-all">
+                        <div className="pt-6 pb-2 text-center">
+                            <div className={`mx-auto flex items-center justify-center h-16 w-16 rounded-full mb-4 ring-8 ${confirmModal.action === 'pay' ? 'bg-green-100 ring-green-50' : 'bg-red-100 ring-red-50'}`}>
+                                <span className={`material-icons-outlined text-3xl ${confirmModal.action === 'pay' ? 'text-green-600' : 'text-red-600'}`}>{confirmModal.action === 'pay' ? 'account_balance_wallet' : 'settings_backup_restore'}</span>
+                            </div>
+                        </div>
+                        <h3 className="text-xl font-black text-gray-900 px-6 uppercase tracking-tighter">{confirmModal.action === 'pay' ? 'Confirmar Recebimento' : 'Estornar Recebimento'}</h3>
+                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mx-6 my-4 text-left">
+                            <p className="text-xs text-gray-500 flex justify-between"><span>Ref:</span> <strong className="text-gray-900">Pedido #{confirmModal.order.order_number}</strong></p>
+                            <p className="text-xs text-gray-500 flex justify-between mt-1"><span>Valor:</span> <strong className="text-gray-900 text-sm">{formatCurrency(confirmModal.type === 'installment' ? confirmModal.order.payment_schedule?.find(p => p.id === confirmModal.installmentId)?.amount || 0 : (confirmModal.type === 'entry' ? confirmModal.order.entry_amount : confirmModal.order.remaining_amount))}</strong></p>
+                        </div>
+                        <div className="bg-gray-50 p-4 flex gap-3 border-t overflow-hidden">
+                            <button onClick={() => setConfirmModal({ ...confirmModal, isOpen: false })} className="flex-1 px-4 py-2.5 bg-white border border-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-100 transition-colors">Sair</button>
+                            <button onClick={executePaymentAction} className={`flex-1 px-4 py-2.5 rounded-xl font-black text-white shadow-lg ${confirmModal.action === 'pay' ? 'bg-green-600 shadow-green-200' : 'bg-red-600 shadow-red-200'}`}>{confirmModal.action === 'pay' ? 'CONFIRMAR' : 'ESTORNAR'}</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Plan Generation Modal */}
+            {planModal.isOpen && planModal.order && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm border border-gray-100 overflow-hidden transform scale-100 transition-all">
+                        <div className="p-4 border-b bg-gray-50 flex items-center justify-between"><h3 className="text-lg font-black text-gray-900 uppercase tracking-tighter">Gerar Parcelamento</h3><button onClick={() => setPlanModal({ isOpen: false, order: null })} className="text-gray-400 hover:text-gray-600"><span className="material-icons-outlined">close</span></button></div>
+                        <div className="p-6 space-y-4">
+                            <div className="bg-blue-50 p-3 rounded-lg border border-blue-100"><p className="text-xs text-blue-700">Parcelando o valor restante de <strong>{formatCurrency(planModal.order.remaining_amount)}</strong></p></div>
+                            <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Número de Parcelas</label><input type="number" min="2" max="10" className="form-input w-full rounded-lg border-gray-300 font-bold" value={planForm.count} onChange={e => setPlanForm({ ...planForm, count: parseInt(e.target.value) || 2 })} /></div>
+                            <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Data da 1ª Parcela</label><input type="date" className="form-input w-full rounded-lg border-gray-300" value={planForm.firstDate} onChange={e => setPlanForm({ ...planForm, firstDate: e.target.value })} /></div>
+                        </div>
+                        <div className="bg-gray-50 p-4 border-t flex gap-3">
+                            <button onClick={() => setPlanModal({ isOpen: false, order: null })} className="flex-1 px-4 py-2.5 bg-white border border-gray-200 text-gray-600 rounded-xl font-bold">Cancelar</button>
+                            <button onClick={generatePlan} className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl font-black shadow-lg shadow-blue-200 hover:bg-blue-700">GERAR PLANO</button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

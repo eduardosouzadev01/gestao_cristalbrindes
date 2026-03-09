@@ -126,6 +126,14 @@ const OrderList: React.FC = () => {
     }
   };
 
+  const getStatusDisplay = (status: string) => {
+    const map: any = {
+      'AGUARDANDO PAGAMENTO ENTRADA': 'AGUARDANDO 1ª PARCELA',
+      'AGUARDANDO PAGAMENTO 2 PARCELA': 'AGUARDANDO 2ª PARCELA',
+    };
+    return map[status] || status;
+  };
+
   const getStatusColor = (status: string) => {
     const map: any = {
       'AGUARDANDO PAGAMENTO ENTRADA': 'bg-yellow-100 text-yellow-700',
@@ -195,42 +203,41 @@ const OrderList: React.FC = () => {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="md:flex md:items-center md:justify-between mb-8">
-        <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate flex items-center gap-2">
-            <span className="material-icons-outlined text-blue-500 text-3xl">list_alt</span>
-            Gestão de Pedidos
+    <div className="max-w-[1920px] w-full mx-auto px-4 py-4 space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-black leading-none text-gray-900 uppercase tracking-tighter flex items-center gap-2">
+            <span className="material-icons-outlined text-blue-600 text-2xl">list_alt</span>
+            GESTÃO DE PEDIDOS
           </h2>
-          <p className="mt-1 text-sm text-gray-500">Gerencie e filtre todos os pedidos de venda em um único lugar.</p>
-        </div>
-        <div className="mt-4 flex md:mt-0 md:ml-4">
-          {/* Novo Pedido button removed as requested */}
+          <p className="mt-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Painel administrativo de pedidos de venda</p>
         </div>
       </div>
 
-      <div className="bg-white shadow-sm rounded-xl border border-gray-200 mb-8 p-5">
-        <div className="flex flex-col md:flex-row gap-4 items-end">
-          <div className="flex-grow w-full md:w-auto">
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Buscar Pedido</label>
+      {/* Optimized Filters */}
+      <div className="bg-white rounded border border-gray-200 p-2.5 shadow-sm">
+        <div className="flex flex-wrap gap-2 items-end">
+          <div className="flex-1 min-w-[250px]">
+            <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">BUSCAR PEDIDO</label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <span className="material-icons-outlined text-gray-400">search</span>
+              <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                <span className="material-icons-outlined text-gray-400 text-sm">search</span>
               </span>
               <input
                 type="text"
-                placeholder="ID, Cliente, CNPJ ou Valor (Total/Parcela)"
-                className="form-input block w-full pl-10 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10"
+                placeholder="ID, Cliente, CNPJ ou Valor..."
+                className="form-input block w-full pl-8 rounded border-gray-300 shadow-sm focus:ring-0 focus:border-blue-500 text-xs h-8 font-bold"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
           </div>
-          <div className="w-full md:w-48">
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Vendedor</label>
+          <div className="w-40">
+            <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">VENDEDOR</label>
             <select
               disabled={!!appUser?.salesperson}
-              className={`form-select block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10 ${appUser?.salesperson ? 'bg-gray-100' : ''}`}
+              className={`form-select block w-full rounded border-gray-300 shadow-sm focus:ring-0 focus:border-blue-500 text-[10px] h-8 font-bold py-0 pr-6 ${appUser?.salesperson ? 'bg-gray-50' : ''}`}
               value={vendedorFilter}
               onChange={(e) => setVendedorFilter(e.target.value)}
             >
@@ -241,41 +248,32 @@ const OrderList: React.FC = () => {
               <option>VENDAS 04</option>
             </select>
           </div>
-          <div className="w-full md:w-48">
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Status</label>
+          <div className="w-40">
+            <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">STATUS</label>
             <select
-              className="form-select block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10"
+              className="form-select block w-full rounded border-gray-300 shadow-sm focus:ring-0 focus:border-blue-500 text-[10px] h-8 font-bold py-0 pr-6"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               {statusOptions.map(opt => (
-                <option key={opt} value={opt}>{opt}</option>
+                <option key={opt} value={opt}>{getStatusDisplay(opt).toUpperCase()}</option>
               ))}
             </select>
           </div>
-          <button className="w-full md:w-auto inline-flex items-center justify-center px-4 py-2.5 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors h-10">
-            <span className="material-icons-outlined mr-2 text-blue-500">filter_list</span>
-            Filtros
-          </button>
-        </div>
-
-
-        {/* Date Filters Row */}
-        <div className="flex flex-col md:flex-row gap-4 mt-4 pt-4 border-t border-gray-100">
-          <div className="w-full md:w-auto">
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Data Limite Recebimento</label>
+          <div className="w-28">
+            <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">DATA LIMITE</label>
             <input
               type="date"
-              className="form-input block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10"
+              className="form-input block w-full rounded border-gray-300 shadow-sm focus:ring-0 focus:border-blue-500 text-[10px] h-8 px-2"
               value={limitDateFilter}
               onChange={(e) => setLimitDateFilter(e.target.value)}
             />
           </div>
-          <div className="w-full md:w-auto">
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Data Saída Fornecedor</label>
+          <div className="w-28">
+            <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">SAÍDA FORN.</label>
             <input
               type="date"
-              className="form-input block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10"
+              className="form-input block w-full rounded border-gray-300 shadow-sm focus:ring-0 focus:border-blue-500 text-[10px] h-8 px-2"
               value={supplierDateFilter}
               onChange={(e) => setSupplierDateFilter(e.target.value)}
             />
@@ -283,119 +281,139 @@ const OrderList: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white shadow-lg rounded-xl overflow-hidden border border-gray-200">
+      <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-10 text-center text-gray-500">Carregando pedidos...</div>
+          <div className="p-12 text-center text-gray-400 font-black uppercase text-[10px] tracking-widest">
+            <span className="material-icons-outlined animate-spin text-2xl mb-2 block">sync</span>
+            Carregando pedidos...
+          </div>
         ) : (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                {[
-                  { label: 'ID', key: 'order_number' },
-                  { label: 'STATUS', key: 'status' },
-                  { label: 'CLIENTE', key: 'partners.name' },
-                  { label: 'VENDEDOR', key: 'salesperson' },
-                  { label: 'DATA PEDIDO', key: 'order_date' },
-                  { label: 'SAÍDA FORN.', key: 'supplier_departure_date' },
-                  { label: 'VALOR TOTAL', key: 'total_amount' },
-                  { label: 'AÇÕES', key: null }
-                ].map((head) => (
-                  <th
-                    key={head.label}
-                    className={`px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider ${head.key ? 'cursor-pointer hover:bg-gray-100 transition-colors' : ''}`}
-                    onClick={() => {
-                      if (head.key) {
-                        if (orderBy === head.key) {
-                          setOrderDirection(orderDirection === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setOrderBy(head.key);
-                          setOrderDirection('asc');
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50/50">
+                <tr className="text-[8px] font-black text-gray-400 uppercase tracking-widest">
+                  {[
+                    { label: 'ID', key: 'order_number', width: 'w-20' },
+                    { label: 'STATUS', key: 'status' },
+                    { label: 'CLIENTE / CNPJ', key: 'partners.name' },
+                    { label: 'VENDEDOR', key: 'salesperson' },
+                    { label: 'DATA PEDIDO', key: 'order_date' },
+                    { label: 'ENTREGA', key: 'payment_due_date' },
+                    { label: 'SAÍDA FORN.', key: 'supplier_departure_date' },
+                    { label: 'VALOR TOTAL', key: 'total_amount', align: 'text-right' },
+                    { label: '', key: null, width: 'w-10' }
+                  ].map((head) => (
+                    <th
+                      key={head.label}
+                      className={`px-3 py-2 text-left ${head.width || ''} ${head.align || ''} ${head.key ? 'cursor-pointer hover:bg-gray-100 transition-colors' : ''}`}
+                      onClick={() => {
+                        if (head.key) {
+                          if (orderBy === head.key) {
+                            setOrderDirection(orderDirection === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setOrderBy(head.key);
+                            setOrderDirection('asc');
+                          }
                         }
-                      }
-                    }}
-                  >
-                    <div className="flex items-center gap-1">
-                      {head.label}
-                      {head.key && (
-                        <span className={`material-icons-outlined text-sm ${orderBy === head.key ? 'text-blue-500' : 'opacity-20'}`}>
-                          {orderBy === head.key ? (orderDirection === 'asc' ? 'north' : 'south') : 'unfold_more'}
-                        </span>
-                      )}
-                    </div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredOrders.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-10 text-center text-gray-500 text-sm">
-                    Nenhum pedido encontrado com os filtros selecionados.
-                  </td>
-                </tr>
-              ) : (
-                filteredOrders.map((order, i) => (
-                  <tr
-                    key={i}
-                    onClick={() => navigate(`/pedido/${order.id_original}?mode=view`)}
-                    className="hover:bg-blue-50 transition-colors cursor-pointer odd:bg-white even:bg-gray-50"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-500">{order.id}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${order.statusColor}`}>
-                        <span className={`w-1.5 h-1.5 mr-1.5 rounded-full ${order.dotColor}`}></span>
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-gray-900">{order.client}</span>
+                      }}
+                    >
+                      <div className={`flex items-center gap-1 ${head.align === 'text-right' ? 'justify-end' : ''}`}>
+                        {head.label}
+                        {head.key && (
+                          <span className={`material-icons-outlined text-[10px] ${orderBy === head.key ? 'text-blue-500' : 'opacity-20'}`}>
+                            {orderBy === head.key ? (orderDirection === 'asc' ? 'north' : 'south') : 'unfold_more'}
+                          </span>
+                        )}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">{order.vendedor}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.date}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-bold">{order.supplierDate ? formatDate(order.supplierDate) : '-'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{order.total}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                      <button className="text-gray-400 hover:text-blue-500" onClick={(e) => { e.stopPropagation(); /* Optional: keep menu working independently */ }}>
-                        <span className="material-icons-outlined">more_vert</span>
-                      </button>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-100">
+                {filteredOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="px-6 py-12 text-center">
+                      <p className="text-gray-400 text-[10px] font-black uppercase">Nenhum pedido encontrado</p>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  filteredOrders.map((order, i) => (
+                    <tr
+                      key={i}
+                      onClick={() => navigate(`/pedido/${order.id_original}?mode=view`)}
+                      className="hover:bg-blue-50/30 transition-colors cursor-pointer group"
+                    >
+                      <td className="px-3 py-1.5 whitespace-nowrap">
+                        <a href={`/pedido/${order.id_original}?mode=view`} onClick={(e) => e.stopPropagation()} className="text-xs font-black text-blue-600 hover:underline">
+                          #{order.id}
+                        </a>
+                      </td>
+                      <td className="px-3 py-1.5 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black uppercase shadow-sm ${order.statusColor}`}>
+                          <span className={`w-1 h-1 mr-1 rounded-full ${order.dotColor}`}></span>
+                          {getStatusDisplay(order.status)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <div className="flex flex-col">
+                          <span className="text-xs font-black text-gray-800 uppercase leading-none truncate max-w-[200px]">{order.client}</span>
+                          <span className="text-[8px] text-gray-400 font-bold mt-0.5">{order.cnpj}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-1.5 whitespace-nowrap">
+                        <span className="text-[10px] font-black text-gray-600 uppercase">{order.vendedor}</span>
+                      </td>
+                      <td className="px-3 py-1.5 whitespace-nowrap text-[10px] text-gray-500 font-bold">{order.date}</td>
+                      <td className="px-3 py-1.5 whitespace-nowrap">
+                        <span className="text-[10px] text-blue-600 font-black">{order.limitDate ? formatDate(order.limitDate) : '-'}</span>
+                      </td>
+                      <td className="px-3 py-1.5 whitespace-nowrap text-[10px] text-gray-500 font-bold">{order.supplierDate ? formatDate(order.supplierDate) : '-'}</td>
+                      <td className="px-3 py-1.5 whitespace-nowrap text-xs font-black text-gray-900 text-right">{order.total}</td>
+                      <td className="px-3 py-1.5 text-center">
+                        <button className="text-gray-300 group-hover:text-blue-500 transition-colors">
+                          <span className="material-icons-outlined text-base">more_vert</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
 
-        {/* Pagination Controls */}
-        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 rounded-b-xl shadow-sm">
-          <div className="flex-1 flex justify-between sm:hidden">
-            <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50">Anterior</button>
-            <button onClick={() => setPage(p => p + 1)} disabled={(page + 1) * pageSize >= totalCount} className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50">Próximo</button>
-          </div>
+        {/* Improved Pagination */}
+        <div className="bg-gray-50/50 border-t border-gray-200 px-4 py-2 flex items-center justify-between">
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm text-gray-700">
-                Mostrando <span className="font-medium">{page * pageSize + 1}</span> até <span className="font-medium">{Math.min((page + 1) * pageSize, totalCount)}</span> de <span className="font-medium">{totalCount}</span> resultados
+              <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                EXIBINDO <span className="text-gray-900">{page * pageSize + 1}-{Math.min((page + 1) * pageSize, totalCount)}</span> DE <span className="text-gray-900">{totalCount}</span> REGISTROS
               </p>
             </div>
             <div>
-              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50">
-                  <span className="material-icons-outlined">chevron_left</span>
+              <nav className="relative z-0 inline-flex rounded shadow-sm -space-x-px" aria-label="Pagination">
+                <button
+                  onClick={() => setPage(p => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="relative inline-flex items-center px-1 py-1 rounded-l border border-gray-300 bg-white text-gray-400 hover:bg-gray-50 disabled:opacity-30"
+                >
+                  <span className="material-icons-outlined text-sm">chevron_left</span>
                 </button>
                 {[...Array(Math.ceil(totalCount / pageSize))].map((_, i) => (
                   <button
                     key={i}
                     onClick={() => setPage(i)}
-                    className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${page === i ? 'z-10 bg-blue-50 border-blue-500 text-blue-600' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'}`}
+                    className={`relative inline-flex items-center px-2.5 py-1 border text-[10px] font-black ${page === i ? 'z-10 bg-blue-600 border-blue-600 text-white shadow-sm' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'}`}
                   >
                     {i + 1}
                   </button>
                 )).slice(Math.max(0, page - 2), Math.min(Math.ceil(totalCount / pageSize), page + 3))}
-                <button onClick={() => setPage(p => p + 1)} disabled={(page + 1) * pageSize >= totalCount} className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50">
-                  <span className="material-icons-outlined">chevron_right</span>
+                <button
+                  onClick={() => setPage(p => p + 1)}
+                  disabled={(page + 1) * pageSize >= totalCount}
+                  className="relative inline-flex items-center px-1 py-1 rounded-r border border-gray-300 bg-white text-gray-400 hover:bg-gray-50 disabled:opacity-30"
+                >
+                  <span className="material-icons-outlined text-sm">chevron_right</span>
                 </button>
               </nav>
             </div>

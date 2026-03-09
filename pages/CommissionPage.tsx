@@ -65,6 +65,32 @@ const CommissionPage: React.FC = () => {
     total: commissions.filter(c => c.salesperson === seller).reduce((acc, curr) => acc + (curr.amount || 0), 0),
     pending: commissions.filter(c => c.salesperson === seller && c.status === 'PENDING').reduce((acc, curr) => acc + (curr.amount || 0), 0)
   }));
+
+  const [yearlyStats, setYearlyStats] = useState<any[]>([]);
+  const [showYearlyAnalysis, setShowYearlyAnalysis] = useState(false);
+
+  useEffect(() => {
+    fetchYearlyStats();
+  }, [year]);
+
+  const fetchYearlyStats = async () => {
+    try {
+      const startDate = `${year}-01-01T00:00:00Z`;
+      const endDate = `${year}-12-31T23:59:59Z`;
+      const { data } = await supabase.from('commissions').select('amount, created_at').gte('created_at', startDate).lte('created_at', endDate);
+      if (data) {
+        const months = Array.from({ length: 12 }, (_, i) => ({
+          month: i + 1,
+          label: formatMonthYear(i + 1, year).split(' DE ')[0],
+          total: data.filter(c => new Date(c.created_at).getMonth() === i).reduce((acc, curr) => acc + (curr.amount || 0), 0)
+        }));
+        setYearlyStats(months);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const [selectedSeller, setSelectedSeller] = useState<string | null>(null);
 
   const togglePaidStatus = async (id: string, currentStatus: string) => {
@@ -210,151 +236,241 @@ const CommissionPage: React.FC = () => {
     : commissions;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+    <div className="max-w-[1920px] w-full mx-auto px-4 py-4 space-y-4">
       {errorMsg && (
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded shadow-md" role="alert">
-          <p className="font-bold">Atenção</p>
-          <p>{errorMsg}</p>
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-3 shadow-sm animate-pulse" role="alert">
+          <span className="material-icons-outlined text-red-500">error_outline</span>
+          <div>
+            <p className="text-xs font-black uppercase tracking-widest">ALERTA DE SISTEMA</p>
+            <p className="text-[11px] font-bold mt-0.5">{errorMsg}</p>
+          </div>
         </div>
       )}
-      <div className="flex items-center justify-between mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 uppercase flex items-center gap-3">
-          <span className="material-icons-outlined text-blue-500 text-3xl">payments</span>
-          Gestão de Comissões
-        </h2>
-      </div>
 
-      {/* Filters */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex gap-4 items-end">
-        <div>
-          <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Mês</label>
-          <select
-            value={month}
-            onChange={(e) => setMonth(parseInt(e.target.value))}
-            className="form-select rounded-lg border-gray-300 text-sm font-bold"
-          >
-            {Array.from({ length: 12 }, (_, i) => (
-              <option key={i + 1} value={i + 1}>
-                {formatMonthYear(i + 1, year).split(' DE ')[0]}
-              </option>
-            ))}
-          </select>
+      {/* Optimized Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-emerald-600 rounded flex items-center justify-center shadow-sm">
+            <span className="material-icons-outlined text-white text-lg">payments</span>
+          </div>
+          <div>
+            <h1 className="text-xl font-black leading-none text-gray-900 uppercase tracking-tighter">GESTÃO DE COMISSÕES</h1>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Controle financeiro e performance de vendas</p>
+          </div>
         </div>
-        <div>
-          <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Ano</label>
-          <select
-            value={year}
-            onChange={(e) => setYear(parseInt(e.target.value))}
-            className="form-select rounded-lg border-gray-300 text-sm font-bold"
+
+        <div className="flex items-center gap-6 bg-white px-4 py-2 rounded border border-gray-200 shadow-sm">
+          <div className="text-right">
+            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">TOTAL ACUMULADO (MÊS)</p>
+            <p className="text-lg font-black text-emerald-600 leading-none">{formatCurrency(totalCommissions)}</p>
+          </div>
+          <button
+            onClick={() => setShowYearlyAnalysis(!showYearlyAnalysis)}
+            className={`w-8 h-8 rounded flex items-center justify-center transition-all ${showYearlyAnalysis ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'}`}
+            title="Análise Anual"
           >
-            {[2023, 2024, 2025, 2026].map(y => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-        </div>
-        <div className="ml-auto text-right">
-          <p className="text-xs font-bold text-gray-400 uppercase">Total de Comissões</p>
-          <p className="text-2xl font-black text-green-500">{formatCurrency(totalCommissions)}</p>
+            <span className="material-icons-outlined text-sm">analytics</span>
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+      {/* Compact Filters & Performance */}
+      <div className="flex flex-col gap-4">
+        <div className="bg-white p-2.5 rounded border border-gray-200 shadow-sm flex items-end gap-3">
+          <div className="w-32">
+            <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">MÊS DE REFERÊNCIA</label>
+            <select
+              value={month}
+              onChange={(e) => setMonth(parseInt(e.target.value))}
+              className="w-full px-2 border border-gray-300 rounded h-8 text-[10px] font-black uppercase tracking-widest bg-gray-50/50"
+            >
+              {Array.from({ length: 12 }, (_, i) => (
+                <option key={i + 1} value={i + 1}>
+                  {formatMonthYear(i + 1, year).split(' DE ')[0]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="w-24">
+            <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">ANO</label>
+            <select
+              value={year}
+              onChange={(e) => setYear(parseInt(e.target.value))}
+              className="w-full px-2 border border-gray-300 rounded h-8 text-[10px] font-black uppercase tracking-widest bg-gray-50/50"
+            >
+              {[2023, 2024, 2025, 2026].map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Yearly Analysis Panel */}
+        {showYearlyAnalysis && (
+          <div className="bg-white p-4 rounded border border-blue-100 shadow-sm animate-in slide-in-from-top-2 duration-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-[10px] font-black text-blue-900 uppercase tracking-widest flex items-center gap-2">
+                <span className="material-icons-outlined text-blue-500 text-sm">trending_up</span>
+                PERFORMANCE ANUAL {year}
+              </h3>
+              <span className="text-[9px] font-black text-gray-400 uppercase bg-gray-50 px-2 py-0.5 rounded border border-gray-100">
+                TOTAL: {formatCurrency(yearlyStats.reduce((acc, curr) => acc + curr.total, 0))}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-3">
+              {yearlyStats.map((m) => {
+                const max = Math.max(...yearlyStats.map(s => s.total)) || 1;
+                const percent = (m.total / max) * 100;
+                return (
+                  <div key={m.month} className="group cursor-pointer">
+                    <div className="flex justify-between items-end mb-1">
+                      <span className="text-[8px] font-black text-gray-500 uppercase">{m.label}</span>
+                      <span className={`text-[9px] font-black ${m.total > 0 ? 'text-gray-800' : 'text-gray-300'}`}>{formatCurrency(m.total)}</span>
+                    </div>
+                    <div className="h-1 w-full bg-gray-50 rounded-full overflow-hidden border border-gray-100">
+                      <div
+                        className={`h-full transition-all duration-700 ease-out ${m.month === month ? 'bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.4)]' : 'bg-gray-200 group-hover:bg-blue-300'}`}
+                        style={{ width: `${percent}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Seller Stats Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {sellerStats.map(stat => (
           <div
             key={stat.name}
-            className={`p-4 rounded-xl border transition-all ${selectedSeller === stat.name ? 'bg-blue-50 border-blue-500 shadow-md' : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm'}`}
+            onClick={() => setSelectedSeller(selectedSeller === stat.name ? null : stat.name)}
+            className={`cursor-pointer p-3 rounded border transition-all relative overflow-hidden group ${selectedSeller === stat.name ? 'bg-blue-50 border-blue-400 shadow-sm ring-1 ring-blue-400' : 'bg-white border-gray-200 hover:border-blue-300'}`}
           >
-            <div className="flex justify-between items-start mb-2" onClick={() => setSelectedSeller(selectedSeller === stat.name ? null : stat.name)}>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{stat.name}</p>
-              {selectedSeller === stat.name && <span className="material-icons-outlined text-blue-500 text-sm">filter_alt</span>}
+            <div className="flex justify-between items-start mb-1.5">
+              <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{stat.name}</p>
+              {selectedSeller === stat.name && <span className="material-icons-outlined text-blue-600 text-[14px]">filter_alt</span>}
             </div>
-            <div className="mb-3" onClick={() => setSelectedSeller(selectedSeller === stat.name ? null : stat.name)}>
-              <p className="text-xl font-black text-gray-800">{formatCurrency(stat.total)}</p>
+            <div className="space-y-0.5">
+              <p className="text-sm font-black text-gray-900 leading-tight">{formatCurrency(stat.total)}</p>
               {stat.pending > 0 && (
-                <p className="text-[10px] font-bold text-orange-500 uppercase">Pendente: {formatCurrency(stat.pending)}</p>
+                <p className="text-[8px] font-bold text-orange-600 uppercase tracking-tight flex items-center gap-1">
+                  <span className="w-1 h-1 bg-orange-600 rounded-full animate-pulse"></span>
+                  PENDENTE: {formatCurrency(stat.pending)}
+                </p>
               )}
             </div>
-            {stat.pending > 0 && (
-              <button
-                onClick={(e) => { e.stopPropagation(); payAllForSeller(stat.name); }}
-                className="w-full py-1.5 bg-green-500 hover:bg-green-600 text-white rounded text-[10px] font-bold uppercase transition-colors"
-              >
-                Pagar Tudo
-              </button>
-            )}
-            {stat.pending === 0 && stat.total > 0 && (
-              <div className="w-full py-1.5 bg-gray-100 text-gray-400 rounded text-[10px] font-bold uppercase text-center">
-                Tudo Pago
-              </div>
-            )}
+
+            <div className="mt-2 pt-2 border-t border-gray-100/50">
+              {stat.pending > 0 ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); payAllForSeller(stat.name); }}
+                  className="w-full py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[8px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95"
+                >
+                  PAGAR TUDO
+                </button>
+              ) : stat.total > 0 ? (
+                <div className="w-full py-1 bg-gray-50 text-gray-400 rounded text-[8px] font-black uppercase tracking-widest text-center flex items-center justify-center gap-1">
+                  <span className="material-icons-outlined text-[10px]">check_circle</span>
+                  PAGO
+                </div>
+              ) : (
+                <div className="w-full py-1 transparent text-transparent rounded text-[8px]">.</div>
+              )}
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Table */}
-      <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+      {/* High-Density Data Table */}
+      <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Vendedor</th>
-                <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Pedido</th>
-                <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Cliente</th>
-                <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">Valor Comissão</th>
-                <th className="px-6 py-3 text-center text-xs font-bold text-gray-400 uppercase tracking-wider">Ações</th>
+            <thead className="bg-gray-50/50">
+              <tr className="text-[8px] font-black text-gray-400 uppercase tracking-widest">
+                <th className="px-4 py-2 text-left">VENDEDOR</th>
+                <th className="px-4 py-2 text-left">PEDIDO</th>
+                <th className="px-4 py-2 text-left">CLIENTE / DESCRIÇÃO</th>
+                <th className="px-4 py-2 text-center">STATUS</th>
+                <th className="px-4 py-2 text-right">VALOR COMISSÃO</th>
+                <th className="px-4 py-2 text-center">AÇÕES</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">Carregando...</td>
+                  <td colSpan={6} className="px-6 py-12 text-center pointer-events-none">
+                    <div className="flex flex-col items-center gap-2">
+                      <span className="material-icons-outlined animate-spin text-blue-600 text-2xl">sync</span>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Processando extrato...</p>
+                    </div>
+                  </td>
                 </tr>
               ) : filteredCommissions.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">Nenhuma comissão encontrada neste período.</td>
+                  <td colSpan={6} className="px-6 py-12 text-center">
+                    <p className="text-[10px] font-black text-gray-300 uppercase italic">Nenhuma comissão identificada no período</p>
+                  </td>
                 </tr>
               ) : (
                 filteredCommissions.map((comm) => (
-                  <tr key={comm.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{comm.salesperson}</td>
-                    <td
-                      className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-bold cursor-pointer hover:underline"
-                      onClick={() => comm.order_id ? navigate(`/pedido/${comm.order_id}`) : null}
-                    >
-                      #{comm.orders?.order_number || 'N/A'}
+                  <tr key={comm.id} className="hover:bg-blue-50/30 transition-colors group">
+                    <td className="px-4 py-1.5 whitespace-nowrap">
+                      <span className="text-[10px] font-black text-gray-700 uppercase">{comm.salesperson}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{comm.orders?.partners?.name || 'Cliente Removido'}</div>
-                      {comm.description && <div className="text-[10px] text-gray-400 italic max-w-[200px] truncate">{comm.description}</div>}
+                    <td className="px-4 py-1.5 whitespace-nowrap">
+                      <button
+                        className="text-[10px] font-black text-blue-600 hover:text-blue-700 underline underline-offset-2 decoration-blue-200"
+                        onClick={() => comm.order_id ? navigate(`/pedido/${comm.order_id}`) : null}
+                      >
+                        #{comm.orders?.order_number || '---'}
+                      </button>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <td className="px-4 py-1.5">
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[10px] font-black text-gray-900 uppercase truncate max-w-[250px] leading-tight">
+                          {comm.orders?.partners?.name || '---'}
+                        </span>
+                        {comm.description && (
+                          <span className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter truncate max-w-[250px] mt-0.5 italic">
+                            {comm.description}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-1.5 whitespace-nowrap text-center">
                       <button
                         onClick={() => togglePaidStatus(comm.id, comm.status)}
-                        className={`px-3 py-1 text-[10px] font-black rounded-full transition-colors ${comm.status === 'PAID' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'}`}
+                        className={`px-2 py-0.5 text-[8px] font-black rounded border transition-all shadow-sm ${comm.status === 'PAID' ? 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100' : 'bg-orange-50 text-orange-600 border-orange-100 hover:bg-orange-100'}`}
                       >
-                        {comm.status === 'PENDING' ? 'PENDENTE' : 'PAGO'}
+                        {comm.status === 'PENDING' ? 'PENDENTE' : 'LIQUIDADO'}
                       </button>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600 text-right">
-                      {formatCurrency(comm.amount)}
+                    <td className="px-4 py-1.5 whitespace-nowrap text-right">
+                      <span className="text-[10px] font-black text-emerald-600">
+                        {formatCurrency(comm.amount)}
+                      </span>
                     </td>
-                    <div className="flex justify-center gap-1">
-                      <button
-                        onClick={() => openEditModal(comm)}
-                        className="p-1 px-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-all flex items-center gap-1"
-                        title="Editar"
-                      >
-                        <span className="material-icons-outlined text-sm">edit</span>
-                      </button>
-                      <button
-                        onClick={() => openSplitModal(comm)}
-                        className="p-1 px-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-all flex items-center gap-1"
-                        title="Dividir"
-                      >
-                        <span className="material-icons-outlined text-sm">call_split</span>
-                      </button>
-                    </div>
+                    <td className="px-4 py-1.5 whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-1 select-none">
+                        <button
+                          onClick={() => openEditModal(comm)}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-all"
+                          title="Ajustar"
+                        >
+                          <span className="material-icons-outlined text-[16px]">edit_note</span>
+                        </button>
+                        <button
+                          onClick={() => openSplitModal(comm)}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded transition-all"
+                          title="Dividir"
+                        >
+                          <span className="material-icons-outlined text-[16px]">call_split</span>
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -363,119 +479,127 @@ const CommissionPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Edit Modal */}
-      {isEditModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 uppercase">Editar Comissão</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Vendedor</label>
-                <select
-                  className="form-select w-full rounded-lg border-gray-300"
-                  value={editForm.salesperson}
-                  onChange={e => setEditForm({ ...editForm, salesperson: e.target.value })}
-                >
-                  {sellers.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Valor da Comissão</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="form-input w-full rounded-lg border-gray-300"
-                  value={editForm.amount}
-                  onChange={e => setEditForm({ ...editForm, amount: parseFloat(e.target.value) })}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Nota de Explicação</label>
-                <textarea
-                  className="form-textarea w-full rounded-lg border-gray-300"
-                  rows={3}
-                  placeholder="Explique o motivo do ajuste..."
-                  value={editForm.description}
-                  onChange={e => setEditForm({ ...editForm, description: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setIsEditModalOpen(false)} className="flex-1 py-3 bg-gray-100 text-gray-500 rounded-xl font-bold uppercase text-xs hover:bg-gray-200 transition-all">Cancelar</button>
-              <button onClick={saveEditValue} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold uppercase text-xs hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all">Salvar</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Split Modal */}
-      {isSplitModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-in zoom-in-95">
-            <h3 className="text-lg font-bold mb-1 uppercase tracking-wider text-blue-600">Dividir Comissão</h3>
-            <p className="text-[10px] text-gray-400 font-bold uppercase mb-6">Transfira parte deste ganho para outro vendedor</p>
-
-            <div className="space-y-4">
-              <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 flex justify-between items-center mb-4">
-                <span className="text-xs font-bold text-blue-700">Total Atual</span>
-                <span className="font-black text-blue-800">{formatCurrency(editingComm?.amount || 0)}</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Em Porcentagem (%)</label>
-                  <input
-                    type="number" min="1" max="99"
-                    className="form-input w-full rounded-xl border-gray-300 font-bold text-blue-600 focus:ring-blue-500 focus:border-blue-500"
-                    value={splitForm.percentage}
-                    onChange={e => calculateSplitByPercent(parseFloat(e.target.value))}
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Em Valor (R$)</label>
-                  <input
-                    type="number" step="0.01"
-                    className="form-input w-full rounded-xl border-gray-300 font-bold text-blue-600 focus:ring-blue-500 focus:border-blue-500"
-                    value={splitForm.amount}
-                    onChange={e => calculateSplitByAmount(parseFloat(e.target.value))}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Transferir para o Vendedor</label>
-                <select
-                  className="form-select w-full rounded-xl border-gray-300 font-bold text-gray-700"
-                  value={splitForm.otherSeller}
-                  onChange={e => setSplitForm({ ...splitForm, otherSeller: e.target.value })}
-                >
-                  {sellers.map(s => (
-                    <option key={s} value={s} disabled={s === editingComm?.salesperson}>{s}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="bg-gray-50 p-3 rounded-xl border border-gray-200">
-                <div className="flex justify-between text-[10px] font-bold uppercase text-gray-400">
-                  <span>Saldo Restante para {editingComm?.salesperson}</span>
-                  <span>{formatCurrency((editingComm?.amount || 0) - splitForm.amount)}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-8">
+      {/* Optimized Modals */}
+      {(isEditModalOpen || isSplitModalOpen) && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/60 backdrop-blur-[2px] p-4">
+          <div className="bg-white rounded-lg w-full max-w-sm shadow-2xl overflow-hidden border border-gray-200 animate-in zoom-in-95 duration-200">
+            <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+              <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">
+                {isEditModalOpen ? 'AJUSTAR COMISSÃO' : 'DIVIDIR GANHOS'}
+              </h3>
               <button
-                onClick={() => setIsSplitModalOpen(false)}
-                className="flex-1 py-3 text-gray-400 font-bold uppercase text-[10px] hover:text-gray-600 transition-colors"
+                onClick={() => { setIsEditModalOpen(false); setIsSplitModalOpen(false); }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
               >
-                Cancelar
+                <span className="material-icons-outlined text-sm">close</span>
               </button>
-              <button
-                onClick={splitCommission}
-                className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold uppercase text-[10px] shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95"
-              >
-                Confirmar Divisão
-              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {isEditModalOpen ? (
+                /* Edit Form */
+                <>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">VENDEDOR</label>
+                      <select
+                        className="w-full px-2 border border-gray-300 rounded h-8 text-[10px] font-black uppercase tracking-widest bg-white"
+                        value={editForm.salesperson}
+                        onChange={e => setEditForm({ ...editForm, salesperson: e.target.value })}
+                      >
+                        {sellers.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">VALOR (R$)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="w-full px-2 border border-gray-300 rounded h-8 text-xs font-black bg-white"
+                        value={editForm.amount}
+                        onChange={e => setEditForm({ ...editForm, amount: parseFloat(e.target.value) })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">MOTIVO DO AJUSTE</label>
+                      <textarea
+                        className="w-full p-2 border border-gray-300 rounded text-[10px] font-bold bg-white placeholder:text-gray-300"
+                        rows={2}
+                        placeholder="Descreva o motivo da alteração..."
+                        value={editForm.description}
+                        onChange={e => setEditForm({ ...editForm, description: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="pt-2">
+                    <button
+                      onClick={saveEditValue}
+                      className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-100 transition-all active:scale-[0.98]"
+                    >
+                      SALVAR ALTERAÇÕES
+                    </button>
+                  </div>
+                </>
+              ) : (
+                /* Split Form */
+                <>
+                  <div className="bg-blue-50 border border-blue-100 p-2 rounded flex justify-between items-center mb-4">
+                    <span className="text-[8px] font-black text-blue-700 uppercase tracking-widest">TOTAL ORIGINAL</span>
+                    <span className="text-xs font-black text-blue-800">{formatCurrency(editingComm?.amount || 0)}</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">% TRANSFERIR</label>
+                      <div className="relative">
+                        <input
+                          type="number" min="1" max="99"
+                          className="w-full px-2 pr-6 border border-gray-300 rounded h-8 text-xs font-black text-blue-600 bg-white"
+                          value={splitForm.percentage}
+                          onChange={e => calculateSplitByPercent(parseFloat(e.target.value))}
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-400">%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">VALOR (R$)</label>
+                      <input
+                        type="number" step="0.01"
+                        className="w-full px-2 border border-gray-300 rounded h-8 text-xs font-black text-blue-600 bg-white"
+                        value={splitForm.amount}
+                        onChange={e => calculateSplitByAmount(parseFloat(e.target.value))}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">DESTINO DA TRANSFERÊNCIA</label>
+                    <select
+                      className="w-full px-2 border border-gray-300 rounded h-8 text-[10px] font-black uppercase tracking-widest bg-white"
+                      value={splitForm.otherSeller}
+                      onChange={e => setSplitForm({ ...splitForm, otherSeller: e.target.value })}
+                    >
+                      {sellers.map(s => (
+                        <option key={s} value={s} disabled={s === editingComm?.salesperson}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="bg-gray-50 border border-gray-200 p-2 rounded flex justify-between items-center opacity-70">
+                    <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest leading-none">SEU SALDO<br />RESTANTE</span>
+                    <span className="text-[10px] font-black text-gray-700">{formatCurrency((editingComm?.amount || 0) - splitForm.amount)}</span>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      onClick={splitCommission}
+                      className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-[10px] font-black uppercase tracking-widest shadow-lg shadow-purple-100 transition-all active:scale-[0.98]"
+                    >
+                      CONFIRMAR DIVISÃO
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
