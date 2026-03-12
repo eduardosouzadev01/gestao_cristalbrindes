@@ -250,7 +250,7 @@ const ReceivablesPage: React.FC = () => {
             <input
               type="text"
               placeholder="Pedido, Cliente ou Valor..."
-              className="form-input w-full pl-10 rounded-lg border-gray-300 text-sm"
+              className="form-input w-full !pl-10 rounded-lg border-gray-300 text-sm"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
             />

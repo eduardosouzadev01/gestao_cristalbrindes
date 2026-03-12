@@ -55,49 +55,94 @@ const CustomSelect: React.FC<{
 
     return (
         <div className="relative" ref={ref}>
-            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">{label}</label>
+            {label && <label className="block text-xs font-bold text-gray-400 uppercase mb-1">{label}</label>}
             <div
                 onClick={() => !disabled && setIsOpen(!isOpen)}
-                className={`form-input w-full rounded-lg flex justify-between items-center cursor-pointer bg-white py-2 ${error ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300'} ${disabled ? 'bg-gray-100' : ''}`}
+                className={`form-input w-full rounded border-gray-300 flex justify-between items-center cursor-pointer bg-white py-0.5 px-2 transition-all hover:border-blue-400 ${error ? 'ring-1 ring-red-500 border-red-500' : ''} ${disabled ? 'bg-gray-100 select-none' : 'hover:shadow-sm'}`}
             >
-                <span className="text-gray-900 truncate">{search || placeholder || "Selecione..."}</span>
-                <span className="material-icons-outlined text-gray-400">expand_more</span>
+                <span className={`truncate text-[11px] font-semibold ${!(search || value) ? 'text-gray-400' : 'text-gray-900'}`}>
+                    {value || search || placeholder || "Selecione..."}
+                </span>
+                <span className={`material-icons-outlined text-sm transition-transform duration-200 ${isOpen ? 'rotate-180 text-blue-500' : 'text-gray-400'}`}>expand_more</span>
             </div>
             {isOpen && !disabled && (
-                <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="p-2 border-b border-gray-100">
-                        <input autoFocus className="w-full text-sm border-0 focus:ring-0 p-1" placeholder="Pesquisar..." value={search} onChange={e => setSearch(e.target.value)} />
+                <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-150">
+                    <div className="p-2 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+                        <span className="material-icons-outlined text-gray-400 text-sm">search</span>
+                        <input 
+                            autoFocus 
+                            className="w-full text-sm border-0 focus:ring-0 p-1 bg-transparent placeholder-gray-400" 
+                            placeholder="Digite para pesquisar..." 
+                            value={search} 
+                            onChange={e => setSearch(e.target.value)} 
+                        />
+                        {search && (
+                            <button onClick={() => setSearch('')} className="p-1 hover:bg-gray-200 rounded-full text-gray-400">
+                                <span className="material-icons-outlined text-xs">close</span>
+                            </button>
+                        )}
                     </div>
-                    <div className="max-h-48 overflow-y-auto">
+                    <div className="max-h-60 overflow-y-auto custom-scrollbar">
                         {(() => {
                             const hasCategories = filtered.some(o => o.supplier_category);
                             if (hasCategories && filtered.length > 0) {
                                 const categories = Array.from(new Set(filtered.map(o => o.supplier_category).filter(Boolean)));
-                                return categories.map(cat => (
+                                const renderedItems = categories.map(cat => (
                                     <div key={cat as string}>
-                                        <div className="px-4 py-1.5 text-[10px] font-bold text-blue-600 bg-blue-50 uppercase tracking-widest border-y border-blue-100">{cat === 'GRAVACOES' ? 'PERSONALIZAÇÃO' : (cat as string)}</div>
+                                        <div className="px-3 py-1.5 text-[9px] font-black text-blue-600 bg-blue-50/50 uppercase tracking-widest border-y border-blue-50">{cat === 'GRAVACOES' ? 'PERSONALIZAÇÃO' : (cat as string)}</div>
                                         {filtered.filter(o => o.supplier_category === cat).map(opt => (
-                                            <div key={opt.id} className="px-4 py-2 text-sm hover:bg-blue-50 cursor-pointer flex justify-between group" onClick={() => { onSelect(opt); setSearch(opt.name); setIsOpen(false); }}>
-                                                <span className="text-gray-700">{opt.name}</span>
-                                                {opt.code && <span className="text-gray-400 text-xs font-mono group-hover:text-blue-500">{opt.code}</span>}
+                                            <div key={opt.id} className="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer flex justify-between group transition-colors" onClick={() => { onSelect(opt); setSearch(opt.name); setIsOpen(false); }}>
+                                                <div className="flex flex-col">
+                                                    <span className="text-gray-700 font-medium group-hover:text-blue-600">{opt.name}</span>
+                                                    {opt.doc && <span className="text-[10px] text-gray-400">{opt.doc}</span>}
+                                                </div>
+                                                {opt.code && <span className="text-gray-400 text-xs font-mono group-hover:text-blue-500 self-center">{opt.code}</span>}
                                             </div>
                                         ))}
                                     </div>
                                 ));
+
+                                // Add section for items without category
+                                const noCategory = filtered.filter(o => !o.supplier_category);
+                                if (noCategory.length > 0) {
+                                    renderedItems.push(
+                                        <div key="no-category">
+                                            <div className="px-3 py-1.5 text-[9px] font-black text-gray-400 bg-gray-50 uppercase tracking-widest border-y border-gray-100">OUTROS</div>
+                                            {noCategory.map(opt => (
+                                                <div key={opt.id} className="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer flex justify-between group transition-colors" onClick={() => { onSelect(opt); setSearch(opt.name); setIsOpen(false); }}>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-gray-700 font-medium group-hover:text-blue-600">{opt.name}</span>
+                                                        {opt.doc && <span className="text-[10px] text-gray-400">{opt.doc}</span>}
+                                                    </div>
+                                                    {opt.code && <span className="text-gray-400 text-xs font-mono group-hover:text-blue-500 self-center">{opt.code}</span>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    );
+                                }
+                                return renderedItems;
                             }
                             return filtered.map(opt => (
-                                <div key={opt.id} className="px-4 py-2 text-sm hover:bg-blue-50 cursor-pointer flex justify-between group" onClick={() => { onSelect(opt); setSearch(opt.name); setIsOpen(false); }}>
-                                    <span className="text-gray-700">{opt.name}</span>
-                                    {opt.code && <span className="text-gray-400 text-xs font-mono group-hover:text-blue-500">{opt.code}</span>}
+                                <div key={opt.id} className="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer flex justify-between group transition-colors" onClick={() => { onSelect(opt); setSearch(opt.name); setIsOpen(false); }}>
+                                    <div className="flex flex-col">
+                                        <span className="text-gray-700 font-medium group-hover:text-blue-600">{opt.name}</span>
+                                        {opt.doc && <span className="text-[10px] text-gray-400">{opt.doc}</span>}
+                                    </div>
+                                    {opt.code && <span className="text-gray-400 text-xs font-mono group-hover:text-blue-500 self-center">{opt.code}</span>}
                                 </div>
                             ));
                         })()}
                         {filtered.length === 0 && (
-                            <div className="px-4 py-2 text-xs text-gray-400 italic">
-                                {label.includes('Fornecedor') ? 'Nenhum fornecedor encontrado.' : 'Nenhum item encontrado.'}
+                            <div className="px-4 py-6 text-center">
+                                <span className="material-icons-outlined text-gray-200 text-4xl mb-2 block">search_off</span>
+                                <div className="text-xs text-gray-400 italic">
+                                    {label.includes('Fornecedor') ? 'Nenhum fornecedor encontrado.' : 'Nenhum item encontrado.'}
+                                </div>
                             </div>
                         )}
-                        <div className="px-4 py-2 text-sm text-blue-600 font-bold hover:bg-blue-50 cursor-pointer border-t" onClick={() => { onAdd(); setIsOpen(false); }}>+ CADASTRAR NOVO</div>
+                        <div className="px-4 py-2.5 text-[11px] text-blue-600 font-black hover:bg-blue-50 cursor-pointer border-t flex items-center gap-2 transition-colors uppercase tracking-tight" onClick={() => { onAdd(); setIsOpen(false); }}>
+                            <span className="material-icons-outlined text-sm">add_circle</span> Cadastrar Novo
+                        </div>
                     </div>
                 </div>
             )}
@@ -110,9 +155,11 @@ const BudgetForm: React.FC = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
+    const isSavingRef = useRef(false);
     const { appUser } = useAuth();
     const userSalesperson = appUser?.salesperson || '';
     const isSeller = !!appUser?.salesperson;
+    const [activeId, setActiveId] = useState<string | undefined>(id === 'novo' ? undefined : id);
 
     // States
     const [budgetNumber, setBudgetNumber] = useState('');
@@ -122,6 +169,13 @@ const BudgetForm: React.FC = () => {
     const [dataPedido, setDataPedido] = useState(getTodayISO()); // Prediction
     const [issuer, setIssuer] = useState('CRISTAL');
     const [clientData, setClientData] = useState({ id: '', name: '', doc: '', phone: '', email: '', emailFin: '' });
+
+    // Commercial data (Proposal terms)
+    const [validity, setValidity] = useState('15 dias');
+    const [shipping, setShipping] = useState('Cliente retira');
+    const [deliveryDeadline, setDeliveryDeadline] = useState('15 / 20 dias úteis');
+    const [paymentMethod, setPaymentMethod] = useState('À vista ou parcelado');
+    const [observation, setObservation] = useState('');
 
     // Lists
     const [clientsList, setClientsList] = useState<any[]>([]);
@@ -154,6 +208,7 @@ const BudgetForm: React.FC = () => {
     // Supplier modal state
     const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
     const [newSupplier, setNewSupplier] = useState({ name: '', doc: '', phone: '', email: '', supplier_category: 'PRODUTOS' });
+    const [supplierModalContext, setSupplierModalContext] = useState<{ itemId: string | number, field: string } | null>(null);
 
     // --- useOrderItems hook ---
     const {
@@ -203,7 +258,8 @@ const BudgetForm: React.FC = () => {
     useEffect(() => {
         loadBaseData();
         if (id && id !== 'novo') {
-            loadBudget();
+            setActiveId(id);
+            loadBudget(id);
         } else if (location.state?.clientData) {
             // New Budget from CRM
             const { clientData: cData, vendedor: vend } = location.state;
@@ -227,8 +283,10 @@ const BudgetForm: React.FC = () => {
 
             // Auto-number placeholder
             setBudgetNumber('AUTO');
+            setActiveId(undefined);
         } else if (!id || id === 'novo') {
             setBudgetNumber('AUTO');
+            setActiveId(undefined);
         }
     }, [id, location.state]);
 
@@ -263,7 +321,13 @@ const BudgetForm: React.FC = () => {
         const { data: s } = await supabase.from('partners').select('*').eq('type', 'FORNECEDOR');
         const { data: f } = await supabase.from('calculation_factors').select('*');
         setClientsList(c || []);
-        setProductsList(p || []);
+
+        // Enrich product names with color to distinguish variations in dropdown
+        const enrichedProducts = (p || []).map(prod => ({
+            ...prod,
+            name: prod.color ? `${prod.name} - ${prod.color}` : prod.name
+        }));
+        setProductsList(enrichedProducts);
 
         let suppliers = s || [];
         const required = ['XBZ', 'ASIA', 'SPOT'];
@@ -349,13 +413,22 @@ const BudgetForm: React.FC = () => {
         const { data } = await supabase.from('products')
             .select('*')
             .or(`name.ilike.%${term}%,code.ilike.%${term}%`)
-            .limit(50);
+            .limit(100);
 
-        if (data) setProductsList(data);
+        if (data) {
+            // Do NOT group by code to preserve individual images per color
+            const enriched = data.map(p => ({
+                ...p,
+                name: p.color ? `${p.name} - ${p.color}` : p.name
+            }));
+            setProductsList(enriched);
+        }
     };
 
-    const loadBudget = async () => {
-        const { data, error } = await supabase.from('budgets').select('*, budget_items(*)').eq('id', id).single();
+    const loadBudget = async (idToLoad?: string) => {
+        const targetId = idToLoad || activeId;
+        if (!targetId) return;
+        const { data, error } = await supabase.from('budgets').select('*, budget_items(*)').eq('id', targetId).single();
         if (data) {
             setBudgetNumber(data.budget_number);
             setVendedor(data.salesperson);
@@ -377,33 +450,68 @@ const BudgetForm: React.FC = () => {
                 }
             }
 
-            // Map items
-            setItems(data.budget_items.map((it: any) => ({
-                id: it.id,
-                productName: it.product_name,
-                supplier_id: it.supplier_id,
-                quantity: it.quantity,
-                priceUnit: it.unit_price,
-                custoPersonalizacao: it.customization_cost,
-                transpFornecedor: it.supplier_transport_cost,
-                transpCliente: it.client_transport_cost,
-                despesaExtra: it.extra_expense,
-                layoutCost: it.layout_cost,
-                fator: it.calculation_factor,
-                bvPct: it.bv_pct || 0,
-                extraPct: it.extra_pct || 0,
-                isApproved: it.is_approved,
-                customization_supplier_id: it.customization_supplier_id || '',
-                transport_supplier_id: it.transport_supplier_id || '',
-                client_transport_supplier_id: it.client_transport_supplier_id || '',
-                layout_supplier_id: it.layout_supplier_id || '',
-                extra_supplier_id: it.extra_supplier_id || ''
-            })));
+            // Load commercial fields
+            setValidity(data.validity || '15 dias');
+            setShipping(data.shipping || 'Cliente retira');
+            setDeliveryDeadline(data.delivery_deadline || '15 / 20 dias úteis');
+            setPaymentMethod(data.payment_method || 'À vista ou parcelado');
+            setObservation(data.observation || '');
+
+            // Map items and fetch variations for each
+            const mappedItems = await Promise.all(data.budget_items.map(async (it: any) => {
+                // Fetch variations and main image if missing
+                const { data: pData } = await supabase.from('products')
+                    .select('variations, color, stock, image_url, code')
+                    .eq('name', it.product_name)
+                    .limit(10); // Find a few to aggregate variations if needed
+
+                let aggregatedVars: any[] = [];
+                if (pData) {
+                    pData.forEach(p => {
+                        const vars = p.variations || [];
+                        vars.forEach((v: any) => {
+                            if (!aggregatedVars.some(av => av.color === v.color)) aggregatedVars.push(v);
+                        });
+                        if (p.color && !aggregatedVars.some(av => av.color === p.color)) {
+                            aggregatedVars.push({ color: p.color, stock: p.stock });
+                        }
+                    });
+                }
+
+                return {
+                    id: it.id,
+                    productName: it.product_name,
+                    supplier_id: it.supplier_id,
+                    quantity: it.quantity,
+                    priceUnit: it.unit_price,
+                    custoPersonalizacao: it.customization_cost,
+                    transpFornecedor: it.supplier_transport_cost,
+                    transpCliente: it.client_transport_cost,
+                    despesaExtra: it.extra_expense,
+                    layoutCost: it.layout_cost,
+                    extraPct: it.extra_pct || 0,
+                    factorId: (factors as any[] || []).find(fct => (1 + (fct.tax_percent + fct.contingency_percent + fct.margin_percent) / 100).toFixed(4) === (it.calculation_factor || 0).toFixed(4))?.id || '',
+                    isApproved: it.is_approved,
+                    customization_supplier_id: it.customization_supplier_id || '',
+                    transport_supplier_id: it.transport_supplier_id || '',
+                    client_transport_supplier_id: it.client_transport_supplier_id || '',
+                    layout_supplier_id: it.layout_supplier_id || '',
+                    extra_supplier_id: it.extra_supplier_id || '',
+                    productDescription: it.product_description || '',
+                    productColor: it.product_color || '',
+                    productCode: it.product_code || (pData?.find(p => p.color === it.product_color)?.code) || (pData && pData[0]?.code) || '',
+                    productImage: it.product_image_url || (pData?.find(p => p.color === it.product_color)?.image_url) || (pData && pData[0]?.image_url) || '',
+                    variations: aggregatedVars
+                };
+            }));
+            setItems(mappedItems);
         }
     };
 
 
-    const saveBudget = async (silent = false) => {
+    const saveBudget = async (silent = false, skipNavigate = false) => {
+        if (isSavingRef.current || (loading && !silent)) return null;
+
         if (status === 'PROPOSTA ACEITA') {
             if (!silent) toast.error('Este orçamento já foi aprovado e convertido em pedido. Não é possível editá-lo.');
             return;
@@ -412,21 +520,22 @@ const BudgetForm: React.FC = () => {
             if (!silent) toast.error('Preencha os campos obrigatórios (Pedido, Vendedor, Cliente).');
             return;
         }
+        if (silent && (!clientData.name || clientData.name === '')) return null;
+
         if (silent) {
             setIsAutoSaving(true);
         } else {
             setLoading(true);
         }
+        isSavingRef.current = true;
         try {
             let finalBudgetNumber = budgetNumber;
-            let currentId = id;
+            let currentId = activeId;
             if (budgetNumber === 'AUTO') {
-                if (silent) return; // Não autossalva orçamentos novos até o salvamento manual
                 // Get next number from DB function
                 const { data: numData, error: numError } = await supabase.rpc('get_next_budget_number');
                 if (numError) throw numError;
                 finalBudgetNumber = numData.toString();
-                setBudgetNumber(finalBudgetNumber);
             }
 
             // Ensure client exists - auto-create if needed
@@ -456,14 +565,22 @@ const BudgetForm: React.FC = () => {
                 status,
                 client_id: resolvedClientId || null,
                 issuer,
-                total_amount: items.reduce((sum, it) => sum + calculateItemTotal(it), 0)
+                total_amount: items.reduce((sum, it) => sum + calculateItemTotal(it), 0),
+                validity,
+                shipping,
+                delivery_deadline: deliveryDeadline,
+                payment_method: paymentMethod,
+                observation
             };
 
             let budgetId = currentId;
-            if (!currentId || currentId === 'novo') {
+            if (!currentId) {
                 const { data, error } = await supabase.from('budgets').insert([payload]).select().single();
                 if (error) throw error;
                 budgetId = data.id;
+                // Only update the state after successful insertion
+                setBudgetNumber(finalBudgetNumber);
+                setActiveId(budgetId);
             } else {
                 const { error } = await supabase.from('budgets').update(payload).eq('id', currentId);
                 if (error) throw error;
@@ -493,7 +610,11 @@ const BudgetForm: React.FC = () => {
                     transport_supplier_id: it.transport_supplier_id || null,
                     client_transport_supplier_id: it.client_transport_supplier_id || null,
                     layout_supplier_id: it.layout_supplier_id || null,
-                    extra_supplier_id: it.extra_supplier_id || null
+                    extra_supplier_id: it.extra_supplier_id || null,
+                    product_description: it.productDescription || null,
+                    product_color: it.productColor || null,
+                    product_code: it.productCode || null,
+                    product_image_url: it.productImage || null
                 };
             });
             if (items.length > 0) {
@@ -503,17 +624,20 @@ const BudgetForm: React.FC = () => {
 
             if (!silent) {
                 toast.success('Orçamento salvo com sucesso!');
-                if (!id || id === 'novo') {
+                if (!skipNavigate && (!id || id === 'novo')) {
                     navigate(`/orcamento/${budgetId}`, { replace: true });
                 }
             }
             setLastSaved(new Date());
+            return budgetId;
         } catch (e: any) {
             if (!silent) toast.error('Erro ao salvar: ' + e.message);
             else console.error('Auto-save error:', e.message);
+            return null;
         } finally {
             if (silent) setIsAutoSaving(false);
             else setLoading(false);
+            isSavingRef.current = false;
         }
     };
 
@@ -524,17 +648,17 @@ const BudgetForm: React.FC = () => {
             return;
         }
 
-        if (!id || id === 'novo' || budgetNumber === 'AUTO') return;
+        if (!activeId || budgetNumber === 'AUTO') return;
 
         const delayDebounceFn = setTimeout(() => {
             saveBudget(true);
         }, 1500);
 
         return () => clearTimeout(delayDebounceFn);
-    }, [items, vendedor, status, dataOrcamento, dataPedido, issuer, clientData.id, clientData.emailFin]);
+    }, [items, vendedor, status, dataOrcamento, dataPedido, issuer, clientData.id, clientData.emailFin, validity, shipping, deliveryDeadline, paymentMethod, observation, activeId]);
 
     const handleGenerateOrderClick = () => {
-        if (!id || budgetNumber === 'AUTO') {
+        if (!activeId || budgetNumber === 'AUTO') {
             toast.error('Salve o orçamento antes de gerar o pedido.');
             return;
         }
@@ -547,25 +671,36 @@ const BudgetForm: React.FC = () => {
 
         if (!validateItemsForAction(approvedItems)) return;
 
+        setCommercialData(prev => ({
+            ...prev,
+            payment_term: paymentMethod
+        }));
         setIsCommercialModalOpen(true);
     };
 
     const handleGenerateProposal = async () => {
-        if (!id || budgetNumber === 'AUTO') {
-            toast.error('Salve o orçamento antes de gerar a proposta.');
-            return;
-        }
-
-        const approvedItems = items.filter(it => it.isApproved);
-        if (approvedItems.length === 0) {
-            toast.error('Selecione pelo menos um item (marcando "Aprovar Item") para gerar a proposta.');
-            return;
-        }
-
-        if (!validateItemsForAction(approvedItems)) return;
-
         setLoading(true);
         try {
+            // Force save first - skipNavigate=true to keep us on the same page while the proposal generates
+            const savedId = await saveBudget(false, true);
+            if (!savedId) throw new Error('Falha ao salvar orçamento antes de gerar proposta');
+
+            // Find current ID from state since navigate might happen after this function
+            const currentBudgetId = savedId;
+            const finalBudgetNumber = budgetNumber; // Should be updated by saveBudget
+
+            const approvedItems = items.filter(it => it.isApproved);
+            if (approvedItems.length === 0) {
+                toast.error('Selecione ao menos um item aprovado para gerar a proposta.');
+                setLoading(false);
+                return;
+            }
+
+            if (!validateItemsForAction(approvedItems)) {
+                setLoading(false);
+                return;
+            }
+
             // Snapshot of items with their final selling price + product metadata
             const productNames = approvedItems.map(it => it.productName).filter(Boolean);
             let productMap: Record<string, any> = {};
@@ -581,32 +716,47 @@ const BudgetForm: React.FC = () => {
 
             const itemsSnapshot = approvedItems.map(it => {
                 const productMeta = productMap[it.productName] || {};
+                const sellingPrice = Number((calculateItemTotal(it) / (it.quantity || 1)).toFixed(2));
                 return {
                     id: it.id,
                     product_name: it.productName,
                     quantity: it.quantity,
-                    unit_price: it.priceUnit,
+                    unit_price: sellingPrice,
                     calculation_factor: it.fator,
                     total_item_value: calculateItemTotal(it),
-                    product_description: productMeta.description || '',
-                    product_image_url: productMeta.image_url || '',
-                    product_code: productMeta.code || '',
-                    product_color: productMeta.color || ''
+                    product_description: it.productDescription || productMeta.description || '',
+                    product_image_url: it.productImage || productMeta.image_url || '',
+                    product_code: it.productCode || productMeta.code || '',
+                    product_color: it.productColor || productMeta.color || ''
                 };
             });
 
             const totalAmount = itemsSnapshot.reduce((sum, it) => sum + it.total_item_value, 0);
 
+            // Calculate proposal number based on count of existing proposals for this budget
+            const { count: proposalCount } = await supabase
+                .from('proposals')
+                .select('id', { count: 'exact', head: true })
+                .eq('budget_id', activeId);
+
+            const suffix = (proposalCount || 0) + 1;
+            const finalProposalNumber = `${budgetNumber}-${suffix.toString().padStart(2, '0')}`;
+
             const { data, error } = await supabase
                 .from('proposals')
                 .insert([{
-                    budget_id: id,
-                    proposal_number: budgetNumber,
+                    budget_id: activeId,
+                    proposal_number: finalProposalNumber,
                     client_id: clientData.id || null,
                     salesperson: vendedor,
                     items: itemsSnapshot,
                     total_amount: totalAmount,
-                    issuer: issuer
+                    issuer: issuer,
+                    validity: validity,
+                    shipping: shipping,
+                    delivery_deadline: deliveryDeadline,
+                    payment_method: paymentMethod,
+                    observation: observation
                 }])
                 .select()
                 .single();
@@ -627,7 +777,7 @@ const BudgetForm: React.FC = () => {
         navigate('/pedido/novo', {
             state: {
                 fromBudget: {
-                    budgetId: id,
+                    budgetId: activeId,
                     budgetNumber: budgetNumber,
                     issuer: issuer,
                     vendedor: vendedor,
@@ -652,14 +802,24 @@ const BudgetForm: React.FC = () => {
                 name: newSupplier.name,
                 doc: newSupplier.doc,
                 phone: newSupplier.phone,
-                email: newSupplier.email
+                email: newSupplier.email,
+                supplier_category: newSupplier.supplier_category
             }]).select().single();
+
             if (error) {
                 if (error.code === '23505') throw new Error('Já existe um fornecedor com este Nome ou CPF/CNPJ.');
                 throw error;
             }
-            // Add to list and close
-            setSuppliersList(prev => [...prev, data]);
+
+            // Refresh lists so it appears in other items
+            await loadBaseData();
+
+            // Auto-select in the item that requested it
+            if (supplierModalContext) {
+                updateItem(supplierModalContext.itemId, supplierModalContext.field, data.id);
+            }
+
+            toast.success('Fornecedor cadastrado e selecionado!');
             setIsSupplierModalOpen(false);
             setNewSupplier({ name: '', doc: '', phone: '', email: '', supplier_category: 'PRODUTOS' });
             toast.success('Fornecedor adicionado com sucesso!');
@@ -671,17 +831,28 @@ const BudgetForm: React.FC = () => {
     };
 
     const duplicateBudget = async () => {
+        if (!activeId || isSavingRef.current) return;
         if (!window.confirm('Deseja duplicar este orçamento?')) return;
+
         setLoading(true);
+        isSavingRef.current = true;
         try {
+            // Load full budget with items
+            const { data: sourceBudget, error: loadError } = await supabase
+                .from('budgets')
+                .select('*, budget_items(*)')
+                .eq('id', activeId)
+                .single();
+
+            if (loadError) throw loadError;
+
             // Get new number
             const { data: numData, error: numError } = await supabase.rpc('get_next_budget_number');
             const newNum = numData ? numData.toString() : 'AUTO';
+            if (numError) throw numError;
 
             const payload = {
                 budget_number: newNum,
-                salesperson: vendedor,
-                status: 'EM ABERTO',
                 client_id: clientData.id || null,
                 issuer,
                 total_amount: items.reduce((sum, it) => sum + calculateItemTotal(it), 0),
@@ -708,7 +879,9 @@ const BudgetForm: React.FC = () => {
                     calculation_factor: it.fator,
                     bv_pct: it.bvPct,
                     total_item_value: calculateItemTotal(it),
-                    is_approved: false // Reset approval on duplicate
+                    is_approved: false, // Reset approval on duplicate
+                    product_description: it.productDescription,
+                    product_color: it.productColor
                 };
             });
 
@@ -734,7 +907,7 @@ const BudgetForm: React.FC = () => {
                     </button>
                     <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2 uppercase tracking-tighter">
                         <span className="material-icons-outlined text-blue-500 text-2xl">description</span>
-                        {id && id !== 'novo' ? 'EDITAR ORÇAMENTO' : 'NOVO ORÇAMENTO'}
+                        {activeId ? 'EDITAR ORÇAMENTO' : 'NOVO ORÇAMENTO'}
                     </h2>
                 </div>
                 <div className="flex gap-2 items-center">
@@ -784,7 +957,7 @@ const BudgetForm: React.FC = () => {
                                 className={`form-input block w-full text-center rounded border-gray-300 font-bold py-1 text-xs ${budgetNumber === 'AUTO' ? 'bg-blue-50 text-blue-600 border-blue-200' : ''}`}
                                 placeholder="AUTO"
                                 value={budgetNumber || ''}
-                                readOnly={budgetNumber === 'AUTO' || (!!id && id !== 'novo') || status === 'PROPOSTA ACEITA'}
+                                readOnly={budgetNumber === 'AUTO' || !!activeId || status === 'PROPOSTA ACEITA'}
                                 onChange={e => setBudgetNumber(e.target.value)}
                             />
                         </div>
@@ -936,32 +1109,123 @@ const BudgetForm: React.FC = () => {
                                                     <div className="grid grid-cols-12 gap-3">
                                                         {/* Definição Base */}
                                                         <div className="col-span-12 lg:col-span-8 flex flex-col gap-2">
-                                                            <div className="grid grid-cols-12 gap-2 pb-2 border-b border-gray-50">
-                                                                <div className="col-span-5">
-                                                                    <CustomSelect label="Produto" options={productsList} onSelect={p => {
-                                                                        updateItem(it.id, 'productName', p.name);
-                                                                        let supplierName = null;
-                                                                        const lowerName = p.name.toLowerCase();
-                                                                        if (p.source) supplierName = p.source.toUpperCase();
-                                                                        else if (lowerName.includes('xbz')) supplierName = 'XBZ';
-                                                                        else if (lowerName.includes('asia') || lowerName.includes('ásia')) supplierName = 'ASIA';
-                                                                        else if (lowerName.includes('spot')) supplierName = 'SPOT';
-                                                                        if (supplierName) {
-                                                                            const found = suppliersList.find(s => s.name?.toUpperCase() === supplierName);
-                                                                            if (found) updateItem(it.id, 'supplier_id', found.id);
-                                                                        }
-                                                                    }} onAdd={() => { }} value={it.productName || ''} onSearch={searchProducts} disabled={status === 'PROPOSTA ACEITA'} />
+                                                            <div className="grid grid-cols-12 gap-x-3 gap-y-1.5 pb-2 border-b border-gray-50">
+                                                                 <div className="col-span-3 text-[10px] font-bold text-gray-600 flex items-center">Produto</div>
+                                                                 <div className="col-span-7 flex gap-2 items-center">
+                                                                     {it.productImage && (
+                                                                         <div className="w-10 h-10 rounded border border-gray-200 overflow-hidden flex-shrink-0 bg-white">
+                                                                             <img src={it.productImage} alt="Thumbnail" className="w-full h-full object-contain" />
+                                                                         </div>
+                                                                     )}
+                                                                     <div className="flex-1">
+                                                                         <CustomSelect
+                                                                             label=""
+                                                                             options={productsList}
+                                                                             onSelect={p => {
+                                                                                 updateItem(it.id, 'productName', p.name);
+                                                                                 updateItem(it.id, 'productDescription', p.description || '');
+                                                                                 updateItem(it.id, 'productColor', p.color || '');
+                                                                                 updateItem(it.id, 'productImage', p.image_url || '');
+                                                                                 updateItem(it.id, 'variations', p.variations || []);
+
+                                                                                 let supplierName = null;
+                                                                                 const lowerName = p.name.toLowerCase();
+                                                                                 if (p.source) supplierName = p.source.toUpperCase();
+                                                                                 else if (lowerName.includes('xbz')) supplierName = 'XBZ';
+                                                                                 else if (lowerName.includes('asia') || lowerName.includes('ásia')) supplierName = 'ASIA';
+                                                                                 else if (lowerName.includes('spot')) supplierName = 'SPOT';
+                                                                                 if (supplierName) {
+                                                                                     const found = suppliersList.find(s => s.name?.toUpperCase() === supplierName);
+                                                                                     if (found) updateItem(it.id, 'supplier_id', found.id);
+                                                                                 }
+                                                                             }}
+                                                                             onAdd={() => { }}
+                                                                             value={it.productName || ''}
+                                                                             onSearch={searchProducts}
+                                                                             disabled={status === 'PROPOSTA ACEITA'}
+                                                                         />
+                                                                     </div>
+                                                                 </div>
+                                                                <div className="col-span-2">
+                                                                    <input
+                                                                        type="number"
+                                                                        className="form-input w-full rounded border-gray-300 text-center font-black py-0.5 text-xs"
+                                                                        value={it.quantity || ''}
+                                                                        placeholder="Qtd."
+                                                                        onChange={e => updateItem(it.id, 'quantity', Number(e.target.value))}
+                                                                        disabled={status === 'PROPOSTA ACEITA'}
+                                                                    />
                                                                 </div>
-                                                                <div className="col-span-3">
-                                                                    <CustomSelect label="Fornecedor Principal" options={suppliersList} onSelect={s => updateItem(it.id, 'supplier_id', s.id)} onAdd={() => { setIsSupplierModalOpen(true); }} placeholder="Selec..." disabled={status === 'PROPOSTA ACEITA'} value={suppliersList.find(s => s.id === it.supplier_id)?.name || ''} />
+
+                                                                <div className="col-span-3 text-[10px] font-bold text-gray-600 flex items-center">Fornecedor</div>
+                                                                <div className="col-span-7">
+                                                                    <CustomSelect
+                                                                        label=""
+                                                                        options={suppliersList}
+                                                                        onSelect={s => updateItem(it.id, 'supplier_id', s.id)}
+                                                                        onAdd={() => {
+                                                                            setSupplierModalContext({ itemId: it.id, field: 'supplier_id' });
+                                                                            setIsSupplierModalOpen(true);
+                                                                        }}
+                                                                        placeholder="Selec..."
+                                                                        disabled={status === 'PROPOSTA ACEITA'}
+                                                                        value={suppliersList.find(s => s.id === it.supplier_id)?.name || ''}
+                                                                    />
                                                                 </div>
                                                                 <div className="col-span-2">
-                                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5 text-center">Quantidade</label>
-                                                                    <input type="number" className="form-input w-full rounded border-gray-300 text-center font-black py-1 text-xs" value={it.quantity || ''} onChange={e => updateItem(it.id, 'quantity', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
+                                                                    <input
+                                                                        className="form-input w-full rounded border-gray-300 text-right font-black py-0.5 text-[11px] text-blue-700 bg-blue-50/50"
+                                                                        value={formatCurrency(it.priceUnit || 0)}
+                                                                        onChange={e => updateItem(it.id, 'priceUnit', parseCurrencyToNumber(e.target.value))}
+                                                                        disabled={status === 'PROPOSTA ACEITA'}
+                                                                    />
                                                                 </div>
-                                                                <div className="col-span-2">
-                                                                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5 text-right">Custo Unit.</label>
-                                                                    <input className="form-input w-full rounded border-gray-300 text-right font-black py-1 text-xs text-blue-700 bg-blue-50/50" value={formatCurrency(it.priceUnit || 0)} onChange={e => updateItem(it.id, 'priceUnit', parseCurrencyToNumber(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
+
+                                                                <div className="col-span-3 text-[10px] font-bold text-gray-600 flex items-center">Cor / Variação</div>
+                                                                <div className="col-span-9 flex gap-2">
+                                                                    <div className="flex-1">
+                                                                        {(() => {
+                                                                            const variations = it.variations || [];
+                                                                            if (variations.length > 0) {
+                                                                                return (
+                                                                                    <select
+                                                                                        className="form-select w-full text-[11px] font-medium rounded py-0.5 border-gray-200"
+                                                                                        value={it.productColor || ''}
+                                                                                        onChange={e => updateItem(it.id, 'productColor', e.target.value)}
+                                                                                        disabled={status === 'PROPOSTA ACEITA'}
+                                                                                    >
+                                                                                        <option value="">Selecione a cor...</option>
+                                                                                        {variations.map((v: any, vIdx: number) => (
+                                                                                            <option key={vIdx} value={v.color}>{v.color} {v.stock !== undefined ? `(${v.stock} em estoque)` : ''}</option>
+                                                                                        ))}
+                                                                                    </select>
+                                                                                );
+                                                                            }
+                                                                            return (
+                                                                                <input
+                                                                                    type="text"
+                                                                                    className="form-input w-full text-[11px] font-medium rounded py-0.5 border-gray-200"
+                                                                                    value={it.productColor || ''}
+                                                                                    placeholder="Digite a cor/variação..."
+                                                                                    onChange={e => updateItem(it.id, 'productColor', e.target.value)}
+                                                                                    disabled={status === 'PROPOSTA ACEITA'}
+                                                                                />
+                                                                            );
+                                                                        })()}
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="col-span-12">
+                                                                    <div className="flex items-center gap-2 mb-1">
+                                                                        <label className="text-[9px] font-black text-gray-400 uppercase">Descrição do Item (Orçamento/Proposta)</label>
+                                                                    </div>
+                                                                    <textarea
+                                                                        className="form-textarea w-full text-[10px] rounded border-gray-200 py-1 h-14 resize-none focus:ring-1 focus:ring-blue-500"
+                                                                        value={it.productDescription || ''}
+                                                                        onChange={e => updateItem(it.id, 'productDescription', e.target.value)}
+                                                                        placeholder="Descrição opcional para aparecer no orçamento e na proposta..."
+                                                                        disabled={status === 'PROPOSTA ACEITA'}
+                                                                    />
                                                                 </div>
                                                             </div>
 
@@ -971,7 +1235,7 @@ const BudgetForm: React.FC = () => {
                                                                     {/* Header — Fornecedor first */}
                                                                     <div className="col-span-3 text-[8px] font-black text-gray-400 uppercase">Serviço/Frete</div>
                                                                     <div className="col-span-7 text-[8px] font-black text-gray-400 uppercase">Fornecedor</div>
-                                                                    <div className="col-span-2 text-[8px] font-black text-gray-400 uppercase text-right">Valor Unit.</div>
+                                                                    <div className="col-span-2 text-[8px] font-black text-gray-400 uppercase text-right">Valor Total</div>
 
                                                                     {[
                                                                         { label: 'Personalização', key: 'custoPersonalizacao', suppKey: 'customization_supplier_id' },
@@ -1022,9 +1286,22 @@ const BudgetForm: React.FC = () => {
                                                                 <div className="grid grid-cols-2 gap-3">
                                                                     <div>
                                                                         <label className="block text-[9px] font-black text-blue-600 uppercase mb-0.5">Fator Multiplic.</label>
-                                                                        <select className="form-select w-full rounded border-blue-200 text-[10px] py-1 font-black bg-white" value={it.fator} onChange={e => updateItem(it.id, 'fator', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'}>
+                                                                        <select 
+                                                                            className="form-select w-full rounded border-blue-200 text-[10px] py-1 font-black bg-white" 
+                                                                            value={it.factorId || factors.find(f => (1 + (f.tax_percent + f.contingency_percent + f.margin_percent) / 100).toFixed(4) === (it.fator || 0).toFixed(4))?.id} 
+                                                                            onChange={e => {
+                                                                                const f = factors.find(x => x.id === e.target.value);
+                                                                                if (f) {
+                                                                                    const multiplier = 1 + (f.tax_percent + f.contingency_percent + f.margin_percent) / 100;
+                                                                                    updateItem(it.id, 'fator', multiplier);
+                                                                                    updateItem(it.id, 'factorId', f.id);
+                                                                                }
+                                                                            }} 
+                                                                            disabled={status === 'PROPOSTA ACEITA'}
+                                                                        >
+                                                                            <option value="">Selecione...</option>
                                                                             {factors.map(f => (
-                                                                                <option key={f.id} value={1 + (f.tax_percent + f.contingency_percent + f.margin_percent) / 100}>{f.name}</option>
+                                                                                <option key={f.id} value={f.id}>{f.name} ({(1 + (f.tax_percent + f.contingency_percent + f.margin_percent) / 100).toFixed(2)}x)</option>
                                                                             ))}
                                                                         </select>
                                                                     </div>
@@ -1043,6 +1320,20 @@ const BudgetForm: React.FC = () => {
                                                                 </div>
 
                                                                 <div className="mt-3 pt-2 border-t border-blue-100 space-y-0.5">
+                                                                    {!isSeller && (
+                                                                        <div className="flex justify-between items-center px-1 mb-1">
+                                                                            <span className="text-[9px] font-extrabold text-green-500 uppercase">Saldo (Lucro)</span>
+                                                                            <span className="text-[11px] font-black text-green-600">{formatCurrency(calculateItemTotal(it) - ((it.quantity * (it.priceUnit || 0)) + (it.custoPersonalizacao || 0) + (it.layoutCost || 0) + (it.transpFornecedor || 0) + (it.transpCliente || 0) + (it.despesaExtra || 0)))}</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {appUser?.email === 'cristalbrindes@cristalbrindes.com.br' && (
+                                                                        <div className="flex justify-between items-center px-1 mb-1 bg-amber-50/50 rounded border border-amber-100 py-0.5">
+                                                                            <span className="text-[8px] font-black text-amber-600 uppercase">Saldo Gerência (-14%)</span>
+                                                                            <span className="text-[10px] font-black text-amber-700">
+                                                                                {formatCurrency((calculateItemTotal(it) * 0.86) - ((it.quantity * (it.priceUnit || 0)) + (it.custoPersonalizacao || 0) + (it.layoutCost || 0) + (it.transpFornecedor || 0) + (it.transpCliente || 0) + (it.despesaExtra || 0)))}
+                                                                            </span>
+                                                                        </div>
+                                                                    )}
                                                                     <div className="flex justify-between items-center px-1">
                                                                         <span className="text-[9px] font-extrabold text-blue-400 uppercase">Preço Unit. Venda</span>
                                                                         <span className="text-[11px] font-black text-gray-800">{formatCurrency((calculateItemTotal(it) / (it.quantity || 1)))}</span>
@@ -1075,6 +1366,76 @@ const BudgetForm: React.FC = () => {
                         <span className="material-icons-outlined text-sm">lock</span> Edição bloqueada por aprovação
                     </div>
                 )}
+            </section>
+
+            {/* Commercial terms at the end of the page */}
+            <section className="bg-white shadow-sm rounded-lg border border-gray-200 p-4 space-y-4">
+                <div className="flex items-center gap-2 mb-2 border-b border-gray-100 pb-2">
+                    <span className="material-icons-outlined text-blue-500 text-sm">assignment</span>
+                    <h3 className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Condições da Proposta</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="border rounded-lg p-3 bg-gray-50/50 focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-400 transition-all">
+                        <label className="block text-[9px] font-black uppercase text-gray-400 mb-1">Validade da proposta</label>
+                        <input
+                            className="w-full bg-transparent border-none p-0 text-sm font-bold focus:ring-0"
+                            value={validity}
+                            onChange={(e) => setValidity(e.target.value)}
+                            disabled={status === 'PROPOSTA ACEITA'}
+                        />
+                    </div>
+                    <div className="border rounded-lg p-3 bg-gray-50/50 focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-400 transition-all">
+                        <label className="block text-[9px] font-black uppercase text-gray-400 mb-1">Frete</label>
+                        <input
+                            className="w-full bg-transparent border-none p-0 text-sm font-bold focus:ring-0"
+                            value={shipping}
+                            onChange={(e) => setShipping(e.target.value)}
+                            disabled={status === 'PROPOSTA ACEITA'}
+                        />
+                    </div>
+                    <div className="border rounded-lg p-3 bg-gray-50/50 focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-400 transition-all">
+                        <label className="block text-[9px] font-black uppercase text-gray-400 mb-1">Prazo de entrega</label>
+                        <input
+                            className="w-full bg-transparent border-none p-0 text-sm font-bold focus:ring-0"
+                            value={deliveryDeadline}
+                            onChange={(e) => setDeliveryDeadline(e.target.value)}
+                            disabled={status === 'PROPOSTA ACEITA'}
+                        />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="border rounded-lg p-3 bg-gray-50/50 focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-400 transition-all">
+                        <label className="block text-[9px] font-black uppercase text-gray-400 mb-1">Forma de Pagamento</label>
+                        <select
+                            className="w-full bg-transparent border-none p-0 text-sm font-medium focus:ring-0"
+                            value={paymentMethod}
+                            onChange={(e) => setPaymentMethod(e.target.value)}
+                            disabled={status === 'PROPOSTA ACEITA'}
+                        >
+                            <option value="À vista ou parcelado">À vista ou parcelado</option>
+                            <option value="50% + 50%">50% + 50%</option>
+                            <option value="À Vista">À Vista</option>
+                            <option value="Credito à vista">Credito à vista</option>
+                            <option value="Faturado 7 dias">Faturado 7 dias</option>
+                            <option value="Faturado 14 dias">Faturado 14 dias</option>
+                            <option value="Faturado 15 dias">Faturado 15 dias</option>
+                            <option value="Faturado 21 dias">Faturado 21 dias</option>
+                            <option value="Faturado 30 dias">Faturado 30 dias</option>
+                            <option value="Faturado 45 dias">Faturado 45 dias</option>
+                        </select>
+                    </div>
+                    <div className="border rounded-lg p-3 bg-gray-50/50 focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-400 transition-all">
+                        <label className="block text-[9px] font-black uppercase text-gray-400 mb-1">Observações</label>
+                        <input
+                            className="w-full bg-transparent border-none p-0 text-sm font-medium focus:ring-0"
+                            value={observation}
+                            onChange={(e) => setObservation(e.target.value)}
+                            disabled={status === 'PROPOSTA ACEITA'}
+                        />
+                    </div>
+                </div>
             </section>
 
             <GenerateOrderModal

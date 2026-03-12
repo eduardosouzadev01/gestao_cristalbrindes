@@ -149,7 +149,7 @@ const ProductsPage: React.FC = () => {
                             <input
                                 type="text"
                                 placeholder="CÓDIGO OU NOME DO PRODUTO..."
-                                className="w-full pl-8 pr-4 border border-gray-300 rounded h-8 text-xs font-bold uppercase placeholder:text-gray-300 tracking-tight shadow-inner"
+                                className="w-full !pl-10 pr-4 border border-gray-300 rounded h-8 text-xs font-bold uppercase placeholder:text-gray-300 tracking-tight shadow-inner"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />

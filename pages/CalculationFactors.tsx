@@ -62,7 +62,7 @@ const CalculationFactors: React.FC = () => {
           </div>
           <div className="relative max-w-xs w-full">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-[20px]">filter_list</span>
-            <input type="text" placeholder="Filtrar fatores..." className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            <input type="text" placeholder="Filtrar fatores..." className="block w-full !pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm" />
           </div>
         </div>
 

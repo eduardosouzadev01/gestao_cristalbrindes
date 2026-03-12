@@ -456,7 +456,7 @@ const OrderBalancePage: React.FC = () => {
                         <div className="relative">
                             <span className="material-icons-outlined absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">search</span>
                             <input
-                                className="form-input w-full rounded border-gray-300 text-xs pl-8 h-8 font-bold focus:ring-0 focus:border-blue-500"
+                                className="form-input w-full rounded border-gray-300 text-xs !pl-10 h-8 font-bold focus:ring-0 focus:border-blue-500"
                                 placeholder="Pedido, cliente, vendedor..."
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}

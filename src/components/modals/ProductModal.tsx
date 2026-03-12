@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { toast } from 'sonner';
+import { QuickSupplierModal, NewSupplierData } from './QuickSupplierModal';
 
 export interface ProductFormData {
     id?: string;
@@ -40,6 +41,15 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     const [suppliers, setSuppliers] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [isQuickSupplierModalOpen, setIsQuickSupplierModalOpen] = useState(false);
+    const [newSupplier, setNewSupplier] = useState<NewSupplierData>({
+        name: '',
+        doc: '',
+        phone: '',
+        email: '',
+        supplier_category: 'PRODUTOS'
+    });
+    const [quickSupplierLoading, setQuickSupplierLoading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -71,7 +81,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         try {
             const { data, error } = await supabase
                 .from('partners')
-                .select('id, name')
+                .select('id, name, supplier_category')
                 .eq('type', 'FORNECEDOR')
                 .order('name');
             if (error) throw error;
@@ -115,7 +125,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             // Gerar nome único para o arquivo
             const fileExt = file.name.split('.').pop();
             const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
-            const filePath = `products/${fileName}`;
+            const filePath = fileName;
 
             // Fazer upload para o bucket 'products'
             // Nota: Assumimos que o bucket existe ou o cliente tem permissão para criar/usar
@@ -198,6 +208,44 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         }
     };
 
+    const handleSaveQuickSupplier = async () => {
+        if (!newSupplier.name.trim() || !newSupplier.doc.trim()) {
+            toast.error('Nome e CNPJ/CPF são obrigatórios.');
+            return;
+        }
+
+        try {
+            setQuickSupplierLoading(true);
+            const { data, error } = await supabase
+                .from('partners')
+                .insert([{
+                    ...newSupplier,
+                    type: 'FORNECEDOR'
+                }])
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            toast.success('Fornecedor cadastrado com sucesso!');
+            await fetchSuppliers();
+            setFormData(prev => ({ ...prev, supplier_id: data.id, source: data.name }));
+            setIsQuickSupplierModalOpen(false);
+            setNewSupplier({
+                name: '',
+                doc: '',
+                phone: '',
+                email: '',
+                supplier_category: 'PRODUTOS'
+            });
+        } catch (error: any) {
+            console.error('Error saving quick supplier:', error);
+            toast.error('Erro ao salvar fornecedor: ' + error.message);
+        } finally {
+            setQuickSupplierLoading(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[90vh]">
@@ -225,17 +273,27 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 
                         <div className="md:col-span-2">
                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Fornecedor Vinculado <span className="text-red-500">*</span></label>
-                            <select
-                                name="supplier_id"
-                                className="form-select block w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500 font-bold"
-                                value={formData.supplier_id}
-                                onChange={handleChange}
-                            >
-                                <option value="">Selecione um fornecedor...</option>
-                                {suppliers.map(s => (
-                                    <option key={s.id} value={s.id}>{s.name}</option>
-                                ))}
-                            </select>
+                            <div className="flex gap-2">
+                                <select
+                                    name="supplier_id"
+                                    className="form-select block w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500 font-bold"
+                                    value={formData.supplier_id}
+                                    onChange={handleChange}
+                                >
+                                    <option value="">Selecione um fornecedor...</option>
+                                    {suppliers.map(s => (
+                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                    ))}
+                                </select>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsQuickSupplierModalOpen(true)}
+                                    className="px-3 bg-blue-50 text-blue-600 rounded-lg border border-blue-100 hover:bg-blue-100 transition-colors flex items-center justify-center shrink-0"
+                                    title="Cadastrar Novo Fornecedor"
+                                >
+                                    <span className="material-icons-outlined">add</span>
+                                </button>
+                            </div>
                         </div>
 
                         <div className="md:col-span-2">
@@ -349,6 +407,15 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                     </button>
                 </div>
             </div>
+
+            <QuickSupplierModal
+                isOpen={isQuickSupplierModalOpen}
+                onClose={() => setIsQuickSupplierModalOpen(false)}
+                newSupplier={newSupplier}
+                setNewSupplier={setNewSupplier}
+                onSave={handleSaveQuickSupplier}
+                loading={quickSupplierLoading}
+            />
         </div>
     );
 };

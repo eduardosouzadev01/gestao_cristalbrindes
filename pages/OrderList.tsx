@@ -4,6 +4,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { formatDate } from '../src/utils/dateUtils';
 import { useAuth } from '../lib/auth';
+import { toast } from 'sonner';
 
 const OrderList: React.FC = () => {
   const navigate = useNavigate();
@@ -121,6 +122,27 @@ const OrderList: React.FC = () => {
         // Since I cannot allow fallback easily without duplicate code, I will warn the user
         alert('AVISO: O banco de dados precisa ser atualizado. Execute o script de migração no Supabase.');
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteOrder = async (order: any) => {
+    if (!appUser?.permissions?.fullAccess && !appUser?.permissions?.canDelete) {
+      toast.error('Você não tem permissão para excluir pedidos.');
+      return;
+    }
+
+    if (!window.confirm(`Excluir pedido #${order.id} permanentemente? Esta ação não pode ser desfeita.`)) return;
+
+    try {
+      setLoading(true);
+      const { error } = await supabase.from('orders').delete().eq('id', order.id_original);
+      if (error) throw error;
+      toast.success('Pedido excluído com sucesso.');
+      fetchOrders();
+    } catch (e: any) {
+      toast.error('Erro ao excluir pedido: ' + e.message);
     } finally {
       setLoading(false);
     }
@@ -369,8 +391,20 @@ const OrderList: React.FC = () => {
                       </td>
                       <td className="px-3 py-1.5 whitespace-nowrap text-[10px] text-gray-500 font-bold">{order.supplierDate ? formatDate(order.supplierDate) : '-'}</td>
                       <td className="px-3 py-1.5 whitespace-nowrap text-xs font-black text-gray-900 text-right">{order.total}</td>
-                      <td className="px-3 py-1.5 text-center">
-                        <button className="text-gray-300 group-hover:text-blue-500 transition-colors">
+                      <td className="px-3 py-1.5 text-center flex items-center justify-center gap-1">
+                        <button onClick={(e) => { e.stopPropagation(); navigate(`/pedido/${order.id_original}?mode=view`); }} className="text-gray-300 hover:text-blue-500 transition-colors" title="Ver Detalhes">
+                          <span className="material-icons-outlined text-base">visibility</span>
+                        </button>
+                        {(appUser?.permissions?.fullAccess || appUser?.permissions?.canDelete) && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); deleteOrder(order); }} 
+                            className="text-gray-300 hover:text-red-500 transition-colors"
+                            title="Excluir Pedido"
+                          >
+                            <span className="material-icons-outlined text-base">delete</span>
+                          </button>
+                        )}
+                        <button className="text-gray-300 hover:text-gray-600 transition-colors">
                           <span className="material-icons-outlined text-base">more_vert</span>
                         </button>
                       </td>

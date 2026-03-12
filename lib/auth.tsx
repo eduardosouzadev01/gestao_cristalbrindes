@@ -160,11 +160,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       case 'crm.financeiro':
         return appUser.permissions.crmFinanceiro;
       case 'financeiro':
-        return appUser.permissions.financeiro.contasReceber || appUser.permissions.financeiro.contasPagar;
+        return !!appUser.permissions.financeiro?.contasReceber || !!appUser.permissions.financeiro?.contasPagar;
       case 'financeiro.receber':
-        return appUser.permissions.financeiro.contasReceber;
+        return !!appUser.permissions.financeiro?.contasReceber;
       case 'financeiro.pagar':
-        return appUser.permissions.financeiro.contasPagar;
+        return !!appUser.permissions.financeiro?.contasPagar;
       case 'comissoes':
         return appUser.permissions.comissoes;
       case 'relatorios':

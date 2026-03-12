@@ -88,8 +88,8 @@ const SupplierList: React.FC = () => {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`py-1 px-1 flex items-center gap-2 border-b-2 transition-all group ${activeTab === tab.id
-                    ? 'border-emerald-600 text-emerald-700 font-black'
-                    : 'border-transparent text-gray-400 font-bold hover:text-gray-600'
+                  ? 'border-emerald-600 text-emerald-700 font-black'
+                  : 'border-transparent text-gray-400 font-bold hover:text-gray-600'
                   }`}
               >
                 <span className={`material-icons-outlined text-sm ${activeTab === tab.id ? 'text-emerald-500' : 'text-gray-300 group-hover:text-gray-400'}`}>{tab.icon}</span>
@@ -109,7 +109,7 @@ const SupplierList: React.FC = () => {
             <input
               type="text"
               placeholder="PESQUISAR NESTA CATEGORIA..."
-              className="block w-full pl-8 pr-3 border border-gray-300 focus:ring-0 focus:border-emerald-500 rounded text-[10px] h-7 font-black uppercase placeholder:text-gray-300 tracking-tight shadow-inner"
+              className="block w-full !pl-10 pr-3 border border-gray-300 focus:ring-0 focus:border-emerald-500 rounded text-[10px] h-7 font-black uppercase placeholder:text-gray-300 tracking-tight shadow-inner"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />

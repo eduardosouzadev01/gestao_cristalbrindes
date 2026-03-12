@@ -61,6 +61,8 @@ const OrderForm: React.FC = () => {
   const [logs, setLogs] = useState<{ user: string, msg: string, time: string }[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const isSavingRef = useRef(false);
+  const [activeId, setActiveId] = useState<string | undefined>(id === 'novo' ? undefined : id);
   const [purchaseOrder, setPurchaseOrder] = useState('');
   const [confirmCostPaymentModal, setConfirmCostPaymentModal] = useState<{ itemId: string | number, field: string, label: string, amount: number } | null>(null);
   const [collapsedItems, setCollapsedItems] = useState<Set<string | number>>(new Set());
@@ -214,8 +216,10 @@ const OrderForm: React.FC = () => {
 
   useEffect(() => {
     if (id && id !== 'novo') {
+      setActiveId(id);
       loadOrder(id);
     } else if (location.state?.fromBudget) {
+      setActiveId(undefined);
       const { fromBudget, items: budgetItems } = location.state;
       setEmitente(fromBudget.issuer || 'CRISTAL');
       setVendedor(fromBudget.vendedor || '');
@@ -227,6 +231,9 @@ const OrderForm: React.FC = () => {
         setItems(budgetItems.map((it: any) => ({
           id: Math.random().toString(36).substr(2, 9),
           productName: it.productName,
+          productCode: it.productCode || '',
+          productColor: it.productColor || '',
+          productDescription: it.productDescription || '',
           supplier_id: it.supplier_id || '',
           quantity: it.quantity || 1,
           priceUnit: it.priceUnit || 0,
@@ -267,7 +274,12 @@ const OrderForm: React.FC = () => {
 
       if (location.state.commercialData) {
         const cd = location.state.commercialData;
-        setModalidade(cd.payment_term || '');
+        
+        // Aplica a Forma de Pagamento ao elemento correspondente no Comercial
+        setOpcaoPagamento(cd.payment_method || '');
+        // E aplica a Forma de Pagamento também no campo Faturamento
+        setModalidade(cd.payment_term || cd.payment_method || '');
+        
         setSupplierDepartureDate(cd.supplier_deadline || '');
         setDataLimite(cd.shipping_deadline || '');
         setInvoiceNumber(cd.invoice_number || '');
@@ -382,46 +394,72 @@ const OrderForm: React.FC = () => {
 
       const { data: orderItems } = await supabase.from('order_items').select('*').eq('order_id', orderId);
       if (orderItems) {
-        setItems(orderItems.map(item => ({
-          id: item.id || Date.now(),
-          productName: item.product_name || '',
-          supplier_id: item.supplier_id || '',
-          quantity: item.quantity || 0,
-          priceUnit: item.unit_price || 0,
-          custoPersonalizacao: item.customization_cost || 0,
-          transpFornecedor: item.supplier_transport_cost || 0,
-          transpCliente: item.client_transport_cost || 0,
-          despesaExtra: item.extra_expense || 0,
-          layoutCost: item.layout_cost || 0,
-          fator: item.calculation_factor || 1.35,
-          bvPct: item.bv_pct || 0,
-          extraPct: item.extra_pct || 0,
-          taxPct: item.tax_pct || 0,
-          unforeseenPct: item.unforeseen_pct || 0,
-          marginPct: item.margin_pct || 0,
-          realPriceUnit: item.real_unit_price || 0,
-          realCustoPersonalizacao: item.real_customization_cost || 0,
-          realTranspFornecedor: item.real_supplier_transport_cost || 0,
-          realTranspCliente: item.real_client_transport_cost || 0,
-          realDespesaExtra: item.real_extra_expense || 0,
-          realLayoutCost: item.real_layout_cost || 0,
-          priceUnitPaid: item.unit_price_paid || false,
-          custoPersonalizacaoPaid: item.customization_paid || false,
-          transpFornecedorPaid: item.supplier_transport_paid || false,
-          transpClientePaid: item.client_transport_paid || false,
-          despesaExtraPaid: item.extra_expense_paid || false,
-          layoutCostPaid: item.layout_paid || false,
-          supplier_payment_date: item.supplier_payment_date || null,
-          customization_payment_date: item.customization_payment_date || null,
-          transport_payment_date: item.transport_payment_date || null,
-          layout_payment_date: item.layout_payment_date || null,
-          extra_payment_date: item.extra_payment_date || null,
-          customization_supplier_id: item.customization_supplier_id || '',
-          transport_supplier_id: item.transport_supplier_id || '',
-          client_transport_supplier_id: item.client_transport_supplier_id || '',
-          layout_supplier_id: item.layout_supplier_id || '',
-          extra_supplier_id: item.extra_supplier_id || ''
-        })));
+        const mappedItems = await Promise.all(orderItems.map(async (item) => {
+          const { data: pData } = await supabase.from('products')
+            .select('variations, color, stock, code')
+            .eq('name', item.product_name)
+            .limit(10);
+
+          let aggregatedVars: any[] = [];
+          if (pData) {
+            pData.forEach(p => {
+              const vars = (p.variations as any[]) || [];
+              vars.forEach((v: any) => {
+                if (!aggregatedVars.some(av => av.color === v.color)) aggregatedVars.push(v);
+              });
+              if (p.color && !aggregatedVars.some(av => av.color === p.color)) {
+                aggregatedVars.push({ color: p.color, stock: p.stock });
+              }
+            });
+          }
+
+          return {
+            id: item.id || Date.now(),
+            productName: item.product_name || '',
+            productCode: item.product_code || (pData && pData[0]?.code) || '',
+            productColor: item.product_color || '',
+            productDescription: item.product_description || '',
+            supplier_id: item.supplier_id || '',
+            quantity: item.quantity || 0,
+            priceUnit: item.unit_price || 0,
+            custoPersonalizacao: item.customization_cost || 0,
+            transpFornecedor: item.supplier_transport_cost || 0,
+            transpCliente: item.client_transport_cost || 0,
+            despesaExtra: item.extra_expense || 0,
+            layoutCost: item.layout_cost || 0,
+            fator: item.calculation_factor || 1.35,
+            factorId: (factorsList as any[] || []).find(f => (1 + (f.tax_percent + f.contingency_percent + f.margin_percent) / 100).toFixed(4) === (item.calculation_factor || 0).toFixed(4))?.id || '',
+            bvPct: item.bv_pct || 0,
+            extraPct: item.extra_pct || 0,
+            taxPct: item.tax_pct || 0,
+            unforeseenPct: item.unforeseen_pct || 0,
+            marginPct: item.margin_pct || 0,
+            realPriceUnit: item.real_unit_price || 0,
+            realCustoPersonalizacao: item.real_customization_cost || 0,
+            realTranspFornecedor: item.real_supplier_transport_cost || 0,
+            realTranspCliente: item.real_client_transport_cost || 0,
+            realDespesaExtra: item.real_extra_expense || 0,
+            realLayoutCost: item.real_layout_cost || 0,
+            priceUnitPaid: item.unit_price_paid || false,
+            custoPersonalizacaoPaid: item.customization_paid || false,
+            transpFornecedorPaid: item.supplier_transport_paid || false,
+            transpClientePaid: item.client_transport_paid || false,
+            despesaExtraPaid: item.extra_expense_paid || false,
+            layoutCostPaid: item.layout_paid || false,
+            supplier_payment_date: item.supplier_payment_date || null,
+            customization_payment_date: item.customization_payment_date || null,
+            transport_payment_date: item.transport_payment_date || null,
+            layout_payment_date: item.layout_payment_date || null,
+            extra_payment_date: item.extra_payment_date || null,
+            customization_supplier_id: item.customization_supplier_id || '',
+            transport_supplier_id: item.transport_supplier_id || '',
+            client_transport_supplier_id: item.client_transport_supplier_id || '',
+            layout_supplier_id: item.layout_supplier_id || '',
+            extra_supplier_id: item.extra_supplier_id || '',
+            variations: aggregatedVars
+          };
+        }));
+        setItems(mappedItems);
       }
 
       const { data: dbLogs } = await supabase.from('order_logs').select('*').eq('order_id', orderId).order('created_at', { ascending: false });
@@ -541,6 +579,9 @@ const OrderForm: React.FC = () => {
       const itemsPayload = items.map(item => ({
         id: (typeof item.id === 'string' && item.id.length > 20) ? item.id : null,
         product_name: item.productName,
+        product_code: item.productCode || null,
+        product_color: item.productColor || null,
+        product_description: item.productDescription || null,
         supplier_id: item.supplier_id || null,
         quantity: item.quantity,
         unit_price: item.priceUnit,
@@ -644,6 +685,9 @@ const OrderForm: React.FC = () => {
     const itemsPayload = updatedItems.map(item => ({
       id: (typeof item.id === 'string' && item.id.length > 20) ? item.id : null,
       product_name: item.productName,
+      product_code: item.productCode || null,
+      product_color: item.productColor || null,
+      product_description: item.productDescription || null,
       supplier_id: item.supplier_id || null,
       quantity: item.quantity,
       unit_price: item.priceUnit,
@@ -831,23 +875,23 @@ const OrderForm: React.FC = () => {
       toast.error('Por favor, preencha todos os campos obrigatórios marcados em vermelho.');
       return;
     }
-
     const valEntrada = parseCurrencyToNumber(recebimentoEntrada);
     const valRestante = parseCurrencyToNumber(recebimentoRestante);
     if (Math.abs((valEntrada + valRestante) - totalPedido) > 0.01) {
       toast.warning(`Atenção: Soma dos recebimentos (${formatCurrency(valEntrada + valRestante)}) difere do total (${formatCurrency(totalPedido)}).`);
       return;
     }
-
     submitOrder();
   };
 
   const submitOrder = async () => {
+    if (isSavingRef.current) return;
     setIsSaving(true);
+    isSavingRef.current = true;
     try {
       // Construct Order Header Payload
       const orderPayload = {
-        id: id && id !== 'novo' ? id : null,
+        id: activeId || null,
         order_number: orderNumber,
         salesperson: vendedor,
         status: status,
@@ -876,6 +920,9 @@ const OrderForm: React.FC = () => {
       const itemsPayload = items.map(item => ({
         id: (typeof item.id === 'string' && item.id.length > 20) ? item.id : null,
         product_name: item.productName,
+        product_code: item.productCode || null,
+        product_color: item.productColor || null,
+        product_description: item.productDescription || null,
         supplier_id: item.supplier_id || null,
         quantity: item.quantity,
         unit_price: item.priceUnit,
@@ -928,6 +975,7 @@ const OrderForm: React.FC = () => {
       }
 
       toast.success('Pedido salvo com sucesso! ID: ' + data);
+      setActiveId(data);
       navigate('/pedidos');
 
     } catch (err: any) {
@@ -939,6 +987,7 @@ const OrderForm: React.FC = () => {
       }
     } finally {
       setIsSaving(false);
+      isSavingRef.current = false;
     }
   };
 
@@ -1118,7 +1167,7 @@ const OrderForm: React.FC = () => {
           </button>
           <h2 className="text-2xl font-bold text-gray-900 sm:text-3xl flex items-center gap-3 uppercase tracking-tighter">
             <span className="material-icons-outlined text-blue-500 text-3xl">post_add</span>
-            {isReadOnly ? 'VISUALIZAR PEDIDO' : 'ABERTURA DE PEDIDO'}
+            {activeId ? 'VISUALIZAR PEDIDO' : 'ABERTURA DE PEDIDO'}
           </h2>
         </div>
         <div className="flex items-center gap-3">
@@ -1426,55 +1475,100 @@ const OrderForm: React.FC = () => {
                 {!isCollapsed && (
                   <div className="px-5 pb-5">
 
-                    <div className="mb-6">
-                      <CustomSelect
-                        label="Produto *"
-                        options={productsList}
-                        onSelect={(v) => {
-                          updateItem(item.id, 'productName', v.name);
-                          updateItem(item.id, 'priceUnit', v.unit_price || 0); // Automatic price
-                        }}
-                        onAdd={() => setIsProductModalOpen(true)}
-                        error={errors.includes(`productName-${index}`)}
+                    <div className="grid grid-cols-12 gap-x-3 gap-y-2 items-end mb-4">
+                      <div className="col-span-12 lg:col-span-4">
+                        <CustomSelect
+                          label="Produto *"
+                          options={productsList}
+                          onSelect={(v) => {
+                            updateItem(item.id, 'productName', v.name);
+                            updateItem(item.id, 'productCode', v.code);
+                            updateItem(item.id, 'priceUnit', v.unit_price || 0); // Automatic price
+                          }}
+                          onAdd={() => setIsProductModalOpen(true)}
+                          error={errors.includes(`productName-${index}`)}
+                          disabled={isReadOnly}
+                          onSearch={searchProducts}
+                          value={item.productName}
+                          placeholder="Selecione..."
+                        />
+                      </div>
+                      <div className="col-span-3 lg:col-span-1">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Qtd *</label>
+                        <input
+                          type="number"
+                          disabled={isReadOnly}
+                          className={`form-input w-full rounded-lg text-center font-bold ${errors.includes(`quantity-${index}`) ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300'} ${isReadOnly ? 'bg-gray-100' : ''}`}
+                          value={item.quantity}
+                          onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 0)}
+                        />
+                      </div>
+                      <div className="col-span-6 lg:col-span-2">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Ref *</label>
+                        <input
+                          type="text"
+                          disabled={isReadOnly}
+                          className={`form-input w-full rounded-lg text-center font-bold border-gray-300 ${isReadOnly ? 'bg-gray-100' : ''}`}
+                          value={item.productCode || ''}
+                          onChange={(e) => updateItem(item.id, 'productCode', e.target.value)}
+                        />
+                      </div>
+                      <div className="col-span-3 lg:col-span-3">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cor *</label>
+                        {(() => {
+                           // Try to find variations logic. Here we just offer a text input for simplicity
+                           // just like budget does when it doesn't have variations loaded
+                           // Since product colors might not be preloaded here, we use input
+                           return (
+                             <input
+                               type="text"
+                               disabled={isReadOnly}
+                               placeholder="Digite a cor..."
+                               className={`form-input w-full rounded-lg border-gray-300 text-[11px] font-bold py-2 ${isReadOnly ? 'bg-gray-100' : ''}`}
+                               value={item.productColor || ''}
+                               onChange={(e) => updateItem(item.id, 'productColor', e.target.value)}
+                             />
+                           )
+                        })()}
+                      </div>
+                      <div className="col-span-6 lg:col-span-2">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Preço Unit.*</label>
+                        <input
+                          disabled={isReadOnly}
+                          className={`form-input w-full rounded-lg border-gray-300 text-right font-black py-2 text-[11px] text-blue-700 bg-blue-50/50 ${errors.includes(`priceUnit-${index}`) ? 'border-red-500 ring-1 ring-red-500' : ''}`}
+                          placeholder="R$ 0,00"
+                          value={formatCurrency(item.priceUnit)}
+                          onChange={(e) => updateItem(item.id, 'priceUnit', parseCurrencyToNumber(e.target.value))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <label className="text-[9px] font-black text-gray-400 uppercase">Descrição do Item (Orçamento/Proposta)</label>
+                      </div>
+                      <textarea
+                        className="form-textarea w-full text-[10px] rounded-lg border-gray-200 py-2 h-16 resize-none focus:ring-1 focus:ring-blue-500"
+                        value={item.productDescription || ''}
+                        onChange={e => updateItem(item.id, 'productDescription', e.target.value)}
+                        placeholder="Descrição opcional..."
                         disabled={isReadOnly}
-                        onSearch={searchProducts}
-                        value={item.productName}
-                        placeholder="Selecione..."
                       />
                     </div>
 
                     <div className="space-y-3">
                       <div className="bg-gray-50 p-4 rounded-xl grid grid-cols-12 gap-4 items-end border border-gray-100">
-                        <div className="col-span-6">
+                        <div className="col-span-12 lg:col-span-6">
                           <CustomSelect
                             label="Fornecedor Produto"
                             options={suppliersList}
                             onSelect={(s) => updateItem(item.id, 'supplier_id', s.id)}
                             onAdd={() => setActiveModal('FORNECEDOR')}
                             disabled={isReadOnly}
+                            value={suppliersList.find(s => s.id === item.supplier_id)?.name || ''}
                           />
                         </div>
-                        <div className="col-span-2">
-                          <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Qtd *</label>
-                          <input
-                            type="number"
-                            disabled={isReadOnly}
-                            className={`form-input w-full rounded-lg text-center font-bold ${errors.includes(`quantity-${index}`) ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300'} ${isReadOnly ? 'bg-gray-100' : ''}`}
-                            value={item.quantity}
-                            onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 0)}
-                          />
-                        </div>
-                        <div className="col-span-2">
-                          <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Preço Unit *</label>
-                          <input
-                            disabled={isReadOnly}
-                            className={`form-input w-full rounded-lg text-right ${errors.includes(`priceUnit-${index}`) ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300'} ${isReadOnly ? 'bg-gray-100' : ''}`}
-                            placeholder="R$ 0,00"
-                            value={formatCurrency(item.priceUnit)}
-                            onChange={(e) => updateItem(item.id, 'priceUnit', parseCurrencyToNumber(e.target.value))}
-                          />
-                        </div>
-                        <div className="col-span-2 text-right">
+                        <div className="col-span-6 lg:col-span-4 text-right">
                           <label className="block text-[10px] font-bold text-blue-400 uppercase mb-1">Custo Prod.</label>
                           <div className="py-2 font-bold text-blue-600">{formatCurrency(item.quantity * item.priceUnit)}</div>
                         </div>

@@ -83,7 +83,7 @@ const ClientList: React.FC = () => {
           <input
             type="text"
             placeholder="NOME, CNPJ, TEL OU E-MAIL..."
-            className="block w-full pl-8 pr-3 border border-gray-300 focus:ring-0 focus:border-blue-500 rounded text-xs h-8 font-bold placeholder:text-gray-300 uppercase tracking-tight shadow-inner bg-gray-50/50"
+            className="block w-full !pl-10 pr-3 border border-gray-300 focus:ring-0 focus:border-blue-500 rounded text-xs h-8 font-bold placeholder:text-gray-300 uppercase tracking-tight shadow-inner bg-gray-50/50"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />

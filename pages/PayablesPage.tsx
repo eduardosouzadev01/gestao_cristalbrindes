@@ -405,7 +405,7 @@ const PayablesPage: React.FC = () => {
           <div className="flex-1 min-w-[150px] relative">
             <span className="material-icons-outlined absolute left-2 top-1/2 -translate-y-1/2 text-gray-300 text-sm">search</span>
             <input
-              className="w-full pl-8 h-8 border border-gray-300 rounded text-[10px] font-black uppercase placeholder:text-gray-300"
+              className="w-full !pl-10 h-8 border border-gray-300 rounded text-[10px] font-black uppercase placeholder:text-gray-300"
               placeholder="BUSCAR REGISTRO..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}

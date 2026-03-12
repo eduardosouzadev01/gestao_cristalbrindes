@@ -1,11 +1,11 @@
 
--- 1. Create sequence for budget numbers
-CREATE SEQUENCE IF NOT EXISTS budget_number_seq START 3500;
+-- 1. Create sequence for budget numbers (Sincronizado com global_budget_seq existente)
+CREATE SEQUENCE IF NOT EXISTS global_budget_seq START 3500;
 
--- 2. Function to get next budget number
-CREATE OR REPLACE FUNCTION get_next_budget_number() RETURNS INTEGER AS $$
+-- 2. Function to get next budget number (Formatado como 0000)
+CREATE OR REPLACE FUNCTION get_next_budget_number() RETURNS TEXT AS $$
 BEGIN
-  RETURN nextval('budget_number_seq');
+  RETURN to_char(nextval('global_budget_seq'), 'FM0000');
 END;
 $$ LANGUAGE plpgsql;
 

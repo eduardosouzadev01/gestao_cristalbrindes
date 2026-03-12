@@ -96,15 +96,28 @@ const BudgetList: React.FC = () => {
         }
     };
 
-    const deleteBudget = async (id: string) => {
-        if (!window.confirm('Excluir orçamento permanentemente?')) return;
+    const deleteBudget = async (budget: any) => {
+        // Validação de segurança: Não excluir se já tiver proposta ou pedido (exceto Gerência)
+        const isLocked = ['PROPOSTA ENVIADA', 'PROPOSTA ACEITA'].includes(budget.status);
+        const canBypassLock = appUser?.permissions?.fullAccess || appUser?.permissions?.canDelete;
+
+        if (isLocked && !canBypassLock) {
+            toast.error('Este orçamento não pode ser excluído pois já possui proposta ou pedido gerado.');
+            return;
+        }
+
+        if (!window.confirm(`Excluir orçamento #${budget.budget_number} permanentemente?`)) return;
+
         try {
-            const { error } = await supabase.from('budgets').delete().eq('id', id);
+            setLoading(true);
+            const { error } = await supabase.from('budgets').delete().eq('id', budget.id);
             if (error) throw error;
-            toast.success('Excluído.');
+            toast.success('Orçamento excluído com sucesso.');
             fetchBudgets();
         } catch (e: any) {
-            toast.error(e.message);
+            toast.error('Erro ao excluir: ' + e.message);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -244,9 +257,16 @@ const BudgetList: React.FC = () => {
                                         {b.total_amount?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                     </td>
                                     <td className="px-3 py-1.5 whitespace-nowrap text-center space-x-1">
-                                        <button onClick={(e) => { e.stopPropagation(); navigate(`/orcamento/${b.id}`); }} className="text-gray-400 hover:text-blue-600 transition-colors"><span className="material-icons-outlined text-sm">edit</span></button>
-                                        {!appUser?.salesperson && (
-                                            <button onClick={(e) => { e.stopPropagation(); deleteBudget(b.id); }} className="text-gray-400 hover:text-red-500 transition-colors"><span className="material-icons-outlined text-sm">delete</span></button>
+                                        <button onClick={(e) => { e.stopPropagation(); navigate(`/orcamento/${b.id}`); }} className="text-gray-400 hover:text-blue-600 transition-colors" title="Editar"><span className="material-icons-outlined text-sm">edit</span></button>
+                                        {/* Só permite excluir se for Supervisor OU se o status for inicial/cancelado */}
+                                        {(!['PROPOSTA ENVIADA', 'PROPOSTA ACEITA'].includes(b.status)) && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); deleteBudget(b); }}
+                                                className="text-gray-400 hover:text-red-500 transition-colors"
+                                                title="Excluir Orçamento"
+                                            >
+                                                <span className="material-icons-outlined text-sm">delete</span>
+                                            </button>
                                         )}
                                     </td>
                                 </tr>

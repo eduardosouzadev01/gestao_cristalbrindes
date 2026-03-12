@@ -331,12 +331,13 @@ const OrdersReceivablesPage: React.FC = () => {
                                     {/* Items Table simplified */}
                                     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden text-[11px]">
                                         <table className="w-full text-xs">
-                                            <thead><tr className="bg-gray-50 border-b border-gray-100 text-[9px] uppercase font-black text-gray-400"><th className="px-3 py-2 text-left">Item</th><th className="px-3 py-2 text-right">Custo Real</th><th className="px-3 py-2 text-right">Venda</th><th className="px-3 py-2 text-right">Margem</th></tr></thead>
+                                            <thead><tr className="bg-gray-50 border-b border-gray-100 text-[9px] uppercase font-black text-gray-400"><th className="px-3 py-2 text-left">Item</th><th className="px-3 py-2 text-right">Custo Real</th><th className="px-3 py-2 text-right">Venda</th><th className="px-3 py-2 text-right">Saldo</th><th className="px-3 py-2 text-right">Margem</th></tr></thead>
                                             <tbody>{o.items.map(i => {
                                                 const realC = i.quantity * (i.real_unit_price || i.unit_price || 0) + (i.real_customization_cost || i.customization_cost || 0) + (i.real_supplier_transport_cost || i.supplier_transport_cost || 0) + (i.real_client_transport_cost || i.client_transport_cost || 0);
                                                 const sale = i.total_item_value || 0;
+                                                const balance = sale - realC;
                                                 const m = sale > 0 ? ((sale - realC) / sale) * 100 : 0;
-                                                return (<tr key={i.id} className="border-b border-gray-50 last:border-0"><td className="px-3 py-2 font-bold text-gray-700">{i.product_name}</td><td className="px-3 py-2 text-right font-mono">{formatCurrency(realC)}</td><td className="px-3 py-2 text-right font-mono font-bold">{formatCurrency(sale)}</td><td className={`px-3 py-2 text-right font-black ${m >= 25 ? 'text-green-600' : 'text-yellow-600'}`}>{m.toFixed(1)}%</td></tr>);
+                                                return (<tr key={i.id} className="border-b border-gray-50 last:border-0"><td className="px-3 py-2 font-bold text-gray-700">{i.product_name}</td><td className="px-3 py-2 text-right font-mono">{formatCurrency(realC)}</td><td className="px-3 py-2 text-right font-mono font-bold">{formatCurrency(sale)}</td><td className="px-3 py-2 text-right font-mono font-black text-blue-600">{formatCurrency(balance)}</td><td className={`px-3 py-2 text-right font-black ${m >= 25 ? 'text-green-600' : 'text-yellow-600'}`}>{m.toFixed(1)}%</td></tr>);
                                             })}</tbody>
                                         </table>
                                     </div>

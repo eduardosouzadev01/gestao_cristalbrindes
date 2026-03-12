@@ -61,7 +61,7 @@ const LoginPage: React.FC = () => {
                                 <input
                                     type="email"
                                     required
-                                    className="form-input block w-full pl-10 pr-4 py-2.5 text-sm"
+                                    className="form-input block w-full !pl-10 pr-4 py-2.5 text-sm"
                                     placeholder="seu@email.com"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
@@ -82,7 +82,7 @@ const LoginPage: React.FC = () => {
                                 <input
                                     type={showPassword ? 'text' : 'password'}
                                     required
-                                    className="form-input block w-full pl-10 pr-12 py-2.5 text-sm"
+                                    className="form-input block w-full !pl-10 pr-12 py-2.5 text-sm"
                                     placeholder="••••••••"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}

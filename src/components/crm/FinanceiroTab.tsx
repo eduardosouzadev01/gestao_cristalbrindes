@@ -100,6 +100,12 @@ export const FinanceiroTab: React.FC<FinanceiroTabProps> = ({
                     <h3 className={`text-2xl font-black tracking-tighter ${finStats.totalNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(finStats.totalNet)}</h3>
                     <p className="text-[10px] text-gray-400 mt-2 font-bold whitespace-nowrap uppercase italic">Estimado (Sem Impostos)</p>
                 </div>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group hover:border-purple-200 transition-all col-span-1 md:col-span-2 lg:col-span-4">
+                    <span className="material-icons-outlined absolute top-2 right-2 text-6xl text-purple-500 opacity-5 group-hover:opacity-10 transition-opacity">savings</span>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Saldo Extra Acumulado (Empresa)</p>
+                    <h3 className="text-2xl font-black text-purple-600 tracking-tighter">{formatCurrency(finStats.totalExtra)}</h3>
+                    <p className="text-[10px] text-gray-400 mt-2 font-bold whitespace-nowrap uppercase italic">Valores reservados sobre o faturamento</p>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

@@ -14,16 +14,21 @@ import { Lead } from '../src/hooks/useCRM';
 // --- Transfer Request Interface ---
 interface TransferRequest {
     id: string;
-    client_id: string;
+    client_id?: string;
+    order_id?: string;
+    order_number?: string;
     requesting_salesperson: string;
+    requested_salesperson?: string; // For SellerTransferRequest
     current_salesperson: string;
-    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'PENDENTE' | 'APROVADO' | 'REJEITADO';
     reason?: string;
     created_at: string;
     updated_at: string;
+    requested_by_email?: string;
     client?: {
         name: string;
     };
+    type: 'CLIENT' | 'ORDER';
 }
 
 // Interfaces (Lead importada de useCRM)
@@ -43,9 +48,10 @@ const ManagementPage: React.FC = () => {
         client_name: '', client_phone: '', client_email: '', client_doc: ''
     };
 
-    const tabParam = searchParams.get('tab') as 'LEADS' | 'PERFORMANCE' | 'FINANCEIRO' | null;
+    const tabParam = searchParams.get('tab') as 'LEADS' | 'PERFORMANCE' | 'FINANCEIRO' | 'TRANSFERENCIAS' | null;
     const [activeTab, setActiveTab] = useState<'LEADS' | 'PERFORMANCE' | 'FINANCEIRO' | 'TRANSFERENCIAS'>(tabParam || 'LEADS');
     const [transferRequests, setTransferRequests] = useState<TransferRequest[]>([]);
+    const [pendingTransferCount, setPendingTransferCount] = useState(0);
     const [loadingTransfers, setLoadingTransfers] = useState(false);
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
     const [selectedClientToTransfer, setSelectedClientToTransfer] = useState<any>(null);
@@ -117,6 +123,7 @@ const ManagementPage: React.FC = () => {
         totalFixedExpenses: 0,
         orderCount: 0,
         ticketMedio: 0,
+        totalExtra: 0,
         topProducts: [] as any[],
         salesByStatus: [] as any[]
     });
@@ -186,6 +193,21 @@ const ManagementPage: React.FC = () => {
             setLeads(sorted);
         }
         setLoading(false);
+    };
+
+    const handleAttendLead = async (e: React.MouseEvent, leadId: string) => {
+        e.stopPropagation();
+        try {
+            const { error } = await supabase
+                .from('crm_leads')
+                .update({ updated_at: new Date().toISOString() })
+                .eq('id', leadId);
+            if (error) throw error;
+            toast.success('Atendimento atualizado!');
+            fetchLeads();
+        } catch (error: any) {
+            toast.error('Erro ao atualizar: ' + error.message);
+        }
     };
 
     const checkClientAndProceed = async () => {
@@ -645,15 +667,46 @@ const ManagementPage: React.FC = () => {
     const fetchTransferRequests = async () => {
         try {
             setLoadingTransfers(true);
-            const { data, error } = await supabase
-                .from('client_transfer_requests')
-                .select('*, client:partners(name)')
-                .order('created_at', { ascending: false });
+            
+            // Fetch Client Transfers
+            let clientQuery = supabase.from('client_transfer_requests').select('*, client:partners(name)');
+            
+            // If seller, filter by their participation
+            if (isSeller && userSalesperson) {
+                clientQuery = clientQuery.or(`requesting_salesperson.eq.${userSalesperson},current_salesperson.eq.${userSalesperson}`);
+            }
 
-            if (error) throw error;
-            setTransferRequests(data || []);
+            const { data: clients, error: clientError } = await clientQuery.order('created_at', { ascending: false });
+
+            if (clientError) throw clientError;
+
+            // Fetch Order Transfers
+            let orderQuery = supabase.from('seller_transfer_requests').select('*');
+
+            if (isSeller && userSalesperson) {
+                orderQuery = orderQuery.or(`requested_salesperson.eq.${userSalesperson},current_salesperson.eq.${userSalesperson}`);
+            }
+
+            const { data: orders, error: orderError } = await orderQuery.order('created_at', { ascending: false });
+
+            if (orderError) throw orderError;
+
+            const unified: TransferRequest[] = [
+                ...(clients || []).map(c => ({ ...c, type: 'CLIENT' as const })),
+                ...(orders || []).map(o => ({ 
+                    ...o, 
+                    type: 'ORDER' as const,
+                    requesting_salesperson: o.current_salesperson, // In order transfer, the requester is the current seller
+                    requested_salesperson: o.requested_salesperson,
+                    status: o.status === 'PENDENTE' ? 'PENDING' : o.status === 'APROVADO' ? 'APPROVED' : 'REJECTED'
+                }))
+            ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+            setTransferRequests(unified);
+            setPendingTransferCount(unified.filter(r => r.status === 'PENDING').length);
         } catch (error: any) {
             console.error('Erro ao buscar solicitações:', error);
+            toast.error('Erro ao carregar transferências');
         } finally {
             setLoadingTransfers(false);
         }
@@ -669,10 +722,22 @@ const ManagementPage: React.FC = () => {
                     requesting_salesperson: appUser?.salesperson || 'ADMIN',
                     current_salesperson: selectedClientToTransfer.salesperson,
                     reason: transferReason,
-                    status: 'PENDING'
+                    status: 'PENDING',
+                    requested_by_email: appUser?.email
                 });
 
             if (error) throw error;
+
+            // Notify Management
+            await supabase.from('notifications').insert({
+                user_email: 'cristalbrindes@cristalbrindes.com.br',
+                title: `🔄 Troca de Carteira - ${selectedClientToTransfer.name}`,
+                message: `${appUser?.salesperson || 'ADMIN'} solicita o cliente do vendedor ${selectedClientToTransfer.salesperson}. Motivo: ${transferReason}`,
+                type: 'info',
+                read: false,
+                link: `/crm?tab=TRANSFERENCIAS`
+            });
+
             toast.success('Solicitação enviada com sucesso!');
             setIsTransferModalOpen(false);
             setTransferReason('');
@@ -686,23 +751,64 @@ const ManagementPage: React.FC = () => {
 
     const handleApproveTransfer = async (request: TransferRequest) => {
         try {
-            // 1. Update Client (Partner)
-            const { error: clientError } = await supabase
-                .from('partners')
-                .update({ salesperson: request.requesting_salesperson })
-                .eq('id', request.client_id);
+            if (request.type === 'CLIENT') {
+                // 1. Update Client (Partner)
+                const { error: clientError } = await supabase
+                    .from('partners')
+                    .update({ salesperson: request.requesting_salesperson })
+                    .eq('id', request.client_id);
 
-            if (clientError) throw clientError;
+                if (clientError) throw clientError;
 
-            // 2. Update Request Status
-            const { error: requestError } = await supabase
-                .from('client_transfer_requests')
-                .update({ status: 'APPROVED' })
-                .eq('id', request.id);
+                // 2. Update Request Status
+                const { error: requestError } = await supabase
+                    .from('client_transfer_requests')
+                    .update({ status: 'APPROVED' })
+                    .eq('id', request.id);
 
-            if (requestError) throw requestError;
+                if (requestError) throw requestError;
+            } else {
+                // 1. Update Order
+                const { error: orderError } = await supabase
+                    .from('orders')
+                    .update({ salesperson: request.requested_salesperson })
+                    .eq('id', request.order_id);
+
+                if (orderError) throw orderError;
+
+                // 2. Log in Order Change Logs
+                await supabase.from('order_change_logs').insert({
+                    order_id: request.order_id,
+                    user_email: appUser?.email || 'SISTEMA',
+                    field_name: 'vendedor',
+                    old_value: request.current_salesperson,
+                    new_value: request.requested_salesperson,
+                    description: `Troca de vendedor aprovada pela gerência. Motivo: ${request.reason}`
+                });
+
+                // 3. Update Request Status
+                const { error: requestError } = await supabase
+                    .from('seller_transfer_requests')
+                    .update({ status: 'APROVADO' })
+                    .eq('id', request.id);
+
+                if (requestError) throw requestError;
+            }
 
             toast.success('Transferência aprovada com sucesso!');
+
+            // Notify Requester
+            if (request.requested_by_email) {
+                await supabase.from('notifications').insert({
+                    user_email: request.requested_by_email,
+                    title: `✅ Troca Aprovada`,
+                    message: `Sua solicitação de troca para ${request.type === 'CLIENT' ? request.client?.name : 'Pedido #' + request.order_number} foi aprovada.`,
+                    type: 'success',
+                    read: false,
+                    link: request.type === 'CLIENT' ? '/clientes' : `/pedido/${request.order_id}`
+                });
+            }
+
             fetchTransferRequests();
         } catch (error: any) {
             toast.error('Erro ao aprovar transferência.');
@@ -712,13 +818,33 @@ const ManagementPage: React.FC = () => {
 
     const handleRejectTransfer = async (request: TransferRequest) => {
         try {
-            const { error } = await supabase
-                .from('client_transfer_requests')
-                .update({ status: 'REJECTED' })
-                .eq('id', request.id);
+            if (request.type === 'CLIENT') {
+                const { error } = await supabase
+                    .from('client_transfer_requests')
+                    .update({ status: 'REJECTED' })
+                    .eq('id', request.id);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase
+                    .from('seller_transfer_requests')
+                    .update({ status: 'REJEITADO' })
+                    .eq('id', request.id);
+                if (error) throw error;
+            }
 
-            if (error) throw error;
             toast.success('Solicitação rejeitada.');
+
+            // Notify Requester
+            if (request.requested_by_email) {
+                await supabase.from('notifications').insert({
+                    user_email: request.requested_by_email,
+                    title: `❌ Troca Rejeitada`,
+                    message: `Sua solicitação de troca para ${request.type === 'CLIENT' ? request.client?.name : 'Pedido #' + request.order_number} foi rejeitada pela gerência.`,
+                    type: 'danger',
+                    read: false
+                });
+            }
+
             fetchTransferRequests();
         } catch (error: any) {
             toast.error('Erro ao rejeitar solicitação.');
@@ -736,7 +862,7 @@ const ManagementPage: React.FC = () => {
                 .from('orders')
                 .select(`
                     id, status, total_amount, salesperson,
-                    order_items ( product_name, quantity, unit_price, customization_cost, supplier_transport_cost, client_transport_cost, extra_expense )
+                    order_items ( product_name, quantity, unit_price, total_item_value, extra_pct, customization_cost, supplier_transport_cost, client_transport_cost, extra_expense )
                 `)
                 .gte('order_date', startStr)
                 .lte('order_date', endStr);
@@ -767,6 +893,7 @@ const ManagementPage: React.FC = () => {
             // Logic for Stats
             let totalSales = 0;
             let totalCostEst = 0;
+            let totalExtra = 0;
             const productMap: any = {};
             const statusMap: any = {};
 
@@ -777,6 +904,7 @@ const ManagementPage: React.FC = () => {
                 o.order_items?.forEach((item: any) => {
                     const estItemCost = (item.quantity * (item.unit_price || 0)) + (item.customization_cost || 0) + (item.supplier_transport_cost || 0) + (item.client_transport_cost || 0) + (item.extra_expense || 0);
                     totalCostEst += estItemCost;
+                    totalExtra += (item.total_item_value || 0) * ((item.extra_pct || 0) / 100);
                     productMap[item.product_name || 'N/A'] = (productMap[item.product_name || 'N/A'] || 0) + (item.quantity * (item.unit_price || 0));
                 });
             });
@@ -786,6 +914,7 @@ const ManagementPage: React.FC = () => {
                 totalNet: totalSales - totalCostEst - totalCommissions - expensesTotal,
                 totalCommissions,
                 totalFixedExpenses: expensesTotal,
+                totalExtra,
                 orderCount: orders?.length || 0,
                 ticketMedio: totalSales / (orders?.length || 1),
                 topProducts: Object.entries(productMap).map(([name, total]) => ({ name, total })).sort((a: any, b: any) => b.total - a.total).slice(0, 5),
@@ -814,8 +943,7 @@ const ManagementPage: React.FC = () => {
         return name.substring(0, 2).toUpperCase();
     };
 
-    const [compactMode, setCompactMode] = useState(true);
-    const [stagnantHours, setStagnantHours] = useState(Number(localStorage.getItem('crm_stagnant_hours')) || 48);
+    const compactMode = true;
 
     // Checklist State
     const [checklistItems, setChecklistItems] = useState<{ id: string; text: string; completed: boolean }[]>([]);
@@ -900,15 +1028,18 @@ const ManagementPage: React.FC = () => {
                                     Financeiro
                                 </button>
                             )}
-                            {(appUser?.role === 'ADMIN' || appUser?.role === 'GESTAO') && (
-                                <button
-                                    onClick={() => setActiveTab('TRANSFERENCIAS')}
-                                    className={`px-4 py-2 rounded-md text-xs font-bold uppercase transition-all flex items-center gap-2 ${activeTab === 'TRANSFERENCIAS' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
-                                >
-                                    <span className="material-icons-outlined text-sm">swap_horiz</span>
-                                    Trocas
-                                </button>
-                            )}
+                            <button
+                                onClick={() => setActiveTab('TRANSFERENCIAS')}
+                                className={`px-4 py-2 rounded-md text-xs font-bold uppercase transition-all flex items-center gap-2 ${activeTab === 'TRANSFERENCIAS' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                            >
+                                <span className="material-icons-outlined text-sm">swap_horiz</span>
+                                Trocas
+                                {pendingTransferCount > 0 && (
+                                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-pulse">
+                                        {pendingTransferCount}
+                                    </span>
+                                )}
+                            </button>
                         </div>
                     )}
                 </div>
@@ -917,21 +1048,7 @@ const ManagementPage: React.FC = () => {
             {activeTab === 'LEADS' && (
                 <>
                     <div className="flex justify-between items-center mb-6">
-                        <div className="flex items-center gap-3 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Alerta Inatividade:</span>
-                            <div className="flex items-center gap-1">
-                                <input
-                                    type="number"
-                                    className="w-12 border-0 bg-blue-50 text-[11px] font-black text-blue-600 rounded px-1 text-center focus:ring-1 focus:ring-blue-200"
-                                    value={stagnantHours}
-                                    onChange={(e) => {
-                                        const val = Number(e.target.value);
-                                        setStagnantHours(val);
-                                        localStorage.setItem('crm_stagnant_hours', val.toString());
-                                    }}
-                                />
-                                <span className="text-[10px] font-black text-blue-400 uppercase">h</span>
-                            </div>
+                        <div className="flex items-center gap-3">
                         </div>
                         <button onClick={() => {
                             setNewLead({ ...initialLeadState, salesperson: isSeller ? appUser?.salesperson : 'VENDAS 01' });
@@ -997,8 +1114,6 @@ const ManagementPage: React.FC = () => {
 
                                 <div className="px-3 flex-1 overflow-y-auto space-y-3 pb-4">
                                     {leads.filter(l => l.status === col.id).map(lead => {
-                                        const dateToCompare = lead.created_at; // use updated_at if available
-                                        const isStagnant = col.id !== 'FINALIZADO' && col.id !== 'PEDIDO_ENTREGUE' && col.id !== 'NAO_APROVADO' && new Date().getTime() - new Date(dateToCompare).getTime() > stagnantHours * 60 * 60 * 1000;
                                         const cleanPhone = lead.client_phone ? lead.client_phone.replace(/\D/g, '') : '';
                                         const readyMessage = lead.closing_metadata?.wa_template || `Olâ ${lead.client_name}, tudo bem?`;
                                         const waLink = cleanPhone ? `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(readyMessage)}` : null;
@@ -1009,7 +1124,7 @@ const ManagementPage: React.FC = () => {
                                                 draggable
                                                 onDragStart={(e) => handleDragStart(e, lead)}
                                                 onDragEnd={handleDragEnd}
-                                                className={`bg-white rounded-xl shadow-sm border ${isStagnant ? 'border-orange-300 shadow-orange-100/50' : 'border-gray-100'} border-l-[3px] hover:shadow-md hover:-translate-y-0.5 transition-all group relative cursor-pointer active:cursor-grabbing p-4 flex flex-col ${compactMode ? 'min-h-[80px]' : 'min-h-[140px]'}`}
+                                                className={`bg-white rounded-xl shadow-sm border border-gray-100 border-l-[3px] hover:shadow-md hover:-translate-y-0.5 transition-all group relative cursor-pointer active:cursor-grabbing p-4 flex flex-col ${compactMode ? 'min-h-[80px]' : 'min-h-[140px]'}`}
                                                 style={{ borderLeftColor: col.color }}
                                                 onClick={() => {
                                                     setEditingLead(lead);
@@ -1019,11 +1134,7 @@ const ManagementPage: React.FC = () => {
                                                 }}
                                             >
                                                 <div className="flex justify-between items-center mb-2">
-                                                    {isStagnant ? (
-                                                        <span className="flex items-center gap-1 px-2 py-[2px] rounded text-[9px] font-bold tracking-wider bg-orange-50 text-orange-600 border border-orange-100 animate-pulse">
-                                                            <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span> Inativo &gt; {stagnantHours}h
-                                                        </span>
-                                                    ) : lead.priority ? (
+                                                    {lead.priority ? (
                                                         <span className={`px-2 py-[2px] rounded text-[9px] font-bold tracking-wider ${lead.priority === 'ALTA' ? 'bg-red-50 text-red-600' :
                                                             lead.priority === 'BAIXA' ? 'bg-gray-50 text-gray-500' : 'bg-blue-50 text-blue-600'
                                                             }`}>
@@ -1037,21 +1148,24 @@ const ManagementPage: React.FC = () => {
                                                     </div>
                                                 </div>
 
-                                                <h4 className="font-bold text-gray-800 text-[14px] leading-snug line-clamp-2 mb-1 pr-4">{lead.client_name}</h4>
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <h4 className="font-bold text-gray-800 text-[14px] leading-snug line-clamp-2 mb-1 pr-4">{lead.client_name}</h4>
+                                                    <button
+                                                        onClick={(e) => handleAttendLead(e, lead.id)}
+                                                        className="h-6 w-6 flex items-center justify-center rounded-full bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white transition-all shadow-sm border border-blue-100 flex-shrink-0"
+                                                        title="Marcar como Atendido (Resetar Tempo)"
+                                                    >
+                                                        <span className="material-icons-outlined text-[14px]">refresh</span>
+                                                    </button>
+                                                </div>
 
-                                                {lead.notes && (
-                                                    <div className="bg-yellow-50/50 p-2 rounded-lg border border-yellow-100/50 mt-1 mb-2">
-                                                        <p className="text-[10px] text-yellow-700 italic line-clamp-2">
+                                                {lead.closing_metadata?.show_on_card && lead.description && (
+                                                    <div className="bg-blue-50/50 p-2 rounded-lg border border-blue-100/50 mt-1 mb-2">
+                                                        <p className="text-[10px] text-blue-700 italic line-clamp-2">
                                                             <span className="material-icons-outlined text-[10px] mr-1">sticky_note_2</span>
-                                                            {lead.notes}
+                                                            {lead.description}
                                                         </p>
                                                     </div>
-                                                )}
-
-                                                {!compactMode && lead.description && (
-                                                    <p className="text-gray-500 text-[11px] mb-3 line-clamp-2 leading-relaxed flex-1">
-                                                        {lead.description}
-                                                    </p>
                                                 )}
 
                                                 <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-50 opacity-80 group-hover:opacity-100 transition-opacity">
@@ -1179,9 +1293,10 @@ const ManagementPage: React.FC = () => {
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead>
                                     <tr className="bg-gray-50/80">
-                                        <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Cliente</th>
-                                        <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Vendedor Atual</th>
-                                        <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Solicitante</th>
+                                        <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Tipo</th>
+                                        <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Alvo</th>
+                                        <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Origem</th>
+                                        <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Destino</th>
                                         <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Data</th>
                                         <th className="px-6 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
                                         <th className="px-6 py-3 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Ações</th>
@@ -1189,21 +1304,26 @@ const ManagementPage: React.FC = () => {
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-100">
                                     {loadingTransfers ? (
-                                        <tr><td colSpan={6} className="px-6 py-10 text-center text-gray-400 font-bold uppercase text-xs">Carregando...</td></tr>
+                                        <tr><td colSpan={7} className="px-6 py-10 text-center text-gray-400 font-bold uppercase text-xs">Carregando...</td></tr>
                                     ) : transferRequests.length === 0 ? (
-                                        <tr><td colSpan={6} className="px-6 py-10 text-center text-gray-400 font-bold uppercase text-xs">Nenhuma solicitação encontrada.</td></tr>
+                                        <tr><td colSpan={7} className="px-6 py-10 text-center text-gray-400 font-bold uppercase text-xs">Nenhuma solicitação encontrada.</td></tr>
                                     ) : (
                                         transferRequests.map(req => (
                                             <tr key={req.id} className="hover:bg-gray-50/50 transition-colors">
                                                 <td className="px-6 py-4">
-                                                    <p className="text-sm font-bold text-gray-900">{req.client?.name}</p>
+                                                    <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter ${req.type === 'CLIENT' ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                        {req.type === 'CLIENT' ? 'Carteira' : 'Pedido'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <p className="text-sm font-bold text-gray-900">{req.type === 'CLIENT' ? req.client?.name : `Pedido #${req.order_number}`}</p>
                                                     <p className="text-[10px] text-gray-400 font-medium italic">"{req.reason || 'Sem motivo informado'}"</p>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <span className="text-xs font-bold text-gray-600">{req.current_salesperson || 'N/A'}</span>
+                                                    <span className="text-xs font-bold text-gray-600">{req.current_salesperson}</span>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <span className="text-xs font-bold text-blue-600">{req.requesting_salesperson}</span>
+                                                    <span className="text-xs font-bold text-blue-600">{req.type === 'CLIENT' ? req.requesting_salesperson : req.requested_salesperson}</span>
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <span className="text-xs text-gray-500">{new Date(req.created_at).toLocaleDateString()}</span>
@@ -1257,7 +1377,7 @@ const ManagementPage: React.FC = () => {
                                                 <span className="material-icons-outlined text-blue-400 text-lg">search</span>
                                             </div>
                                             <input
-                                                className="form-input w-full pl-10 rounded-lg border-blue-200 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                className="form-input w-full !pl-10 rounded-lg border-blue-200 focus:ring-blue-500 focus:border-blue-500 text-sm"
                                                 placeholder="Busque por Nome, E-mail, CPF/CNPJ ou Telefone..."
                                                 value={clientSearchTerm}
                                                 onChange={e => searchClients(e.target.value)}
@@ -1411,8 +1531,28 @@ const ManagementPage: React.FC = () => {
                                 )}
 
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Descrição do Pedido / Interesse</label>
-                                    <textarea className="form-textarea w-full rounded-lg border-gray-300" rows={3} placeholder="O que o cliente está buscando?" value={newLead.description || ''} onChange={e => setNewLead({ ...newLead, description: e.target.value })} ></textarea>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="block text-xs font-bold text-gray-400 uppercase">Anotações do Atendimento</label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                checked={newLead.closing_metadata?.show_on_card || false}
+                                                onChange={e => setNewLead({
+                                                    ...newLead,
+                                                    closing_metadata: { ...newLead.closing_metadata, show_on_card: e.target.checked }
+                                                })}
+                                            />
+                                            <span className="text-[10px] font-bold text-blue-500 uppercase">Exibir no Card</span>
+                                        </label>
+                                    </div>
+                                    <textarea
+                                        className="form-textarea w-full rounded-lg border-gray-300"
+                                        rows={3}
+                                        placeholder="O que o cliente está buscando? Notas internas..."
+                                        value={newLead.description || ''}
+                                        onChange={e => setNewLead({ ...newLead, description: e.target.value })}
+                                    ></textarea>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
@@ -1454,10 +1594,6 @@ const ManagementPage: React.FC = () => {
                                         </div>
                                     </div>
 
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Anotações Internas (Exibe no Card)</label>
-                                    <textarea className="form-textarea w-full rounded-lg border-gray-300 bg-yellow-50 font-medium text-sm" rows={2} placeholder="Notas rápidas..." value={newLead.notes || ''} onChange={e => setNewLead({ ...newLead, notes: e.target.value })} ></textarea>
                                 </div>
 
                                 {/* Checklist Section */}

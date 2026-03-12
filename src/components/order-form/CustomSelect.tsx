@@ -82,7 +82,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                             const hasCategories = filtered.some(o => o.supplier_category);
                             if (hasCategories && filtered.length > 0) {
                                 const categories = Array.from(new Set(filtered.map(o => o.supplier_category).filter(Boolean)));
-                                return categories.map(cat => (
+                                const renderedItems = categories.map(cat => (
                                     <div key={cat as string}>
                                         <div className="px-4 py-1.5 text-[10px] font-bold text-blue-600 bg-blue-50 uppercase tracking-widest border-y border-blue-100">{cat === 'GRAVACOES' ? 'PERSONALIZAÇÃO' : (cat as string)}</div>
                                         {filtered.filter(o => o.supplier_category === cat).map(opt => (
@@ -93,6 +93,23 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                                         ))}
                                     </div>
                                 ));
+
+                                // Add section for items without category
+                                const noCategory = filtered.filter(o => !o.supplier_category);
+                                if (noCategory.length > 0) {
+                                    renderedItems.push(
+                                        <div key="no-category">
+                                            <div className="px-4 py-1.5 text-[10px] font-bold text-gray-400 bg-gray-50 uppercase tracking-widest border-y border-gray-100">OUTROS</div>
+                                            {noCategory.map(opt => (
+                                                <div key={opt.id} className="px-4 py-2 text-sm hover:bg-blue-50 cursor-pointer text-gray-700 flex justify-between group" onClick={() => { onSelect(opt); setSearch(opt.name); setIsOpen(false); }}>
+                                                    <span>{opt.name}</span>
+                                                    {opt.code && <span className="text-gray-400 text-xs font-mono group-hover:text-blue-500">{opt.code}</span>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    );
+                                }
+                                return renderedItems as any;
                             }
                             return filtered.map(opt => (
                                 <div key={opt.id} className="px-4 py-2 text-sm hover:bg-blue-50 cursor-pointer text-gray-700 flex justify-between group" onClick={() => { onSelect(opt); setSearch(opt.name); setIsOpen(false); }}>

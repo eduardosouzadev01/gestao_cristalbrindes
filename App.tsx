@@ -30,6 +30,7 @@ import ProposalList from './pages/ProposalList';
 import ProposalDetail from './pages/ProposalDetail';
 import ManagementPage from './pages/ManagementPage';
 import ProductsPage from './pages/ProductsPage';
+import InternalTasksPage from './pages/InternalTasksPage';
 import FinancialDashboardPage from './pages/FinancialDashboardPage';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 
@@ -105,6 +106,12 @@ const Header: React.FC = () => {
       ]
     },
     {
+      name: 'Processos',
+      permission: 'financeiro',
+      path: '/processos',
+      icon: 'assignment'
+    },
+    {
       name: 'Cadastros',
       permission: 'cadastros',
       path: '#',
@@ -149,12 +156,14 @@ const Header: React.FC = () => {
                   navigate('/crm');
                 }
               }}
-              className="flex-shrink-0 flex items-center gap-2 mr-8 hover:opacity-80 transition-opacity"
+              className="flex-shrink-0 flex items-center h-full mr-8 hover:opacity-80 transition-opacity"
             >
-              <div className="w-7 h-7 rounded-lg bg-[#0F6CBD] flex items-center justify-center">
-                <span className="material-icons-outlined text-white text-[16px]">diamond</span>
-              </div>
-              <span className="font-semibold text-[13px] text-[#111827] tracking-tight">Cristal Brindes</span>
+              <img
+                src="/img/Cristal Brindes_menu.png"
+                alt="Cristal Brindes"
+                className="h-7 w-auto object-contain"
+                style={{ mixBlendMode: 'multiply' }}
+              />
             </button>
             <nav className="hidden sm:ml-2 sm:flex sm:space-x-0 h-full items-center">
               {menuStructure.map((item) => {
@@ -291,6 +300,7 @@ const AppLayout: React.FC = () => {
           <Route path="/propostas" element={<ProtectedRoute permission="pedidos"><ProposalList /></ProtectedRoute>} />
           <Route path="/proposta/:id" element={<ProtectedRoute permission="pedidos"><ProposalDetail /></ProtectedRoute>} />
           <Route path="/crm" element={<ProtectedRoute permission="pedidos"><ManagementPage /></ProtectedRoute>} />
+          <Route path="/processos" element={<ProtectedRoute permission="financeiro"><InternalTasksPage /></ProtectedRoute>} />
           <Route path="/produtos" element={<ProtectedRoute permission="produtos"><ProductsPage /></ProtectedRoute>} />
           <Route path="/clientes" element={<ProtectedRoute permission="cadastros"><ClientList /></ProtectedRoute>} />
           <Route path="/fornecedores" element={<ProtectedRoute permission="cadastros"><SupplierList /></ProtectedRoute>} />

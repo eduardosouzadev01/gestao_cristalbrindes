@@ -51,10 +51,11 @@ export const QuickSupplierModal: React.FC<QuickSupplierModalProps> = ({
                         </div>
                         <div>
                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Categoria Fornecedor</label>
-                            <select className="form-select block w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500" value={newSupplier.supplier_category} onChange={(e) => setNewSupplier({ ...newSupplier, supplier_category: e.target.value })}>
-                                <option value="PRODUTOS">Produtos</option>
-                                <option value="PERSONALIZACAO">Personalização</option>
-                                <option value="TRANSPORTADORA">Transportadora</option>
+                            <select className="form-select block w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500 font-bold" value={newSupplier.supplier_category} onChange={(e) => setNewSupplier({ ...newSupplier, supplier_category: e.target.value })}>
+                                <option value="PRODUTOS">PRODUTOS (FORNECEDOR)</option>
+                                <option value="GRAVACOES">GRAVAÇÕES (PERSONALIZAÇÃO)</option>
+                                <option value="TRANSPORTADORA">TRANSPORTADORA</option>
+                                <option value="OUTROS">OUTROS</option>
                             </select>
                         </div>
                     </div>

@@ -17,6 +17,7 @@ export const useOrderItems = (initialItems: any[] = []) => {
         fator: 1.34,
         bvPct: 0,
         extraPct: 0,
+        factorId: '',
         taxPct: 0,
         unforeseenPct: 0,
         marginPct: 0,
@@ -39,7 +40,10 @@ export const useOrderItems = (initialItems: any[] = []) => {
         customization_payment_date: null,
         transport_payment_date: null,
         layout_payment_date: null,
-        extra_payment_date: null
+        extra_payment_date: null,
+        variations: [],
+        productImage: '',
+        productCode: ''
     }]);
 
     const addItem = () => {
@@ -57,6 +61,7 @@ export const useOrderItems = (initialItems: any[] = []) => {
             fator: 1.34,
             bvPct: 0,
             extraPct: 0,
+            factorId: '',
             taxPct: 0,
             unforeseenPct: 0,
             marginPct: 0,
@@ -79,7 +84,10 @@ export const useOrderItems = (initialItems: any[] = []) => {
             customization_payment_date: null,
             transport_payment_date: null,
             layout_payment_date: null,
-            extra_payment_date: null
+            extra_payment_date: null,
+            variations: [],
+            productImage: '',
+            productCode: ''
         }]);
     };
 

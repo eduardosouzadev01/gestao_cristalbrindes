@@ -38,6 +38,27 @@ const ProposalList: React.FC = () => {
         }
     };
 
+    const deleteProposal = async (proposal: any) => {
+        if (!appUser?.permissions?.fullAccess && !appUser?.permissions?.canDelete) {
+            toast.error('Você não tem permissão para excluir propostas.');
+            return;
+        }
+
+        if (!window.confirm(`Excluir proposta #${proposal.proposal_number} permanentemente?`)) return;
+
+        try {
+            setLoading(true);
+            const { error } = await supabase.from('proposals').delete().eq('id', proposal.id);
+            if (error) throw error;
+            toast.success('Proposta excluída com sucesso.');
+            loadProposals();
+        } catch (e: any) {
+            toast.error('Erro ao excluir proposta: ' + e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const filteredProposals = proposals.filter(p =>
         p.proposal_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.client?.name?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -59,7 +80,7 @@ const ProposalList: React.FC = () => {
                         <input
                             type="text"
                             placeholder="Buscar proposta ou cliente..."
-                            className="w-full pl-8 pr-3 py-1 text-xs border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 h-8"
+                            className="w-full !pl-10 pr-3 py-1 text-xs border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 h-8"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -120,6 +141,15 @@ const ProposalList: React.FC = () => {
                                                 >
                                                     <span className="material-icons-outlined text-base">visibility</span>
                                                 </button>
+                                                {(appUser?.permissions?.fullAccess || appUser?.permissions?.canDelete) && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); deleteProposal(item); }}
+                                                        className="p-1 text-gray-400 hover:text-red-500 hover:bg-white hover:shadow-sm rounded transition-all"
+                                                        title="Excluir Proposta"
+                                                    >
+                                                        <span className="material-icons-outlined text-base">delete</span>
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
