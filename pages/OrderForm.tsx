@@ -264,6 +264,7 @@ const OrderForm: React.FC = () => {
           transport_payment_date: it.transport_payment_date || (location.state.commercialData && it.transport_supplier_id ? location.state.commercialData.supplier_payment_dates[it.transport_supplier_id] : null) || null,
           layout_payment_date: it.layout_payment_date || (location.state.commercialData && it.layout_supplier_id ? location.state.commercialData.supplier_payment_dates[it.layout_supplier_id] : null) || null,
           extra_payment_date: it.extra_payment_date || (location.state.commercialData && it.extra_supplier_id ? location.state.commercialData.supplier_payment_dates[it.extra_supplier_id] : null) || null,
+          supplier_departure_date: it.supplier_departure_date || (location.state.commercialData ? location.state.commercialData.supplier_departure_dates[it.supplier_id] : null) || null,
           customization_supplier_id: it.customization_supplier_id || '',
           transport_supplier_id: it.transport_supplier_id || '',
           client_transport_supplier_id: it.client_transport_supplier_id || '',
@@ -451,6 +452,7 @@ const OrderForm: React.FC = () => {
             transport_payment_date: item.transport_payment_date || null,
             layout_payment_date: item.layout_payment_date || null,
             extra_payment_date: item.extra_payment_date || null,
+            supplier_departure_date: item.supplier_departure_date || null,
             customization_supplier_id: item.customization_supplier_id || '',
             transport_supplier_id: item.transport_supplier_id || '',
             client_transport_supplier_id: item.client_transport_supplier_id || '',
@@ -614,6 +616,7 @@ const OrderForm: React.FC = () => {
         transport_payment_date: item.transport_payment_date || null,
         layout_payment_date: item.layout_payment_date || null,
         extra_payment_date: item.extra_payment_date || null,
+        supplier_departure_date: item.supplier_departure_date || null,
         customization_supplier_id: item.customization_supplier_id || null,
         transport_supplier_id: item.transport_supplier_id || null,
         client_transport_supplier_id: item.client_transport_supplier_id || null,
@@ -720,6 +723,7 @@ const OrderForm: React.FC = () => {
       transport_payment_date: item.transport_payment_date || null,
       layout_payment_date: item.layout_payment_date || null,
       extra_payment_date: item.extra_payment_date || null,
+      supplier_departure_date: item.supplier_departure_date || null,
       customization_supplier_id: item.customization_supplier_id || null,
       transport_supplier_id: item.transport_supplier_id || null,
       client_transport_supplier_id: item.client_transport_supplier_id || null,
@@ -861,7 +865,10 @@ const OrderForm: React.FC = () => {
     if (!modalidade) newErrors.push('modalidade');
 
     if (!dataLimite) newErrors.push('dataLimite');
-    if (!supplierDepartureDate) newErrors.push('supplierDepartureDate');
+    
+    items.forEach((it, idx) => {
+      if (!it.supplier_departure_date) newErrors.push(`supplierDepartureDate-${idx}`);
+    });
 
     items.forEach((it, idx) => {
       if (!it.productName) newErrors.push(`productName-${idx}`);
@@ -955,6 +962,7 @@ const OrderForm: React.FC = () => {
         transport_payment_date: item.transport_payment_date || null,
         layout_payment_date: item.layout_payment_date || null,
         extra_payment_date: item.extra_payment_date || null,
+        supplier_departure_date: item.supplier_departure_date || null,
         customization_supplier_id: item.customization_supplier_id || null,
         transport_supplier_id: item.transport_supplier_id || null,
         client_transport_supplier_id: item.client_transport_supplier_id || null,
@@ -1568,7 +1576,18 @@ const OrderForm: React.FC = () => {
                             value={suppliersList.find(s => s.id === item.supplier_id)?.name || ''}
                           />
                         </div>
-                        <div className="col-span-6 lg:col-span-4 text-right">
+                        <div className="col-span-6 lg:col-span-3 text-right">
+                          <label className="block text-[10px] font-bold text-blue-400 uppercase mb-1">Saída do Fornec. *</label>
+                          <input
+                            type="date"
+                            lang="pt-BR"
+                            disabled={isReadOnly}
+                            className={`form-input w-full rounded-lg text-sm border-gray-300 font-bold text-gray-700 ${errors.includes(`supplierDepartureDate-${index}`) ? 'border-red-500 ring-1 ring-red-500' : ''} ${isReadOnly ? 'bg-gray-100' : ''}`}
+                            value={item.supplier_departure_date || ''}
+                            onChange={(e) => updateItem(item.id, 'supplier_departure_date', e.target.value)}
+                          />
+                        </div>
+                        <div className="col-span-6 lg:col-span-3 text-right">
                           <label className="block text-[10px] font-bold text-blue-400 uppercase mb-1">Custo Prod.</label>
                           <div className="py-2 font-bold text-blue-600">{formatCurrency(item.quantity * item.priceUnit)}</div>
                         </div>
@@ -1810,7 +1829,15 @@ const OrderForm: React.FC = () => {
                         )}
                       </div>
 
-                      <div className="flex flex-col gap-3 text-right w-full md:w-auto md:pl-4">
+                      <div className="flex flex-col gap-1 text-right w-full md:w-auto md:pl-4 mb-2">
+                        <div className="flex justify-between items-center gap-4 text-red-500">
+                          <span className="text-[10px] font-bold uppercase tracking-wider">Imposto (14%)</span>
+                          <span className="text-sm font-bold">{formatCurrency(calculateItemTotal(item) * 0.14)}</span>
+                        </div>
+                        <div className="flex justify-between items-center gap-4 text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-100">
+                          <span className="text-[10px] font-bold uppercase tracking-wider">Margem (Saldo)</span>
+                          <span className="text-sm font-black">{formatCurrency((calculateItemTotal(item) * 0.86) - ((item.quantity * (item.priceUnit || 0)) + (item.custoPersonalizacao || 0) + (item.layoutCost || 0) + (item.transpFornecedor || 0) + (item.transpCliente || 0) + (item.despesaExtra || 0)))}</span>
+                        </div>
                         <div
                           onClick={() => openPriceAdjustment(item.id, 'unit', calculateItemTotal(item) / (item.quantity || 1))}
                           className={`cursor-pointer hover:bg-white p-2 rounded-lg transition-colors group relative border border-transparent hover:border-blue-100 ${isReadOnly ? 'pointer-events-none' : ''}`}
@@ -2143,22 +2170,7 @@ const OrderForm: React.FC = () => {
                 </div>
 
                 <div className="col-span-4">
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Saída do Fornec.</label>
-                  {isReadOnly ? (
-                    <div className="form-input w-full rounded-lg text-sm border-gray-200 bg-gray-100 font-bold text-gray-700 py-2">
-                      {formatDate(supplierDepartureDate)}
-                    </div>
-                  ) : (
-                    <input
-                      type="date"
-                      lang="pt-BR"
-                      className={`form-input w-full rounded-lg text-sm ${errors.includes('supplierDepartureDate') ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-200'}`}
-                      value={supplierDepartureDate}
-                      onChange={(e) => setSupplierDepartureDate(e.target.value)}
-                    />
-                  )}
-                </div>
-                <div className="col-span-4">
+                  {/* Global supplier departure date removed - now per item */}
                   <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Limite Receb.</label>
                   {isReadOnly ? (
                     <div className="form-input w-full rounded-lg text-sm border-gray-200 bg-gray-100 font-bold text-gray-700 py-2">

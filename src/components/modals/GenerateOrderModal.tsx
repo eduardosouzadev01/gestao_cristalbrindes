@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 
 interface CommercialData {
     payment_term: string;
-    supplier_deadline: string;
+    supplier_deadline: string; // Not used anymore as global, will be removed or repurposed
     shipping_deadline: string;
     invoice_number: string;
     purchase_order: string;
@@ -10,6 +10,7 @@ interface CommercialData {
     entry_forecast_date: string;
     remaining_forecast_date: string;
     supplier_payment_dates: Record<string, string>;
+    supplier_departure_dates: Record<string, string>;
 }
 
 interface GenerateOrderModalProps {
@@ -54,11 +55,21 @@ export const GenerateOrderModal: React.FC<GenerateOrderModalProps> = ({
         return Array.from(supplierMap.entries()); // [[id, name], ...]
     }, [approvedItems, suppliersList]);
 
-    const updateSupplierDate = (supplierId: string, date: string) => {
+    const updateSupplierPaymentDate = (supplierId: string, date: string) => {
         setCommercialData({
             ...commercialData,
             supplier_payment_dates: {
                 ...commercialData.supplier_payment_dates,
+                [supplierId]: date
+            }
+        });
+    };
+
+    const updateSupplierDepartureDate = (supplierId: string, date: string) => {
+        setCommercialData({
+            ...commercialData,
+            supplier_departure_dates: {
+                ...commercialData.supplier_departure_dates || {},
                 [supplierId]: date
             }
         });
@@ -76,34 +87,54 @@ export const GenerateOrderModal: React.FC<GenerateOrderModalProps> = ({
                     </button>
                 </div>
                 <div className="p-6 space-y-5 overflow-y-auto flex-1">
-                    {/* Faturamento */}
-                    <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">Faturamento <span className="text-red-500">*</span></label>
-                        <select className="form-select block w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500" value={commercialData.payment_term} onChange={(e) => setCommercialData({ ...commercialData, payment_term: e.target.value })}>
-                            <option value="">SELECIONE...</option>
-                            <option value="50% + 50%">50% + 50%</option>
-                            <option value="À Vista">À Vista</option>
-                            <option value="Credito à vista">Credito à vista</option>
-                            <option value="Faturado 7 dias">Faturado 7 dias</option>
-                            <option value="Faturado 14 dias">Faturado 14 dias</option>
-                            <option value="Faturado 15 dias">Faturado 15 dias</option>
-                            <option value="Faturado 21 dias">Faturado 21 dias</option>
-                            <option value="Faturado 30 dias">Faturado 30 dias</option>
-                            <option value="Faturado 45 dias">Faturado 45 dias</option>
-                        </select>
-                    </div>
-
-                    {/* Datas de Saída */}
+                    {/* Faturamento e Data Limite */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">Data Saída do Fornecedor <span className="text-red-500">*</span></label>
-                            <input type="date" className="form-input block w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500" value={commercialData.supplier_deadline} onChange={(e) => setCommercialData({ ...commercialData, supplier_deadline: e.target.value })} />
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">Faturamento <span className="text-red-500">*</span></label>
+                            <select className="form-select block w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500" value={commercialData.payment_term} onChange={(e) => setCommercialData({ ...commercialData, payment_term: e.target.value })}>
+                                <option value="">SELECIONE...</option>
+                                <option value="50% + 50%">50% + 50%</option>
+                                <option value="À Vista">À Vista</option>
+                                <option value="Credito à vista">Credito à vista</option>
+                                <option value="Faturado 7 dias">Faturado 7 dias</option>
+                                <option value="Faturado 14 dias">Faturado 14 dias</option>
+                                <option value="Faturado 15 dias">Faturado 15 dias</option>
+                                <option value="Faturado 21 dias">Faturado 21 dias</option>
+                                <option value="Faturado 30 dias">Faturado 30 dias</option>
+                                <option value="Faturado 45 dias">Faturado 45 dias</option>
+                            </select>
                         </div>
                         <div>
                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">Data Limite Recebimento <span className="text-red-500">*</span></label>
                             <input type="date" className="form-input block w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500" value={commercialData.shipping_deadline} onChange={(e) => setCommercialData({ ...commercialData, shipping_deadline: e.target.value })} />
                         </div>
                     </div>
+
+                    {/* DATAS DE SAÍDA DOS FORNECEDORES - NEW SECTION */}
+                    {uniqueSuppliers.length > 0 && (
+                        <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                            <p className="text-[10px] font-bold text-blue-700 uppercase mb-3 flex items-center gap-1">
+                                <span className="material-icons-outlined text-sm">local_shipping</span> Datas de Saída do Fornecedor <span className="text-red-600 ml-1">(Obrigatório)</span>
+                            </p>
+                            <div className="space-y-3">
+                                {uniqueSuppliers.map(([suppId, suppName]) => (
+                                    <div key={suppId} className="flex items-center gap-3">
+                                        <div className="flex-1 min-w-0">
+                                            <span className="text-xs font-bold text-gray-700 truncate block">{suppName}</span>
+                                        </div>
+                                        <div className="w-48">
+                                            <input
+                                                type="date"
+                                                className="form-input block w-full rounded-lg border-blue-300 text-sm focus:border-blue-500 focus:ring-blue-500 bg-white"
+                                                value={commercialData.supplier_departure_dates?.[suppId] || ''}
+                                                onChange={(e) => updateSupplierDepartureDate(suppId, e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* PREVISÃO DE PAGAMENTOS - A RECEBER */}
                     <div className="bg-green-50 rounded-xl p-4 border border-green-200">
@@ -139,7 +170,7 @@ export const GenerateOrderModal: React.FC<GenerateOrderModalProps> = ({
                                                 type="date"
                                                 className="form-input block w-full rounded-lg border-red-300 text-sm focus:border-red-500 focus:ring-red-500 bg-white"
                                                 value={commercialData.supplier_payment_dates[suppId] || ''}
-                                                onChange={(e) => updateSupplierDate(suppId, e.target.value)}
+                                                onChange={(e) => updateSupplierPaymentDate(suppId, e.target.value)}
                                             />
                                         </div>
                                     </div>

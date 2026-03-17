@@ -195,14 +195,15 @@ const BudgetForm: React.FC = () => {
     const [isCommercialModalOpen, setIsCommercialModalOpen] = useState(false);
     const [commercialData, setCommercialData] = useState({
         payment_term: '',
-        supplier_deadline: '',
+        supplier_deadline: '', // No longer used globally in UI
         shipping_deadline: '',
         invoice_number: '',
         purchase_order: '',
         layout_info: '',
         entry_forecast_date: '',
         remaining_forecast_date: '',
-        supplier_payment_dates: {} as Record<string, string>
+        supplier_payment_dates: {} as Record<string, string>,
+        supplier_departure_dates: {} as Record<string, string>
     });
 
     // Supplier modal state
@@ -490,6 +491,7 @@ const BudgetForm: React.FC = () => {
                     despesaExtra: it.extra_expense,
                     layoutCost: it.layout_cost,
                     extraPct: it.extra_pct || 0,
+                    fator: it.calculation_factor || 1.35,
                     factorId: (factors as any[] || []).find(fct => (1 + (fct.tax_percent + fct.contingency_percent + fct.margin_percent) / 100).toFixed(4) === (it.calculation_factor || 0).toFixed(4))?.id || '',
                     isApproved: it.is_approved,
                     customization_supplier_id: it.customization_supplier_id || '',
@@ -773,6 +775,23 @@ const BudgetForm: React.FC = () => {
     };
 
     const confirmGenerateOrder = async () => {
+        // Enforce validations for mandatory fields
+        if (!commercialData.payment_term || !commercialData.shipping_deadline || !commercialData.entry_forecast_date) {
+            toast.error('Preencha todos os campos obrigatórios (Faturamento, Limite Recebimento e Previsão Entrada).');
+            return;
+        }
+
+        const approvedItems = items.filter(it => it.isApproved);
+        const supplierIds = Array.from(new Set(approvedItems.map(it => it.supplier_id).filter(Boolean)));
+        
+        // Ensure all unique product suppliers have a departure date
+        for (const suppId of supplierIds) {
+            if (!commercialData.supplier_departure_dates?.[suppId]) {
+                toast.error('Informe a data de saída para todos os fornecedores dos produtos.');
+                return;
+            }
+        }
+
         setIsCommercialModalOpen(false);
         navigate('/pedido/novo', {
             state: {
@@ -784,7 +803,7 @@ const BudgetForm: React.FC = () => {
                     clientData: clientData,
                     budget_date: dataOrcamento
                 },
-                items: items.filter(it => it.isApproved),
+                items: approvedItems,
                 commercialData: commercialData
             }
         });
@@ -1320,20 +1339,16 @@ const BudgetForm: React.FC = () => {
                                                                 </div>
 
                                                                 <div className="mt-3 pt-2 border-t border-blue-100 space-y-0.5">
-                                                                    {!isSeller && (
-                                                                        <div className="flex justify-between items-center px-1 mb-1">
-                                                                            <span className="text-[9px] font-extrabold text-green-500 uppercase">Saldo (Lucro)</span>
-                                                                            <span className="text-[11px] font-black text-green-600">{formatCurrency(calculateItemTotal(it) - ((it.quantity * (it.priceUnit || 0)) + (it.custoPersonalizacao || 0) + (it.layoutCost || 0) + (it.transpFornecedor || 0) + (it.transpCliente || 0) + (it.despesaExtra || 0)))}</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {appUser?.email === 'cristalbrindes@cristalbrindes.com.br' && (
-                                                                        <div className="flex justify-between items-center px-1 mb-1 bg-amber-50/50 rounded border border-amber-100 py-0.5">
-                                                                            <span className="text-[8px] font-black text-amber-600 uppercase">Saldo Gerência (-14%)</span>
-                                                                            <span className="text-[10px] font-black text-amber-700">
-                                                                                {formatCurrency((calculateItemTotal(it) * 0.86) - ((it.quantity * (it.priceUnit || 0)) + (it.custoPersonalizacao || 0) + (it.layoutCost || 0) + (it.transpFornecedor || 0) + (it.transpCliente || 0) + (it.despesaExtra || 0)))}
-                                                                            </span>
-                                                                        </div>
-                                                                    )}
+                                                                    <div className="flex justify-between items-center px-1">
+                                                                        <span className="text-[9px] font-extrabold text-red-400 uppercase">Imposto (14%)</span>
+                                                                        <span className="text-[10px] font-black text-red-500">{formatCurrency(calculateItemTotal(it) * 0.14)}</span>
+                                                                    </div>
+                                                                    <div className="flex justify-between items-center px-1 mb-1 bg-green-50/50 rounded border border-green-100 py-1">
+                                                                        <span className="text-[9px] font-extrabold text-green-600 uppercase">Margem (Saldo)</span>
+                                                                        <span className="text-[10px] font-black text-green-700">
+                                                                            {formatCurrency((calculateItemTotal(it) * 0.86) - ((it.quantity * (it.priceUnit || 0)) + (it.custoPersonalizacao || 0) + (it.layoutCost || 0) + (it.transpFornecedor || 0) + (it.transpCliente || 0) + (it.despesaExtra || 0)))}
+                                                                        </span>
+                                                                    </div>
                                                                     <div className="flex justify-between items-center px-1">
                                                                         <span className="text-[9px] font-extrabold text-blue-400 uppercase">Preço Unit. Venda</span>
                                                                         <span className="text-[11px] font-black text-gray-800">{formatCurrency((calculateItemTotal(it) / (it.quantity || 1)))}</span>
