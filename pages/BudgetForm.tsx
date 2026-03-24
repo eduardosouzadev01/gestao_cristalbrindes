@@ -1082,15 +1082,15 @@ const BudgetForm: React.FC = () => {
                 <DragDropContext onDragEnd={onDragEnd}>
                     <Droppable droppableId="budget-items">
                         {(provided) => (
-                            <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-2">
+                            <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-6 pt-2 pb-6">
                                 {items.map((it, idx) => (
                                     <Draggable key={String(it.id)} draggableId={String(it.id)} index={idx} isDragDisabled={status === 'PROPOSTA ACEITA'}>
                                         {(dragProvided, snapshot) => (
                                             <div
                                                 ref={dragProvided.innerRef}
                                                 {...dragProvided.draggableProps}
-                                                className={`bg-white shadow-sm rounded-lg border transition-all overflow-hidden ${snapshot.isDragging ? 'shadow-xl ring-2 ring-blue-400 rotate-[0.5deg]' :
-                                                    it.isApproved ? 'border-green-500 ring-1 ring-green-100' : 'border-gray-200'
+                                                className={`bg-white rounded-xl border-2 transition-all relative ${snapshot.isDragging ? 'shadow-2xl ring-4 ring-blue-400 rotate-[1deg] z-50 scale-[1.01]' :
+                                                    it.isApproved ? 'border-green-500 ring-4 ring-green-50 shadow-lg' : 'border-gray-200 hover:border-gray-300 shadow focus-within:border-blue-300 focus-within:shadow-md'
                                                     }`}
                                             >
                                                 {/* Compact Header for Item */}
@@ -1299,61 +1299,122 @@ const BudgetForm: React.FC = () => {
                                                             </div>
                                                         </div>
 
-                                                        {/* Direita: Cálculos e Totais */}
                                                         <div className="col-span-12 lg:col-span-4 flex flex-col gap-2">
-                                                            <div className="bg-blue-50/50 p-2.5 rounded-lg border border-blue-100 flex-1 flex flex-col justify-between">
-                                                                <div className="grid grid-cols-2 gap-3">
+                                                            <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100 flex-1 flex flex-col justify-between">
+                                                                
+                                                                {/* NEW MOCKUP OPTIONS */}
+                                                                <div className="space-y-3">
+                                                                    {/* NF */}
                                                                     <div>
-                                                                        <label className="block text-[9px] font-black text-blue-600 uppercase mb-0.5">Fator Multiplic.</label>
-                                                                        <select 
-                                                                            className="form-select w-full rounded border-blue-200 text-[10px] py-1 font-black bg-white" 
-                                                                            value={it.factorId || factors.find(f => (1 + (f.tax_percent + f.contingency_percent + f.margin_percent) / 100).toFixed(4) === (it.fator || 0).toFixed(4))?.id} 
-                                                                            onChange={e => {
-                                                                                const f = factors.find(x => x.id === e.target.value);
-                                                                                if (f) {
-                                                                                    const multiplier = 1 + (f.tax_percent + f.contingency_percent + f.margin_percent) / 100;
-                                                                                    updateItem(it.id, 'fator', multiplier);
-                                                                                    updateItem(it.id, 'factorId', f.id);
-                                                                                }
-                                                                            }} 
-                                                                            disabled={status === 'PROPOSTA ACEITA'}
-                                                                        >
-                                                                            <option value="">Selecione...</option>
-                                                                            {factors.map(f => (
-                                                                                <option key={f.id} value={f.id}>{f.name} ({(1 + (f.tax_percent + f.contingency_percent + f.margin_percent) / 100).toFixed(2)}x)</option>
+                                                                        <label className="block text-[9px] font-black text-blue-600 uppercase mb-0.5">Nota Fiscal</label>
+                                                                        <div className="flex gap-1">
+                                                                            <button className={`flex-1 py-1.5 rounded text-[10px] font-bold border transition-colors ${(it.mockNF ?? 14) === 14 ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
+                                                                                onClick={() => { updateItem(it.id, 'mockNF', 14); updateItem(it.id, 'fator', 1 + (14 + (it.mockMargin ?? 15) + (it.mockPayment ?? 0)) / 100); }}
+                                                                                disabled={status === 'PROPOSTA ACEITA'}>
+                                                                                Com NF (14%)
+                                                                            </button>
+                                                                            <button className={`flex-1 py-1.5 rounded text-[10px] font-bold border transition-colors ${(it.mockNF ?? 14) === 0 ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
+                                                                                onClick={() => { updateItem(it.id, 'mockNF', 0); updateItem(it.id, 'fator', 1 + (0 + (it.mockMargin ?? 15) + (it.mockPayment ?? 0)) / 100); }}
+                                                                                disabled={status === 'PROPOSTA ACEITA'}>
+                                                                                Sem NF (0%)
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Margem */}
+                                                                    <div>
+                                                                        <label className="flex items-center justify-between text-[9px] font-black text-blue-600 uppercase mb-0.5">
+                                                                            <span>Margem</span>
+                                                                            {(it.isManualMargin) && <span className="text-[8px] bg-yellow-100 text-yellow-800 px-1.5 tracking-tight rounded-sm">Inserido Manualmente</span>}
+                                                                        </label>
+                                                                        <div className="flex gap-1 items-center">
+                                                                            {[10, 15, 20].map(m => (
+                                                                                <button key={m} className={`flex-1 py-1.5 rounded-l text-[10px] font-bold border-y border-l transition-colors border-gray-200 ${!it.isManualMargin && (it.mockMargin ?? 15) === m ? 'bg-blue-600 text-white border-blue-600 border-r border-r-blue-600 shadow-sm z-10' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                                                                                    onClick={() => { updateItem(it.id, 'isManualMargin', false); updateItem(it.id, 'mockMargin', m); updateItem(it.id, 'fator', 1 + ((it.mockNF ?? 14) + m + (it.mockPayment ?? 0)) / 100); }}
+                                                                                    disabled={status === 'PROPOSTA ACEITA'}>
+                                                                                    {m}%
+                                                                                </button>
                                                                             ))}
-                                                                        </select>
+                                                                            <input 
+                                                                                className={`w-[60px] rounded-r border transition-all text-center py-1.5 text-[10px] font-black focus:ring-1 focus:ring-blue-500 focus:z-10 bg-white ${it.isManualMargin ? 'border-blue-500 text-blue-600 ring-1 ring-blue-500 z-10' : 'border-gray-200 text-gray-500'}`}
+                                                                                value={it.mockMargin ?? 15}
+                                                                                type="number"
+                                                                                placeholder="%"
+                                                                                onChange={(e) => { 
+                                                                                    const val = Number(e.target.value);
+                                                                                    updateItem(it.id, 'isManualMargin', true);
+                                                                                    updateItem(it.id, 'mockMargin', val);
+                                                                                    updateItem(it.id, 'fator', 1 + ((it.mockNF ?? 14) + val + (it.mockPayment ?? 0)) / 100);
+                                                                                }}
+                                                                                disabled={status === 'PROPOSTA ACEITA'}
+                                                                            />
+                                                                        </div>
                                                                     </div>
-                                                                    <div>
-                                                                        <label className="block text-[9px] font-black text-blue-600 uppercase mb-0.5">Saldo Extra (%)</label>
-                                                                        <input type="number" className="form-input w-full rounded border-blue-200 text-right py-1 text-[10px] font-black bg-white" value={it.extraPct} onChange={e => updateItem(it.id, 'extraPct', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
+
+                                                                    {/* Pagamento & Saldo */}
+                                                                    <div className="grid grid-cols-5 gap-2">
+                                                                        <div className="col-span-3">
+                                                                            <label className="block text-[9px] font-black text-blue-600 uppercase mb-0.5">Forma de Pagamento</label>
+                                                                            <select 
+                                                                                className="form-select w-full rounded border-gray-200 text-[10px] py-1.5 font-bold bg-white focus:border-blue-500 focus:ring-blue-500 transition-colors" 
+                                                                                value={it.mockPaymentDesc || '50% + 50% (0%)'}
+                                                                                onChange={e => {
+                                                                                    const desc = e.target.value;
+                                                                                    const val = desc.includes('(0%)') ? 0 : desc.includes('(+3%)') ? 3 : desc.includes('(+4%)') ? 4 : desc.includes('(+8%)') ? 8 : 0;
+                                                                                    updateItem(it.id, 'mockPaymentDesc', desc);
+                                                                                    updateItem(it.id, 'mockPayment', val);
+                                                                                    updateItem(it.id, 'fator', 1 + ((it.mockNF ?? 14) + (it.mockMargin ?? 15) + val) / 100);
+                                                                                }}
+                                                                                disabled={status === 'PROPOSTA ACEITA'}
+                                                                            >
+                                                                                <option value="50% + 50% (0%)">50% + 50% (0%)</option>
+                                                                                <option value="À vista (0%)">À vista (0%)</option>
+                                                                                <option value="1x no Crédito (+3%)">1x no Crédito (+3%)</option>
+                                                                                <option value="Até 15 dias (+4%)">Até 15 dias (+4%)</option>
+                                                                                <option value="Até 30 dias (+8%)">Até 30 dias (+8%)</option>
+                                                                            </select>
+                                                                        </div>
+                                                                        <div className="col-span-2">
+                                                                            <label className="block text-[9px] font-black text-blue-600 uppercase mb-0.5">Saldo Extra (%)</label>
+                                                                            <input type="number" className="form-input w-full rounded border-gray-200 text-center py-1.5 text-[10px] font-bold bg-white focus:border-blue-500 focus:ring-blue-500 transition-colors" value={it.extraPct} onChange={e => updateItem(it.id, 'extraPct', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
+                                                                        </div>
                                                                     </div>
-                                                                    <div>
-                                                                        <label className="block text-[9px] font-black text-gray-500 uppercase mb-0.5">BV (%)</label>
-                                                                        <input type="number" className="form-input w-full rounded border-gray-200 text-right py-1 text-[10px] font-bold bg-white" value={it.bvPct} onChange={e => updateItem(it.id, 'bvPct', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
-                                                                    </div>
-                                                                    <div className="flex flex-col justify-end items-end text-right">
-                                                                        <span className="text-[8px] font-bold text-gray-400 uppercase leading-none">Custo Total Item</span>
-                                                                        <span className="text-xs font-black text-gray-700">{formatCurrency((it.quantity * it.priceUnit) + (it.custoPersonalizacao + it.layoutCost + it.transpFornecedor + it.transpCliente + it.despesaExtra))}</span>
+
+                                                                    {/* Custo Total and BV */}
+                                                                    <div className="grid grid-cols-2 flex items-center justify-between mt-3 gap-2 border-t pt-2 border-blue-100">
+                                                                        <div>
+                                                                            <label className="block text-[9px] font-black text-gray-500 uppercase mb-0.5">BV (%)</label>
+                                                                            <input type="number" className="form-input w-16 rounded border-gray-200 py-1 text-[10px] font-bold bg-white text-center focus:border-blue-500 focus:ring-blue-500 transition-colors" value={it.bvPct} onChange={e => updateItem(it.id, 'bvPct', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
+                                                                        </div>
+                                                                        <div className="flex flex-col justify-end items-end text-right">
+                                                                            <span className="text-[8px] font-bold text-gray-400 uppercase leading-none">Custo Total Item</span>
+                                                                            <span className="text-sm font-black text-gray-700">{formatCurrency((it.quantity * (it.priceUnit || 0)) + (it.custoPersonalizacao || 0) + (it.layoutCost || 0) + (it.transpFornecedor || 0) + (it.transpCliente || 0) + (it.despesaExtra || 0))}</span>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
 
-                                                                <div className="mt-3 pt-2 border-t border-blue-100 space-y-0.5">
+                                                                <div className="mt-4 pt-3 border-t border-blue-200 space-y-1">
                                                                     <div className="flex justify-between items-center px-1">
-                                                                        <span className="text-[9px] font-extrabold text-red-400 uppercase">Imposto (14%)</span>
-                                                                        <span className="text-[10px] font-black text-red-500">{formatCurrency(calculateItemTotal(it) * 0.14)}</span>
+                                                                        <span className="text-[9px] font-black text-red-500 uppercase">Imposto ({(it.mockNF ?? 14)}%)</span>
+                                                                        <span className="text-[10px] font-bold text-red-500">{formatCurrency(calculateItemTotal(it) * ((it.mockNF ?? 14)/100))}</span>
                                                                     </div>
-                                                                    <div className="flex justify-between items-center px-1 mb-1 bg-green-50/50 rounded border border-green-100 py-1">
-                                                                        <span className="text-[9px] font-extrabold text-green-600 uppercase">Margem (Saldo)</span>
-                                                                        <span className="text-[10px] font-black text-green-700">
-                                                                            {formatCurrency((calculateItemTotal(it) * 0.86) - ((it.quantity * (it.priceUnit || 0)) + (it.custoPersonalizacao || 0) + (it.layoutCost || 0) + (it.transpFornecedor || 0) + (it.transpCliente || 0) + (it.despesaExtra || 0)))}
+                                                                    <div className="flex justify-between items-center px-1.5 mb-1.5 bg-green-50 rounded border border-green-200 py-1.5">
+                                                                        <span className="text-[9px] font-black text-green-700 uppercase">Margem (Saldo)</span>
+                                                                        <span className="text-[10px] font-bold text-green-700">
+                                                                            {formatCurrency((calculateItemTotal(it) * (1 - ((it.mockNF ?? 14)/100))) - ((it.quantity * (it.priceUnit || 0)) + (it.custoPersonalizacao || 0) + (it.layoutCost || 0) + (it.transpFornecedor || 0) + (it.transpCliente || 0) + (it.despesaExtra || 0)))}
                                                                         </span>
                                                                     </div>
+                                                                    {((it.mockPayment ?? 0) > 0) && (
+                                                                        <div className="flex justify-between items-center px-1">
+                                                                            <span className="text-[9px] font-black text-orange-500 uppercase">Acrésc. Pgto ({(it.mockPayment ?? 0)}%)</span>
+                                                                            <span className="text-[10px] font-bold text-orange-500">{formatCurrency(calculateItemTotal(it) * ((it.mockPayment ?? 0)/100))}</span>
+                                                                        </div>
+                                                                    )}
                                                                     <div className="flex justify-between items-center px-1">
-                                                                        <span className="text-[9px] font-extrabold text-blue-400 uppercase">Preço Unit. Venda</span>
+                                                                        <span className="text-[9px] font-black text-blue-500 uppercase">Preço Unit. Venda</span>
                                                                         <span className="text-[11px] font-black text-gray-800">{formatCurrency((calculateItemTotal(it) / (it.quantity || 1)))}</span>
                                                                     </div>
-                                                                    <div className="flex justify-between items-baseline bg-blue-600 p-1.5 rounded shadow-sm">
+                                                                    <div className="flex justify-between items-baseline bg-blue-600 p-2 rounded shadow my-1">
                                                                         <span className="text-[10px] font-black uppercase text-white tracking-widest">TOTAL VENDA</span>
                                                                         <span className="text-xl font-black text-white">{formatCurrency(calculateItemTotal(it))}</span>
                                                                     </div>
