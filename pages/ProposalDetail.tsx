@@ -60,7 +60,7 @@ const ProposalDetail: React.FC = () => {
             email: 'cristalbrindes@cristalbrindes.com.br',
             phone: '(27) 99992-0408',
             address: 'RUA PORTO ALEGRE, 590 - ALTEROSAS - CEP: 29167-036 - SERRA - ES',
-            logo: '/img/Cristal Brindes 3.png'
+            logo: 'img/logo.png'
         },
         'NATUREZA': {
             name: 'Natureza Brindes',
@@ -76,7 +76,7 @@ const ProposalDetail: React.FC = () => {
             email: 'vendas@espiritobrindes.com.br',
             phone: '(27) 99992-0408',
             address: 'RUA PORTO ALEGRE, 590 - ALTEROSAS - CEP: 29167-036 - SERRA - ES',
-            logo: '/img/Cristal Brindes 3.png'
+            logo: 'img/logo.png'
         }
     };
 
