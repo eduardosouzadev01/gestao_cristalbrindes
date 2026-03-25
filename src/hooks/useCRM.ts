@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 export interface Lead {
     id: string;
     client_name: string;
+    client_contact_name?: string;
     client_phone?: string;
     client_email?: string;
     client_doc?: string;

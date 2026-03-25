@@ -27,6 +27,7 @@ const formatPhone = (value: string) => {
 // --- Schema de Validação (O "banco de dados" não aceita falhas) ---
 const registrationSchema = z.object({
   name: z.string().min(3, 'O nome deve ter no mínimo 3 caracteres'),
+  contact_name: z.string().optional().or(z.literal('')),
   doc: z.string().min(14, 'Documento inválido'),
   phone: z.string().min(14, 'Telefone incompleto'),
   email: z.string().email('E-mail inválido'),
@@ -123,6 +124,7 @@ const RegistrationForm: React.FC = () => {
         setPartnerType(data.type);
         reset({
           name: data.name || '',
+          contact_name: data.contact_name || '',
           doc: data.doc || '',
           phone: data.phone || '',
           email: data.email || '',
@@ -204,6 +206,16 @@ const RegistrationForm: React.FC = () => {
                   placeholder="Nome completo ou Razão Social"
                 />
                 {errors.name && <span className="text-red-500 text-xs mt-1 block">{errors.name.message}</span>}
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Nome do Contato</label>
+                <input
+                  {...register('contact_name')}
+                  className={`form-input w-full rounded-xl py-3 ${errors.contact_name ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'}`}
+                  placeholder="Nome da pessoa responsável pela conta"
+                />
+                {errors.contact_name && <span className="text-red-500 text-xs mt-1 block">{errors.contact_name.message}</span>}
               </div>
 
               <div>

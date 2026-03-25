@@ -62,8 +62,8 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                 onClick={() => !disabled && setIsOpen(!isOpen)}
                 className={`form-input w-full rounded-lg flex justify-between items-center cursor-pointer bg-white py-2 ${error ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300'} ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
             >
-                <span className={(search || value) ? "text-gray-900" : "text-gray-400"}>{search || value || placeholder || "Selecione..."}</span>
-                <span className="material-icons-outlined text-gray-400">expand_more</span>
+                <span className={`truncate flex-1 min-w-0 ${(search || value) ? "text-gray-900" : "text-gray-400"}`}>{search || value || placeholder || "Selecione..."}</span>
+                <span className="material-icons-outlined text-gray-400 flex-shrink-0 ml-1">expand_more</span>
             </div>
 
             {isOpen && !disabled && (

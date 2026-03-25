@@ -23,8 +23,8 @@ const ClientList: React.FC = () => {
       let query = supabase.from('partners').select('*').eq('type', 'CLIENTE');
 
       if (search && search.trim()) {
-        const s = search.trim();
-        query = query.or(`name.ilike.%${s}%,doc.ilike.%${s}%,phone.ilike.%${s}%,email.ilike.%${s}%,salesperson.ilike.%${s}%`);
+        const s = search.trim().replace(/"/g, '""');
+        query = query.or(`name.ilike."%${s}%",doc.ilike."%${s}%",phone.ilike."%${s}%",email.ilike."%${s}%",salesperson.ilike."%${s}%"`);
       }
 
       const { data, error } = await query.order('name').limit(1000);

@@ -51,15 +51,18 @@ const BudgetList: React.FC = () => {
             if (location.state?.clientId) {
                 query = query.eq('client_id', location.state.clientId);
             } else if (searchTerm) {
+                // Escape searchTerm to prevent PostgREST .or() parsing errors with parenthesis/commas
+                const safeSearchTerm = searchTerm.replace(/"/g, '""');
+                
                 const { data: matchedPartners } = await supabase
                     .from('partners')
                     .select('id')
-                    .or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,doc.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`);
+                    .or(`name.ilike."%${safeSearchTerm}%",email.ilike."%${safeSearchTerm}%",doc.ilike."%${safeSearchTerm}%",phone.ilike."%${safeSearchTerm}%"`);
 
                 const pIds = matchedPartners?.map((p: any) => p.id) || [];
 
                 if (pIds.length > 0) {
-                    query = query.or(`budget_number.ilike.%${searchTerm}%,client_id.in.(${pIds.join(',')})`);
+                    query = query.or(`budget_number.ilike."%${safeSearchTerm}%",client_id.in.(${pIds.join(',')})`);
                 } else {
                     query = query.ilike('budget_number', `%${searchTerm}%`);
                 }

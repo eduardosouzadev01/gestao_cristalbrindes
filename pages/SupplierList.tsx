@@ -24,8 +24,8 @@ const SupplierList: React.FC = () => {
       let query = supabase.from('partners').select('*').eq('type', 'FORNECEDOR');
 
       if (search && search.trim()) {
-        const s = search.trim();
-        query = query.or(`name.ilike.%${s}%,doc.ilike.%${s}%,phone.ilike.%${s}%,email.ilike.%${s}%`);
+        const s = search.trim().replace(/"/g, '""');
+        query = query.or(`name.ilike."%${s}%",doc.ilike."%${s}%",phone.ilike."%${s}%",email.ilike."%${s}%"`);
       }
 
       const { data, error } = await query.order('name').limit(1000);

@@ -41,6 +41,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     const [suppliers, setSuppliers] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
     const [isQuickSupplierModalOpen, setIsQuickSupplierModalOpen] = useState(false);
     const [newSupplier, setNewSupplier] = useState<NewSupplierData>({
         name: '',
@@ -109,8 +110,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         }
     };
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
+    const uploadFile = async (file: File) => {
         if (!file) return;
 
         // Validar tipo de arquivo
@@ -128,8 +128,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             const filePath = fileName;
 
             // Fazer upload para o bucket 'products'
-            // Nota: Assumimos que o bucket existe ou o cliente tem permissão para criar/usar
-            const { data, error } = await supabase.storage
+            const { error } = await supabase.storage
                 .from('products')
                 .upload(filePath, file);
 
@@ -153,6 +152,29 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         } finally {
             setUploading(false);
         }
+    };
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) uploadFile(file);
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        
+        const file = e.dataTransfer.files?.[0];
+        if (file) uploadFile(file);
     };
 
     const handleSave = async () => {
@@ -298,7 +320,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 
                         <div className="md:col-span-2">
                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Foto do Produto</label>
-                            <div className="mt-1 flex items-center gap-4 p-4 border-2 border-dashed border-gray-200 rounded-xl hover:border-blue-400 transition-all bg-gray-50/30 group">
+                            <div 
+                                className={`mt-1 flex items-center gap-4 p-4 border-2 border-dashed rounded-xl transition-all bg-gray-50/30 group ${isDragging ? 'border-blue-500 bg-blue-50/50 scale-[1.01]' : 'border-gray-200 hover:border-blue-400'}`}
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
+                            >
                                 <div className="w-24 h-24 bg-white rounded-lg overflow-hidden flex-shrink-0 border border-gray-100 shadow-sm flex items-center justify-center">
                                     {formData.image_url ? (
                                         <img src={formData.image_url} alt="Preview" className="w-full h-full object-cover" />

@@ -11,6 +11,8 @@ import { maskPhone, maskCpfCnpj } from '../src/utils/maskUtils';
 import { GenerateOrderModal } from '../src/components/modals/GenerateOrderModal';
 import { QuickSupplierModal, NewSupplierData } from '../src/components/modals/QuickSupplierModal';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import RichTextEditor from '../src/components/common/RichTextEditor';
+import { ProposalsHistoryModal } from '../src/components/modals/ProposalsHistoryModal';
 
 
 // --- Custom Select Wrapper ---
@@ -60,10 +62,10 @@ const CustomSelect: React.FC<{
                 onClick={() => !disabled && setIsOpen(!isOpen)}
                 className={`form-input w-full rounded border-gray-300 flex justify-between items-center cursor-pointer bg-white py-0.5 px-2 transition-all hover:border-blue-400 ${error ? 'ring-1 ring-red-500 border-red-500' : ''} ${disabled ? 'bg-gray-100 select-none' : 'hover:shadow-sm'}`}
             >
-                <span className={`truncate text-[11px] font-semibold ${!(search || value) ? 'text-gray-400' : 'text-gray-900'}`}>
+                <span className={`truncate flex-1 min-w-0 text-[11px] font-semibold ${!(search || value) ? 'text-gray-400' : 'text-gray-900'}`}>
                     {value || search || placeholder || "Selecione..."}
                 </span>
-                <span className={`material-icons-outlined text-sm transition-transform duration-200 ${isOpen ? 'rotate-180 text-blue-500' : 'text-gray-400'}`}>expand_more</span>
+                <span className={`material-icons-outlined text-sm flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180 text-blue-500' : 'text-gray-400'}`}>expand_more</span>
             </div>
             {isOpen && !disabled && (
                 <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-150">
@@ -206,10 +208,13 @@ const BudgetForm: React.FC = () => {
         supplier_departure_dates: {} as Record<string, string>
     });
 
-    // Supplier modal state
     const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
     const [newSupplier, setNewSupplier] = useState({ name: '', doc: '', phone: '', email: '', supplier_category: 'PRODUTOS' });
     const [supplierModalContext, setSupplierModalContext] = useState<{ itemId: string | number, field: string } | null>(null);
+
+    // History modal state
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [proposalsHistory, setProposalsHistory] = useState<any[]>([]);
 
     // --- useOrderItems hook ---
     const {
@@ -479,6 +484,52 @@ const BudgetForm: React.FC = () => {
                     });
                 }
 
+                const fator = it.calculation_factor || 1.35;
+                const totalPct = Math.round((fator - 1) * 100);
+                
+                let mockNF = 14;
+                let mockPayment = 0;
+                let mockPaymentDesc = '50% + 50% (0%)';
+                let mockMargin = totalPct - mockNF - mockPayment;
+                
+                // Try to deduce exact match to standard margins
+                const standardMargins = [10, 15, 20];
+                const paymentOptions = [
+                    { val: 0, desc: '50% + 50% (0%)' },
+                    { val: 0, desc: 'À vista (0%)' },
+                    { val: 3, desc: '1x no Crédito (+3%)' },
+                    { val: 4, desc: 'Até 15 dias (+4%)' },
+                    { val: 8, desc: 'Até 30 dias (+8%)' }
+                ];
+                
+                let foundMatch = false;
+                for (const nf of [14, 0]) {
+                    for (const margin of standardMargins) {
+                        for (const pay of paymentOptions) {
+                            if (nf + margin + pay.val === totalPct) {
+                                mockNF = nf;
+                                mockMargin = margin;
+                                mockPayment = pay.val;
+                                mockPaymentDesc = pay.desc;
+                                foundMatch = true;
+                                break;
+                            }
+                        }
+                        if (foundMatch) break;
+                    }
+                    if (foundMatch) break;
+                }
+                
+                // If no exact match to standard margins, just assume NF=14(or 0 if total is small) and no payment tax
+                if (!foundMatch) {
+                    if (totalPct < 14) mockNF = 0;
+                    mockPayment = 0;
+                    mockPaymentDesc = '50% + 50% (0%)';
+                    mockMargin = totalPct - mockNF - mockPayment;
+                }
+                
+                const isManualMargin = !standardMargins.includes(mockMargin);
+
                 return {
                     id: it.id,
                     productName: it.product_name,
@@ -491,7 +542,13 @@ const BudgetForm: React.FC = () => {
                     despesaExtra: it.extra_expense,
                     layoutCost: it.layout_cost,
                     extraPct: it.extra_pct || 0,
-                    fator: it.calculation_factor || 1.35,
+                    bvPct: it.bv_pct || 0,
+                    fator: fator,
+                    mockNF,
+                    mockMargin,
+                    mockPayment,
+                    mockPaymentDesc,
+                    isManualMargin,
                     factorId: (factors as any[] || []).find(fct => (1 + (fct.tax_percent + fct.contingency_percent + fct.margin_percent) / 100).toFixed(4) === (it.calculation_factor || 0).toFixed(4))?.id || '',
                     isApproved: it.is_approved,
                     customization_supplier_id: it.customization_supplier_id || '',
@@ -719,13 +776,14 @@ const BudgetForm: React.FC = () => {
             const itemsSnapshot = approvedItems.map(it => {
                 const productMeta = productMap[it.productName] || {};
                 const sellingPrice = Number((calculateItemTotal(it) / (it.quantity || 1)).toFixed(2));
+                const itemTotalValue = sellingPrice * (it.quantity || 1);
                 return {
                     id: it.id,
                     product_name: it.productName,
                     quantity: it.quantity,
                     unit_price: sellingPrice,
                     calculation_factor: it.fator,
-                    total_item_value: calculateItemTotal(it),
+                    total_item_value: itemTotalValue,
                     product_description: it.productDescription || productMeta.description || '',
                     product_image_url: it.productImage || productMeta.image_url || '',
                     product_code: it.productCode || productMeta.code || '',
@@ -769,6 +827,28 @@ const BudgetForm: React.FC = () => {
             navigate(`/proposta/${data.id}`);
         } catch (error: any) {
             toast.error('Erro ao gerar proposta: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchProposalsHistory = async () => {
+        if (!activeId || activeId === 'novo') {
+            toast.info('Salve o orçamento para ver o histórico.');
+            return;
+        }
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('proposals')
+                .select('*')
+                .eq('budget_id', activeId)
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            setProposalsHistory(data || []);
+            setIsHistoryModalOpen(true);
+        } catch (err: any) {
+            toast.error('Erro ao carregar histórico: ' + err.message);
         } finally {
             setLoading(false);
         }
@@ -949,10 +1029,22 @@ const BudgetForm: React.FC = () => {
                                 <span className="material-icons-outlined text-base">save</span>
                                 {loading && !isAutoSaving ? 'Salvando...' : 'Salvar'}
                             </button>
-                            <button onClick={handleGenerateProposal} className="h-9 px-4 rounded-lg shadow-sm text-[10px] font-black text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition-all uppercase flex items-center justify-center gap-2 active:scale-95 leading-none">
-                                <span className="material-icons-outlined text-base">picture_as_pdf</span>
-                                Proposta
-                            </button>
+                            <div className="flex bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden hover:border-blue-300 transition-all group">
+                                <button 
+                                    onClick={fetchProposalsHistory} 
+                                    className="h-9 px-3 bg-gray-50/30 hover:bg-blue-50 transition-all text-gray-400 hover:text-blue-500 flex items-center justify-center border-r border-gray-200 group/hist" 
+                                    title="Ver Histórico de Propostas"
+                                >
+                                    <span className="material-icons-outlined text-[18px] group-hover/hist:rotate-[-15deg] transition-transform">history</span>
+                                </button>
+                                <button 
+                                    onClick={handleGenerateProposal} 
+                                    className="h-9 px-4 text-[10px] font-black text-gray-700 hover:bg-gray-50/50 transition-all uppercase flex items-center justify-center gap-2 active:scale-95 leading-none bg-white group/pdf"
+                                >
+                                    <span className="material-icons-outlined text-[18px] text-blue-500 group-hover/pdf:scale-110 transition-transform">picture_as_pdf</span>
+                                    Proposta
+                                </button>
+                            </div>
                             <button onClick={handleGenerateOrderClick} className="h-9 px-4 rounded-lg shadow-sm text-[10px] font-black text-white bg-blue-500 hover:bg-blue-600 transition-all uppercase flex items-center justify-center gap-2 active:scale-95 leading-none">
                                 <span className="material-icons-outlined text-base">shopping_cart</span>
                                 Gerar Pedido
@@ -1095,7 +1187,7 @@ const BudgetForm: React.FC = () => {
                                             >
                                                 {/* Compact Header for Item */}
                                                 <div className={`px-2 py-1 border-b flex justify-between items-center ${it.isApproved ? 'bg-green-50/50 border-green-100' : 'bg-gray-50 border-gray-100'}`}>
-                                                    <div className="flex items-center gap-2">
+                                                    <div className="flex items-center gap-2 min-w-0 flex-1">
                                                         {/* Drag Handle */}
                                                         <div
                                                             {...dragProvided.dragHandleProps}
@@ -1104,8 +1196,8 @@ const BudgetForm: React.FC = () => {
                                                         >
                                                             <span className="material-icons-outlined text-base">drag_indicator</span>
                                                         </div>
-                                                        <span className="bg-gray-800 text-white text-[9px] font-black px-1.5 py-0.5 rounded leading-none">ITEM {idx + 1}</span>
-                                                        <span className={`text-[11px] font-black uppercase tracking-tight ${it.isApproved ? 'text-green-700' : 'text-gray-600'}`}>
+                                                        <span className="bg-gray-800 text-white text-[9px] font-black px-1.5 py-0.5 rounded leading-none flex-shrink-0">ITEM {idx + 1}</span>
+                                                        <span className={`text-[11px] font-black uppercase tracking-tight truncate flex-1 min-w-0 ${it.isApproved ? 'text-green-700' : 'text-gray-600'}`}>
                                                             {it.productName || 'Escolher Produto...'}
                                                         </span>
                                                     </div>
@@ -1136,13 +1228,14 @@ const BudgetForm: React.FC = () => {
                                                                              <img src={it.productImage} alt="Thumbnail" className="w-full h-full object-contain" />
                                                                          </div>
                                                                      )}
-                                                                     <div className="flex-1">
+                                                                     <div className="flex-1 min-w-0">
                                                                          <CustomSelect
                                                                              label=""
                                                                              options={productsList}
                                                                              onSelect={p => {
                                                                                  updateItem(it.id, 'productName', p.name);
-                                                                                 updateItem(it.id, 'productDescription', p.description || '');
+                                                                                 const desc = p.description ? p.description.replace(/\n/g, '<br>') : '';
+                                                                                 updateItem(it.id, 'productDescription', desc);
                                                                                  updateItem(it.id, 'productColor', p.color || '');
                                                                                  updateItem(it.id, 'productImage', p.image_url || '');
                                                                                  updateItem(it.id, 'variations', p.variations || []);
@@ -1238,11 +1331,11 @@ const BudgetForm: React.FC = () => {
                                                                     <div className="flex items-center gap-2 mb-1">
                                                                         <label className="text-[9px] font-black text-gray-400 uppercase">Descrição do Item (Orçamento/Proposta)</label>
                                                                     </div>
-                                                                    <textarea
-                                                                        className="form-textarea w-full text-[10px] rounded border-gray-200 py-1 h-14 resize-none focus:ring-1 focus:ring-blue-500"
+                                                                    <RichTextEditor
+                                                                        className="w-full text-[10px] rounded border-gray-200 py-1"
                                                                         value={it.productDescription || ''}
-                                                                        onChange={e => updateItem(it.id, 'productDescription', e.target.value)}
-                                                                        placeholder="Descrição opcional para aparecer no orçamento e na proposta..."
+                                                                        onChange={val => updateItem(it.id, 'productDescription', val)}
+                                                                        placeholder="Descrição opcional..."
                                                                         disabled={status === 'PROPOSTA ACEITA'}
                                                                     />
                                                                 </div>
@@ -1382,9 +1475,16 @@ const BudgetForm: React.FC = () => {
 
                                                                     {/* Custo Total and BV */}
                                                                     <div className="grid grid-cols-2 flex items-center justify-between mt-3 gap-2 border-t pt-2 border-blue-100">
-                                                                        <div>
+                                                                         <div>
                                                                             <label className="block text-[9px] font-black text-gray-500 uppercase mb-0.5">BV (%)</label>
-                                                                            <input type="number" className="form-input w-16 rounded border-gray-200 py-1 text-[10px] font-bold bg-white text-center focus:border-blue-500 focus:ring-blue-500 transition-colors" value={it.bvPct} onChange={e => updateItem(it.id, 'bvPct', Number(e.target.value))} disabled={status === 'PROPOSTA ACEITA'} />
+                                                                            <input 
+                                                                                type="number" 
+                                                                                min="0" 
+                                                                                className="form-input w-16 rounded border-gray-200 py-1 text-[10px] font-bold bg-white text-center focus:border-blue-500 focus:ring-blue-500 transition-colors" 
+                                                                                value={it.bvPct} 
+                                                                                onChange={e => updateItem(it.id, 'bvPct', Math.max(0, Number(e.target.value)))} 
+                                                                                disabled={status === 'PROPOSTA ACEITA'} 
+                                                                            />
                                                                         </div>
                                                                         <div className="flex flex-col justify-end items-end text-right">
                                                                             <span className="text-[8px] font-bold text-gray-400 uppercase leading-none">Custo Total Item</span>
@@ -1398,10 +1498,28 @@ const BudgetForm: React.FC = () => {
                                                                         <span className="text-[9px] font-black text-red-500 uppercase">Imposto ({(it.mockNF ?? 14)}%)</span>
                                                                         <span className="text-[10px] font-bold text-red-500">{formatCurrency(calculateItemTotal(it) * ((it.mockNF ?? 14)/100))}</span>
                                                                     </div>
+                                                                    
+                                                                    {(it.bvPct > 0) && (
+                                                                        <div className="flex justify-between items-center px-1">
+                                                                            <span className="text-[9px] font-black text-amber-600 uppercase">BV ({it.bvPct}%)</span>
+                                                                            <span className="text-[10px] font-bold text-amber-600">{formatCurrency(calculateItemTotal(it) * (it.bvPct / 100))}</span>
+                                                                        </div>
+                                                                    )}
+
+                                                                    {(it.extraPct > 0) && (
+                                                                        <div className="flex justify-between items-center px-1">
+                                                                            <span className="text-[9px] font-black text-indigo-500 uppercase">Saldo Extra ({it.extraPct}%)</span>
+                                                                            <span className="text-[10px] font-bold text-indigo-500">{formatCurrency(calculateItemTotal(it) * (it.extraPct / 100))}</span>
+                                                                        </div>
+                                                                    )}
+
                                                                     <div className="flex justify-between items-center px-1.5 mb-1.5 bg-green-50 rounded border border-green-200 py-1.5">
                                                                         <span className="text-[9px] font-black text-green-700 uppercase">Margem (Saldo)</span>
                                                                         <span className="text-[10px] font-bold text-green-700">
-                                                                            {formatCurrency((calculateItemTotal(it) * (1 - ((it.mockNF ?? 14)/100))) - ((it.quantity * (it.priceUnit || 0)) + (it.custoPersonalizacao || 0) + (it.layoutCost || 0) + (it.transpFornecedor || 0) + (it.transpCliente || 0) + (it.despesaExtra || 0)))}
+                                                                            {formatCurrency(
+                                                                                (calculateItemTotal(it) * (1 - ((it.mockNF ?? 14)/100) - (it.bvPct / 100) - (it.extraPct / 100) - ((it.mockPayment ?? 0)/100))) - 
+                                                                                ((it.quantity * (it.priceUnit || 0)) + (it.custoPersonalizacao || 0) + (it.layoutCost || 0) + (it.transpFornecedor || 0) + (it.transpCliente || 0) + (it.despesaExtra || 0))
+                                                                            )}
                                                                         </span>
                                                                     </div>
                                                                     {((it.mockPayment ?? 0) > 0) && (
@@ -1532,6 +1650,12 @@ const BudgetForm: React.FC = () => {
                 setNewSupplier={setNewSupplier}
                 onSave={handleSaveSupplier}
                 loading={loading}
+            />
+
+            <ProposalsHistoryModal
+                isOpen={isHistoryModalOpen}
+                onClose={() => setIsHistoryModalOpen(false)}
+                proposals={proposalsHistory}
             />
         </div>
     );

@@ -552,7 +552,6 @@
            ACCESSIBILITY: Reduced Motion Support
            ========================================== */
         @media (prefers-reduced-motion: reduce) {
-
             *,
             *::before,
             *::after {
@@ -560,6 +559,35 @@
                 animation-iteration-count: 1 !important;
                 transition-duration: 0.01ms !important;
             }
+        }
+
+        /* ─── RICH TEXT CONTENT ─── */
+        .rich-text-content ul, 
+        [contenteditable] ul {
+            list-style-type: disc !important;
+            padding-left: 1.25rem !important;
+            margin: 0.5rem 0 !important;
+        }
+        .rich-text-content ol,
+        [contenteditable] ol {
+            list-style-type: decimal !important;
+            padding-left: 1.25rem !important;
+            margin: 0.5rem 0 !important;
+        }
+        .rich-text-content li,
+        [contenteditable] li {
+            margin-bottom: 0.125rem !important;
+            display: list-item !important;
+        }
+        .rich-text-content b, .rich-text-content strong, [contenteditable] b, [contenteditable] strong {
+            font-weight: 900 !important;
+            color: #000000 !important;
+        }
+        .rich-text-content i, .rich-text-content em, [contenteditable] i, [contenteditable] em {
+            font-style: italic !important;
+        }
+        .rich-text-content u, [contenteditable] u {
+            text-decoration: underline !important;
         }
     </style>
     <script>

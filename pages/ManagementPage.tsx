@@ -45,7 +45,7 @@ const ManagementPage: React.FC = () => {
         status: 'ATENDIMENTO',
         salesperson: userSalesperson || 'VENDAS 01',
         priority: 'NORMAL',
-        client_name: '', client_phone: '', client_email: '', client_doc: ''
+        client_name: '', client_contact_name: '', client_phone: '', client_email: '', client_doc: ''
     };
 
     const tabParam = searchParams.get('tab') as 'LEADS' | 'PERFORMANCE' | 'FINANCEIRO' | 'TRANSFERENCIAS' | null;
@@ -240,6 +240,7 @@ const ManagementPage: React.FC = () => {
             setNewLead({
                 ...baseLead,
                 client_name: foundClient.name,
+                client_contact_name: foundClient.contact_name || '',
                 client_phone: foundClient.phone,
                 client_email: foundClient.email,
                 client_doc: foundClient.doc || '',
@@ -253,6 +254,7 @@ const ManagementPage: React.FC = () => {
             setNewLead({
                 ...baseLead,
                 client_name: '',
+                client_contact_name: '',
                 client_phone: !isEmail ? term : '',
                 client_email: isEmail ? term : '',
                 client_doc: ''
@@ -295,6 +297,7 @@ const ManagementPage: React.FC = () => {
         setNewLead({
             ...newLead,
             client_name: client.name,
+            client_contact_name: client.contact_name || '',
             client_phone: client.phone,
             client_email: client.email || '',
             client_doc: client.doc || ''
@@ -314,6 +317,7 @@ const ManagementPage: React.FC = () => {
         try {
             const partnerPayload = {
                 name: newLead.client_name,
+                contact_name: newLead.client_contact_name || null,
                 phone: newLead.client_phone,
                 email: newLead.client_email,
                 doc: newLead.client_doc,
@@ -375,6 +379,7 @@ const ManagementPage: React.FC = () => {
             if (!partnerSaved && newLead.client_name) {
                 const partnerPayload = {
                     name: newLead.client_name,
+                    contact_name: newLead.client_contact_name || null,
                     phone: newLead.client_phone,
                     email: newLead.client_email,
                     doc: newLead.client_doc,
@@ -943,7 +948,8 @@ const ManagementPage: React.FC = () => {
         return name.substring(0, 2).toUpperCase();
     };
 
-    const compactMode = true;
+    const [compactMode, setCompactMode] = useState(true);
+    const [isFullscreen, setIsFullscreen] = useState(false);
 
     // Checklist State
     const [checklistItems, setChecklistItems] = useState<{ id: string; text: string; completed: boolean }[]>([]);
@@ -1050,20 +1056,49 @@ const ManagementPage: React.FC = () => {
                     <div className="flex justify-between items-center mb-6">
                         <div className="flex items-center gap-3">
                         </div>
-                        <button onClick={() => {
-                            setNewLead({ ...initialLeadState, salesperson: isSeller ? appUser?.salesperson : 'VENDAS 01' });
-                            setEditingLead(null);
-                            setShowClientForm(false);
-                            setPartnerSaved(false);
-                            setIsLeadModalOpen(true);
-                        }} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold uppercase text-xs hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center gap-2">
-                            <span className="material-icons-outlined">add</span> Novo Atendimento
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button onClick={() => setIsFullscreen(!isFullscreen)} className="px-3 py-3 bg-white border border-gray-200 text-gray-600 rounded-xl font-bold uppercase text-xs hover:bg-gray-50 flex items-center gap-2 transition-all shadow-sm">
+                                <span className="material-icons-outlined">{isFullscreen ? 'fullscreen_exit' : 'fullscreen'}</span>
+                                <span className="hidden md:inline">{isFullscreen ? 'Sair Tela Cheia' : 'Ampliar CRM'}</span>
+                            </button>
+                            <button onClick={() => {
+                                setNewLead({ ...initialLeadState, salesperson: isSeller ? appUser?.salesperson : 'VENDAS 01' });
+                                setEditingLead(null);
+                                setShowClientForm(false);
+                                setPartnerSaved(false);
+                                setIsLeadModalOpen(true);
+                            }} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold uppercase text-xs hover:bg-blue-700 shadow-lg flex items-center gap-2 transition-all">
+                                <span className="material-icons-outlined">add</span> Novo Atendimento
+                            </button>
+                        </div>
                     </div>
 
+                    <div className={isFullscreen ? "fixed inset-0 z-50 bg-gray-50/95 overflow-hidden flex flex-col backdrop-blur-sm" : ""}>
+                        {isFullscreen && (
+                            <div className="flex items-center justify-between p-4 bg-white border-b border-gray-200 shadow-sm animate-fade-in-down">
+                                <div className="flex items-center gap-2">
+                                    <span className="material-icons-outlined text-blue-600 text-2xl">view_kanban</span>
+                                    <h2 className="text-lg font-black text-gray-900 uppercase tracking-tighter">CRM & Gestão (Modo Ampliado)</h2>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button onClick={() => {
+                                        setNewLead({ ...initialLeadState, salesperson: isSeller ? appUser?.salesperson : 'VENDAS 01' });
+                                        setEditingLead(null);
+                                        setShowClientForm(false);
+                                        setPartnerSaved(false);
+                                        setIsLeadModalOpen(true);
+                                    }} className="px-4 py-2 bg-blue-600 text-white rounded font-bold uppercase text-[10px] hover:bg-blue-700 shadow-sm flex items-center gap-2 transition-all">
+                                        <span className="material-icons-outlined text-sm">add</span> Novo Atendimento
+                                    </button>
+                                    <button onClick={() => setIsFullscreen(false)} className="px-3 py-2 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition-all ml-2" title="Sair da Tela Cheia">
+                                        <span className="material-icons-outlined text-sm">close</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     <div
                         ref={scrollContainerRef}
-                        className="flex overflow-x-auto pb-4 gap-4 cursor-grab active:cursor-grabbing select-none [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-200 [&::-webkit-scrollbar-thumb]:rounded-full hover:[::-webkit-scrollbar-thumb]:bg-gray-300"
+                        className={`flex gap-4 cursor-grab active:cursor-grabbing select-none [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[::-webkit-scrollbar-thumb]:bg-gray-400 ${isFullscreen ? 'p-6 flex-1 overflow-x-auto overflow-y-hidden' : 'overflow-x-auto pb-4'}`}
                         onMouseDown={(e) => {
                             if (!scrollContainerRef.current) return;
                             setIsDraggingScroll(true);
@@ -1087,7 +1122,7 @@ const ManagementPage: React.FC = () => {
                         {leadColumns.map(col => (
                             <div
                                 key={col.id}
-                                className={`min-w-[280px] w-[280px] flex-shrink-0 flex flex-col max-h-[calc(100vh-250px)] transition-all rounded-xl border ${dragOverColumn === col.id ? 'ring-2 ring-blue-400' : ''}`}
+                                className={`min-w-[280px] w-[280px] flex-shrink-0 flex flex-col transition-all rounded-xl border ${dragOverColumn === col.id ? 'ring-2 ring-blue-400' : ''} ${isFullscreen ? 'h-full max-h-none' : 'max-h-[calc(100vh-250px)]'}`}
                                 style={{ backgroundColor: `${col.color}12`, borderColor: dragOverColumn === col.id ? undefined : `${col.color}30` }}
                                 onDragOver={handleDragOver}
                                 onDragEnter={(e) => handleDragEnter(e, col.id)}
@@ -1149,7 +1184,10 @@ const ManagementPage: React.FC = () => {
                                                 </div>
 
                                                 <div className="flex items-start justify-between gap-2">
-                                                    <h4 className="font-bold text-gray-800 text-[14px] leading-snug line-clamp-2 mb-1 pr-4">{lead.client_name}</h4>
+                                                    <div className="flex-1">
+                                                        <h4 className="font-bold text-gray-800 text-[14px] leading-snug line-clamp-2 mb-0.5 pr-2">{lead.client_name}</h4>
+                                                        {lead.client_contact_name && <p className="text-[10px] text-gray-500 font-medium line-clamp-1 flex items-center gap-1"><span className="material-icons-outlined text-[10px]">person</span> {lead.client_contact_name}</p>}
+                                                    </div>
                                                     <button
                                                         onClick={(e) => handleAttendLead(e, lead.id)}
                                                         className="h-6 w-6 flex items-center justify-center rounded-full bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white transition-all shadow-sm border border-blue-100 flex-shrink-0"
@@ -1199,10 +1237,11 @@ const ManagementPage: React.FC = () => {
                                                             e.stopPropagation();
                                                             let clientId = '';
                                                             const conditions = [];
-                                                            if (lead.client_doc) conditions.push(`doc.eq.${lead.client_doc}`);
-                                                            if (lead.client_email) conditions.push(`email.eq.${lead.client_email}`);
-                                                            if (lead.client_phone) conditions.push(`phone.eq.${lead.client_phone}`);
-                                                            if (conditions.length === 0) conditions.push(`name.ilike.${lead.client_name}`);
+                                                            if (lead.client_doc) conditions.push(`doc.eq."${lead.client_doc.replace(/"/g, '""')}"`);
+                                                            if (lead.client_email) conditions.push(`email.eq."${lead.client_email.replace(/"/g, '""')}"`);
+                                                            if (lead.client_phone) conditions.push(`phone.eq."${lead.client_phone.replace(/"/g, '""')}"`);
+                                                            const safeClientName = lead.client_name.replace(/"/g, '""');
+                                                            if (conditions.length === 0) conditions.push(`name.ilike."%${safeClientName}%"`);
 
                                                             const { data } = await supabase.from('partners').select('id').or(conditions.join(',')).eq('type', 'CLIENTE').limit(1);
                                                             if (data && data.length > 0) clientId = data[0].id;
@@ -1242,6 +1281,7 @@ const ManagementPage: React.FC = () => {
                                 </div>
                             </div>
                         ))}
+                    </div>
                     </div>
                 </>
             )}
@@ -1462,14 +1502,25 @@ const ManagementPage: React.FC = () => {
                                         </div>
 
                                         <div className="space-y-4">
-                                            <div>
-                                                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Nome do Cliente / Empresa *</label>
-                                                <input
-                                                    className={`form-input w-full rounded-lg border-gray-300 ${partnerSaved ? 'bg-gray-50' : ''}`}
-                                                    placeholder="Nome do cliente ou empresa"
-                                                    value={newLead.client_name || ''}
-                                                    onChange={e => { setNewLead({ ...newLead, client_name: e.target.value }); setPartnerSaved(false); }}
-                                                />
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Nome da Empresa *</label>
+                                                    <input
+                                                        className={`form-input w-full rounded-lg border-gray-300 ${partnerSaved ? 'bg-gray-50' : ''}`}
+                                                        placeholder="Ex: Empresa XYZ"
+                                                        value={newLead.client_name || ''}
+                                                        onChange={e => { setNewLead({ ...newLead, client_name: e.target.value }); setPartnerSaved(false); }}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Nome do Contato</label>
+                                                    <input
+                                                        className={`form-input w-full rounded-lg border-gray-300 ${partnerSaved ? 'bg-gray-50' : ''}`}
+                                                        placeholder="Ex: João da Silva"
+                                                        value={newLead.client_contact_name || ''}
+                                                        onChange={e => { setNewLead({ ...newLead, client_contact_name: e.target.value }); setPartnerSaved(false); }}
+                                                    />
+                                                </div>
                                             </div>
 
                                             <div className="grid grid-cols-2 gap-4">

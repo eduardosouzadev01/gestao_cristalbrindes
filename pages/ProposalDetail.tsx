@@ -60,7 +60,7 @@ const ProposalDetail: React.FC = () => {
             email: 'cristalbrindes@cristalbrindes.com.br',
             phone: '(27) 99992-0408',
             address: 'RUA PORTO ALEGRE, 590 - ALTEROSAS - CEP: 29167-036 - SERRA - ES',
-            logo: 'img/logo.png'
+            logo: '/img/Cristal Brindes 3.png'
         },
         'NATUREZA': {
             name: 'Natureza Brindes',
@@ -76,7 +76,7 @@ const ProposalDetail: React.FC = () => {
             email: 'vendas@espiritobrindes.com.br',
             phone: '(27) 99992-0408',
             address: 'RUA PORTO ALEGRE, 590 - ALTEROSAS - CEP: 29167-036 - SERRA - ES',
-            logo: 'img/logo.png'
+            logo: '/img/Cristal Brindes 3.png'
         }
     };
 
@@ -134,7 +134,7 @@ const ProposalDetail: React.FC = () => {
                         <div className="space-y-2 text-[13px]">
                             <p><span className="font-bold">Empresa:</span> {proposal.client?.name}</p>
                             <p><span className="font-bold">CNPJ:</span> {proposal.client?.doc || 'Não informado'}</p>
-                            <p><span className="font-bold">Contato:</span> {proposal.client?.name}</p>
+                            <p><span className="font-bold">Contato:</span> {proposal.client?.contact_name || 'Não informado'}</p>
                             <p><span className="font-bold">Email:</span> <span className="text-blue-600 underline font-medium">{proposal.client?.email || 'N/A'}</span></p>
                             <p><span className="font-bold">Telefone:</span> {proposal.client?.phone || 'N/A'}</p>
                         </div>
@@ -187,9 +187,10 @@ const ProposalDetail: React.FC = () => {
                                         </div>
                                         <div className="flex-1 space-y-3">
                                             <h3 className="text-lg font-black uppercase tracking-tight text-gray-900 border-b pb-2">{group.product_name}</h3>
-                                            <p className="text-sm text-gray-600 leading-relaxed italic">
-                                                {group.product_description || 'Descrição do produto não informada.'}
-                                            </p>
+                                            <div 
+                                                className="text-sm text-gray-600 leading-relaxed rich-text-content"
+                                                dangerouslySetInnerHTML={{ __html: group.product_description || 'Descrição do produto não informada.' }}
+                                            />
                                             <div className="flex gap-4 text-xs font-bold text-gray-400">
                                                 {group.product_code && <span>Ref: <span className="text-gray-700">{group.product_code}</span></span>}
                                                 {group.product_color && <span>Cor: <span className="text-gray-700">{group.product_color}</span></span>}
@@ -284,6 +285,13 @@ const ProposalDetail: React.FC = () => {
                         margin: 0 !important;
                         padding: 0 !important;
                         background: white !important;
+                    }
+                    
+                    /* Ensure rich text bolds are very visible in PDF */
+                    .rich-text-content b, 
+                    .rich-text-content strong {
+                        font-weight: 900 !important;
+                        color: #000000 !important;
                     }
                     
                     /* Main container for the proposal content */

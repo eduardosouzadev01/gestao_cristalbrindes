@@ -11,6 +11,7 @@ import { maskPhone, maskCpfCnpj, validateEmail, validateCpfCnpj } from '../src/u
 import { CustomSelect } from '../src/components/order-form/CustomSelect';
 import { Modal } from '../src/components/order-form/Modal';
 import { ProductModal } from '../src/components/modals/ProductModal';
+import RichTextEditor from '../src/components/common/RichTextEditor';
 
 // --- Utils Centralized ---
 
@@ -1555,13 +1556,13 @@ const OrderForm: React.FC = () => {
                       <div className="flex items-center gap-2 mb-1">
                         <label className="text-[9px] font-black text-gray-400 uppercase">Descrição do Item (Orçamento/Proposta)</label>
                       </div>
-                      <textarea
-                        className="form-textarea w-full text-[10px] rounded-lg border-gray-200 py-2 h-16 resize-none focus:ring-1 focus:ring-blue-500"
-                        value={item.productDescription || ''}
-                        onChange={e => updateItem(item.id, 'productDescription', e.target.value)}
-                        placeholder="Descrição opcional..."
-                        disabled={isReadOnly}
-                      />
+                                            <RichTextEditor
+                                              className="w-full text-[10px] rounded-lg border-gray-200 py-1"
+                                              value={item.productDescription || ''}
+                                              onChange={val => updateItem(item.id, 'productDescription', val)}
+                                              placeholder="Descrição opcional..."
+                                              disabled={isReadOnly}
+                                            />
                     </div>
 
                     <div className="space-y-3">

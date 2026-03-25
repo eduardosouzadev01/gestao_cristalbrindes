@@ -391,10 +391,29 @@ export async function fetchSpotProducts(
     const optionalsData = optionalsRaw ? parseCSV(optionalsRaw) : [];
 
     const stockMap: Record<string, number> = {};
+    const stockVariationsMap: Record<string, any[]> = {};
+
     stocksData.forEach((row) => {
         if (row.ProdReference) {
             stockMap[row.ProdReference] =
                 (stockMap[row.ProdReference] || 0) + (parseInt(row.Quantity) || 0);
+            
+            const color = row.ColorName || row.Color || 'N/A';
+            if (color !== 'N/A' && color !== '') {
+                if (!stockVariationsMap[row.ProdReference]) stockVariationsMap[row.ProdReference] = [];
+                const existing = stockVariationsMap[row.ProdReference].find((v: any) => v.color === color);
+                if (existing) {
+                    existing.stock += (parseInt(row.Quantity) || 0);
+                } else {
+                    stockVariationsMap[row.ProdReference].push({
+                        id: row.Reference || row.Sku || `${row.ProdReference}-${color}`,
+                        color: color,
+                        image: '', // Fill later
+                        stock: parseInt(row.Quantity) || 0,
+                        price: 0 // Fill later
+                    });
+                }
+            }
         }
     });
 
@@ -437,9 +456,16 @@ export async function fetchSpotProducts(
             const ref = p.ProdReference;
             if (!ref) return null;
 
-            const variationList = variationsMap[ref] || [];
+            let variationList = variationsMap[ref] || [];
+            if (variationList.length === 0 && stockVariationsMap[ref]) {
+                 variationList = stockVariationsMap[ref];
+            }
+
             const stock = stockMap[ref] || 0;
-            const price = variationList.length > 0 ? variationList[0].price : 0;
+            const basePriceStr = p.Price || p.Preco || p.WebPrice || p.Value || '0';
+            const basePrice = parseFloat(basePriceStr.replace(',', '.'));
+            
+            const price = variationList.length > 0 && variationList[0].price > 0 ? variationList[0].price : basePrice;
 
             const baseUrl = 'https://www.spotgifts.com.br/fotos/produtos/';
             const images: string[] = [];
@@ -465,7 +491,15 @@ export async function fetchSpotProducts(
             addImg(p.BagImage);
             addImg(p.PouchImage);
 
-            // If no variations were found in optionals, create a default one
+            // Fill stock variations price and image if they were fallback
+            variationList = variationList.map((v: any) => ({
+                ...v,
+                image: v.image || images[0] || '',
+                price: v.price || price,
+                priceFormatted: v.priceFormatted || (price > 0 ? price.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : 'Sob Consulta')
+            }));
+
+            // If no variations were found, create a default one
             const finalVariations =
                 variationList.length > 0
                     ? variationList

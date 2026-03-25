@@ -159,9 +159,9 @@ const Header: React.FC = () => {
               className="flex-shrink-0 flex items-center h-full mr-8 hover:opacity-80 transition-opacity"
             >
               <img
-                src="img/logo_menu.png"
+                src="/img/Cristal Brindes_menu.png"
                 alt="Cristal Brindes"
-                className="h-7 w-auto object-contain"
+                className="h-8 w-auto object-contain"
                 style={{ mixBlendMode: 'multiply' }}
               />
             </button>
