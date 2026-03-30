@@ -777,6 +777,16 @@ const BudgetForm: React.FC = () => {
                 const productMeta = productMap[it.productName] || {};
                 const sellingPrice = Number((calculateItemTotal(it) / (it.quantity || 1)).toFixed(2));
                 const itemTotalValue = sellingPrice * (it.quantity || 1);
+                const selVar = productMeta.variations?.find?.((v: any) => v.color === it.productColor);
+                const finalCode = it.productCode || (selVar ? (selVar.sku || selVar.code || selVar.reference) : null) || productMeta.code || (productMeta.variations && productMeta.variations.length > 0 ? (productMeta.variations[0].sku || productMeta.variations[0].code || productMeta.variations[0].reference) : '') || '';
+
+                let fallbackDesc = productMeta.description ? productMeta.description.replace(/\\n/g, '<br>') : '';
+                
+                let descToSave = it.productDescription || fallbackDesc;
+                if (descToSave && finalCode && !descToSave.includes(finalCode)) {
+                    descToSave = `<b>Ref: ${finalCode}</b><br><br>${descToSave}`;
+                }
+
                 return {
                     id: it.id,
                     product_name: it.productName,
@@ -784,9 +794,9 @@ const BudgetForm: React.FC = () => {
                     unit_price: sellingPrice,
                     calculation_factor: it.fator,
                     total_item_value: itemTotalValue,
-                    product_description: it.productDescription || (productMeta.description ? (productMeta.code ? `<b>Ref: ${productMeta.code}</b><br><br>${productMeta.description.replace(/\\n/g, '<br>')}` : productMeta.description.replace(/\\n/g, '<br>')) : ''),
+                    product_description: descToSave,
                     product_image_url: it.productImage || productMeta.image_url || '',
-                    product_code: it.productCode || productMeta.code || '',
+                    product_code: finalCode,
                     product_color: it.productColor || productMeta.color || ''
                 };
             });
@@ -1235,8 +1245,10 @@ const BudgetForm: React.FC = () => {
                                                                              onSelect={p => {
                                                                                  updateItem(it.id, 'productName', p.name);
                                                                                  let desc = p.description ? p.description.replace(/\n/g, '<br>') : '';
-                                                                                 if (p.code) {
-                                                                                     desc = `<b>Ref: ${p.code}</b><br><br>${desc}`;
+                                                                                 const mainCode = p.code || (p.variations && p.variations.length > 0 ? (p.variations[0].sku || p.variations[0].code || p.variations[0].reference) : null);
+                                                                                 if (mainCode) {
+                                                                                     desc = `<b>Ref: ${mainCode}</b><br><br>${desc}`;
+                                                                                     updateItem(it.id, 'productCode', mainCode);
                                                                                  }
                                                                                  updateItem(it.id, 'productDescription', desc);
                                                                                  updateItem(it.id, 'productColor', p.color || '');
@@ -1306,7 +1318,21 @@ const BudgetForm: React.FC = () => {
                                                                                     <select
                                                                                         className="form-select w-full text-[11px] font-medium rounded py-0.5 border-gray-200"
                                                                                         value={it.productColor || ''}
-                                                                                        onChange={e => updateItem(it.id, 'productColor', e.target.value)}
+                                                                                        onChange={e => {
+                                                                                            const selectedColor = e.target.value;
+                                                                                            updateItem(it.id, 'productColor', selectedColor);
+                                                                                            const selectedVar = variations.find((v: any) => v.color === selectedColor);
+                                                                                            if (selectedVar) {
+                                                                                                const varCode = selectedVar.sku || selectedVar.code || selectedVar.reference;
+                                                                                                if (varCode) {
+                                                                                                    updateItem(it.id, 'productCode', varCode);
+                                                                                                    let desc = it.productDescription || '';
+                                                                                                    desc = desc.replace(/<b>Ref:.*?<\/b><br><br>/, '');
+                                                                                                    desc = `<b>Ref: ${varCode}</b><br><br>${desc}`;
+                                                                                                    updateItem(it.id, 'productDescription', desc);
+                                                                                                }
+                                                                                            }
+                                                                                        }}
                                                                                         disabled={status === 'PROPOSTA ACEITA'}
                                                                                     >
                                                                                         <option value="">Selecione a cor...</option>
