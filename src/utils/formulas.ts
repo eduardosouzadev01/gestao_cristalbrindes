@@ -12,7 +12,12 @@ export const calculateItemTotal = (item: any) => {
     if (item.bvPct && item.bvPct > 0) percentageDivisor -= (item.bvPct / 100);
     if (item.extraPct && item.extraPct > 0) percentageDivisor -= (item.extraPct / 100);
 
-    return percentageDivisor > 0 ? baseSale / percentageDivisor : baseSale;
+    const rawTotal = percentageDivisor > 0 ? baseSale / percentageDivisor : baseSale;
+
+    const qty = item.quantity && item.quantity > 0 ? item.quantity : 1;
+    const roundedUnitPrice = Math.round((rawTotal / qty) * 100) / 100;
+
+    return roundedUnitPrice * qty;
 };
 
 export const calculateItemRealTotal = (item: any) => {
