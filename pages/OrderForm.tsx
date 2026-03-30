@@ -1493,6 +1493,11 @@ const OrderForm: React.FC = () => {
                             updateItem(item.id, 'productName', v.name);
                             updateItem(item.id, 'productCode', v.code);
                             updateItem(item.id, 'priceUnit', v.unit_price || 0); // Automatic price
+                            let desc = v.description ? v.description.replace(/\n/g, '<br>') : '';
+                            if (v.code) {
+                              desc = `<b>Ref: ${v.code}</b><br><br>${desc}`;
+                            }
+                            updateItem(item.id, 'productDescription', desc);
                           }}
                           onAdd={() => setIsProductModalOpen(true)}
                           error={errors.includes(`productName-${index}`)}

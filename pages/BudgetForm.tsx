@@ -784,7 +784,7 @@ const BudgetForm: React.FC = () => {
                     unit_price: sellingPrice,
                     calculation_factor: it.fator,
                     total_item_value: itemTotalValue,
-                    product_description: it.productDescription || productMeta.description || '',
+                    product_description: it.productDescription || (productMeta.description ? (productMeta.code ? `<b>Ref: ${productMeta.code}</b><br><br>${productMeta.description.replace(/\\n/g, '<br>')}` : productMeta.description.replace(/\\n/g, '<br>')) : ''),
                     product_image_url: it.productImage || productMeta.image_url || '',
                     product_code: it.productCode || productMeta.code || '',
                     product_color: it.productColor || productMeta.color || ''
@@ -1234,7 +1234,10 @@ const BudgetForm: React.FC = () => {
                                                                              options={productsList}
                                                                              onSelect={p => {
                                                                                  updateItem(it.id, 'productName', p.name);
-                                                                                 const desc = p.description ? p.description.replace(/\n/g, '<br>') : '';
+                                                                                 let desc = p.description ? p.description.replace(/\n/g, '<br>') : '';
+                                                                                 if (p.code) {
+                                                                                     desc = `<b>Ref: ${p.code}</b><br><br>${desc}`;
+                                                                                 }
                                                                                  updateItem(it.id, 'productDescription', desc);
                                                                                  updateItem(it.id, 'productColor', p.color || '');
                                                                                  updateItem(it.id, 'productImage', p.image_url || '');
