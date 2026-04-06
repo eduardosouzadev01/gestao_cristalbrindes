@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cristal Brindes - Sistema de Gestão</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&display=swap"
         rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1"
@@ -62,12 +62,34 @@
             --status-info-fg: #0F548C;
             --status-info-border: #96C6FA;
 
+            /* ─── NEW DESIGN SYSTEM (Budget Refactor) ─── */
+            --bg-page-budget: #FFFFFF;
+            --bg-surface-budget: #F8F8F8;
+            --bg-muted-budget: #EAEBEC;
+            --text-primary-budget: #0f172a;
+            --text-secondary-budget: #475569;
+            --text-tertiary-budget: #94a3b8;
+            --color-accent-budget: #0F6CBD;
+            --color-accent-light-budget: #F8F8F8;
+            --color-accent-text-budget: #0F548C;
+            --color-danger-budget: #FDE7E9;
+            --color-danger-text-budget: #BC2F32;
+            --color-info-budget: #EAEBEC;
+            --color-info-text-budget: #0F548C;
+            --color-warn-budget: #FFF1D6;
+            --color-warn-text-budget: #8A6116;
+            --border-subtle-budget: 1px solid #D0D3D6;
+            --border-medium-budget: 1px solid #D0D3D6;
+            --radius-sm-budget: 6px;
+            --radius-md-budget: 8px;
+            --radius-lg-budget: 12px;
+
             /* ─── TIMING ─── */
             --duration-fast: 0.1s;
             --duration-normal: 0.2s;
             --ease-fluent: cubic-bezier(0.33, 0, 0.67, 1);
 
-            /* ─── LEGACY ALIASES ─── */
+            /* ─── LEGACY ALIASES (Keep for compatibility) ─── */
             --bg-page: transparent;
             --bg-card: var(--neutral-background-1);
             --bg-section: var(--neutral-background-2);
@@ -82,6 +104,10 @@
             --color-primary-700: var(--fluent-brand);
             --color-primary-800: var(--fluent-brand-hover);
         }
+
+        /* ─── FONT UTILITIES ─── */
+        .font-sans-budget { font-family: 'DM Sans', sans-serif !important; }
+        .font-mono-budget { font-family: 'DM Mono', monospace !important; }
 
         /* ─── BASE ─── */
 
@@ -102,7 +128,7 @@
 
         body {
             font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #FCFDFF 0%, #F4F7FA 100%);
+            background: #FFFFFF;
             background-attachment: fixed;
             color: var(--neutral-foreground-2);
             font-size: 14px;
@@ -221,9 +247,9 @@
         .bg-white {
             background: var(--neutral-background-1) !important;
             border-color: var(--neutral-stroke-2) !important;
-            box-shadow: none !important;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
             border-radius: 8px;
-            transition: background var(--duration-fast) var(--ease-fluent);
+            transition: all var(--duration-fast) var(--ease-fluent);
         }
 
         /* ─── HEADER (Fluent: clean white, thin bottom border) ─── */

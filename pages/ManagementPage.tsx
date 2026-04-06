@@ -97,6 +97,23 @@ const ManagementPage: React.FC = () => {
     const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
     const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [kanbanSellerFilter, setKanbanSellerFilter] = useState('Todos');
+    const [kanbanPeriodFilter, setKanbanPeriodFilter] = useState('Todos');
+    const [collapsedCols, setCollapsedCols] = useState<Record<string, boolean>>({});
+    const [globalSearchTerm, setGlobalSearchTerm] = useState('');
+
+    const searchInputRef = React.useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     // Scroll Click & Drag State
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -933,11 +950,11 @@ const ManagementPage: React.FC = () => {
     };
 
     const leadColumns = [
-        { id: 'ATENDIMENTO', title: 'Em Atendimento', color: '#7b68ee', icon: 'support_agent' },
-        { id: 'ORCAMENTO', title: 'Em Orçamento', color: '#ff9800', icon: 'description' },
-        { id: 'PROPOSTA_ENVIADA', title: 'Proposta Enviada', color: '#1db954', icon: 'send' },
-        { id: 'PEDIDO_ABERTO', title: 'Pedido Aberto', color: '#00bcd4', icon: 'shopping_cart' },
-        { id: 'PEDIDO_ENTREGUE', title: 'Pedido Entregue', color: '#e91e63', icon: 'local_shipping' },
+        { id: 'ATENDIMENTO', title: 'Em Atendimento', color: '#7C3AED', icon: 'support_agent' },
+        { id: 'ORCAMENTO', title: 'Em Orçamento', color: '#F59E0B', icon: 'description' },
+        { id: 'PROPOSTA_ENVIADA', title: 'Proposta Enviada', color: '#10B981', icon: 'send' },
+        { id: 'PEDIDO_ABERTO', title: 'Pedido Aberto', color: '#3B82F6', icon: 'shopping_cart' },
+        { id: 'PEDIDO_ENTREGUE', title: 'Pedido Entregue', color: '#065F46', icon: 'local_shipping' },
     ];
 
     const getSalespersonInitials = (name?: string) => {
@@ -1008,10 +1025,10 @@ const ManagementPage: React.FC = () => {
                     )}
                     {/* Exibe o seletor de abas apenas se o usuário tiver acesso a mais do que "LEADS" */}
                     {(hasPermission('crm.performance') || hasPermission('crm.financeiro')) && (
-                        <div className="flex bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
+                        <div className="flex items-center gap-1 bg-transparent">
                             <button
                                 onClick={() => setActiveTab('LEADS')}
-                                className={`px-4 py-2 rounded-md text-xs font-bold uppercase transition-all flex items-center gap-2 ${activeTab === 'LEADS' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                                className={`px-4 py-2 rounded-lg text-[11px] font-black uppercase transition-all flex items-center gap-2 ${activeTab === 'LEADS' ? 'bg-[#1565C0] text-white' : 'bg-transparent text-gray-500 hover:text-[#1565C0] hover:underline decoration-2 underline-offset-4'}`}
                             >
                                 <span className="material-icons-outlined text-sm">view_kanban</span>
                                 Atendimentos
@@ -1019,7 +1036,7 @@ const ManagementPage: React.FC = () => {
                             {hasPermission('crm.performance') && (
                                 <button
                                     onClick={() => setActiveTab('PERFORMANCE')}
-                                    className={`px-4 py-2 rounded-md text-xs font-bold uppercase transition-all flex items-center gap-2 ${activeTab === 'PERFORMANCE' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                                    className={`px-4 py-2 rounded-lg text-[11px] font-black uppercase transition-all flex items-center gap-2 ${activeTab === 'PERFORMANCE' ? 'bg-[#1565C0] text-white' : 'bg-transparent text-gray-500 hover:text-[#1565C0] hover:underline decoration-2 underline-offset-4'}`}
                                 >
                                     <span className="material-icons-outlined text-sm">insert_chart</span>
                                     Performance
@@ -1028,7 +1045,7 @@ const ManagementPage: React.FC = () => {
                             {hasPermission('crm.financeiro') && (
                                 <button
                                     onClick={() => setActiveTab('FINANCEIRO')}
-                                    className={`px-4 py-2 rounded-md text-xs font-bold uppercase transition-all flex items-center gap-2 ${activeTab === 'FINANCEIRO' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                                    className={`px-4 py-2 rounded-lg text-[11px] font-black uppercase transition-all flex items-center gap-2 ${activeTab === 'FINANCEIRO' ? 'bg-[#1565C0] text-white' : 'bg-transparent text-gray-500 hover:text-[#1565C0] hover:underline decoration-2 underline-offset-4'}`}
                                 >
                                     <span className="material-icons-outlined text-sm">payments</span>
                                     Financeiro
@@ -1036,7 +1053,7 @@ const ManagementPage: React.FC = () => {
                             )}
                             <button
                                 onClick={() => setActiveTab('TRANSFERENCIAS')}
-                                className={`px-4 py-2 rounded-md text-xs font-bold uppercase transition-all flex items-center gap-2 ${activeTab === 'TRANSFERENCIAS' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                                className={`px-4 py-2 rounded-lg text-[11px] font-black uppercase transition-all flex items-center gap-2 ${activeTab === 'TRANSFERENCIAS' ? 'bg-[#1565C0] text-white' : 'bg-transparent text-gray-500 hover:text-[#1565C0] hover:underline decoration-2 underline-offset-4'}`}
                             >
                                 <span className="material-icons-outlined text-sm">swap_horiz</span>
                                 Trocas
@@ -1053,13 +1070,79 @@ const ManagementPage: React.FC = () => {
 
             {activeTab === 'LEADS' && (
                 <>
-                    <div className="flex justify-between items-center mb-6">
-                        <div className="flex items-center gap-3">
+                    {/* Board Summary */}
+                    <div className="flex flex-wrap items-center justify-between mb-4 bg-gray-50/80 p-3 rounded-lg border border-gray-200 shadow-sm gap-4">
+                        {(() => {
+                            const proposalsWaiting = leads.filter(l => l.status === 'PROPOSTA_ENVIADA').length;
+                            const openOrders = leads.filter(l => l.status === 'PEDIDO_ABERTO').length;
+                            const delayedLeads = leads.filter(l => {
+                                const diff = new Date().getTime() - new Date(l.updated_at || l.created_at).getTime();
+                                return Math.floor(diff / 86400000) > 15;
+                            }).length;
+                            return (
+                                <>
+                                    <div className="flex gap-4 divide-x divide-gray-300 w-full md:w-auto">
+                                        <div className="px-3">
+                                            <span className="text-[10px] uppercase font-bold text-gray-500 block">Propostas aguardando</span>
+                                            <span className="text-lg font-black text-gray-800">{proposalsWaiting}</span>
+                                        </div>
+                                        <div className="px-3">
+                                            <span className="text-[10px] uppercase font-bold text-gray-500 block">Pedidos abertos</span>
+                                            <span className="text-lg font-black text-blue-600">{openOrders}</span>
+                                        </div>
+                                        <div className="px-3 cursor-pointer group" onClick={() => {/* Filtro futuros */}}>
+                                            <span className="text-[10px] uppercase font-bold text-gray-500 block">Atrasados</span>
+                                            <span className={`text-lg font-black flex items-center gap-1 ${delayedLeads > 0 ? 'text-red-500' : 'text-gray-800'}`}>
+                                                {delayedLeads > 0 ? `${delayedLeads} 🔴` : '0'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </>
+                            );
+                        })()}
+                    </div>
+
+                    {/* Action and Filter Bar */}
+                    <div className="flex flex-wrap items-center gap-3 mb-6 bg-white p-2 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100">
+                        <div className="relative flex-1 min-w-[320px]">
+                            <span className="material-icons-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">search</span>
+                            <input 
+                                ref={searchInputRef}
+                                type="text"
+                                placeholder="Buscar cliente, empresa ou responsável... (Ctrl+K)"
+                                className="w-full pl-10 pr-4 py-2 bg-gray-50/50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all placeholder:text-gray-400 font-medium"
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                            />
                         </div>
                         <div className="flex items-center gap-2">
-                            <button onClick={() => setIsFullscreen(!isFullscreen)} className="px-3 py-3 bg-white border border-gray-200 text-gray-600 rounded-xl font-bold uppercase text-xs hover:bg-gray-50 flex items-center gap-2 transition-all shadow-sm">
-                                <span className="material-icons-outlined">{isFullscreen ? 'fullscreen_exit' : 'fullscreen'}</span>
-                                <span className="hidden md:inline">{isFullscreen ? 'Sair Tela Cheia' : 'Ampliar CRM'}</span>
+                            <select 
+                                className="bg-gray-50/50 border border-gray-200 text-sm font-medium text-gray-600 py-2 px-3 rounded-lg outline-none cursor-pointer focus:ring-2 focus:ring-blue-500 hover:bg-gray-50"
+                                value={kanbanSellerFilter}
+                                onChange={e => setKanbanSellerFilter(e.target.value)}
+                            >
+                                <option value="Todos">Vendedor: Todos</option>
+                                {Array.from(new Set(leads.map(l => l.salesperson || 'N/A'))).sort().map(s => (
+                                    <option key={s} value={s}>{s}</option>
+                                ))}
+                            </select>
+                            
+                            <select
+                                className="bg-gray-50/50 border border-gray-200 text-sm font-medium text-gray-600 py-2 px-3 rounded-lg outline-none cursor-pointer focus:ring-2 focus:ring-blue-500 hover:bg-gray-50"
+                                value={kanbanPeriodFilter}
+                                onChange={e => setKanbanPeriodFilter(e.target.value)}
+                            >
+                                <option value="Todos">Período: Todos</option>
+                                <option value="Hoje">Hoje</option>
+                                <option value="7d">Últimos 7 dias</option>
+                                <option value="30d">Últimos 30 dias</option>
+                            </select>
+                        </div>
+                        <div className="ml-auto w-px h-8 bg-gray-200 mx-2 hidden md:block"></div>
+                        <div className="ml-auto md:ml-0 flex gap-2">
+                            <button onClick={() => setIsFullscreen(!isFullscreen)} className="px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg font-bold uppercase text-[10px] hover:bg-gray-50 flex items-center gap-2 transition-all">
+                                <span className="material-icons-outlined text-sm">{isFullscreen ? 'fullscreen_exit' : 'open_in_full'}</span>
+                                <span className="hidden md:inline">{isFullscreen ? 'Sair Ampliado' : 'Ampliar CRM'}</span>
                             </button>
                             <button onClick={() => {
                                 setNewLead({ ...initialLeadState, salesperson: isSeller ? appUser?.salesperson : 'VENDAS 01' });
@@ -1067,18 +1150,18 @@ const ManagementPage: React.FC = () => {
                                 setShowClientForm(false);
                                 setPartnerSaved(false);
                                 setIsLeadModalOpen(true);
-                            }} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold uppercase text-xs hover:bg-blue-700 shadow-lg flex items-center gap-2 transition-all">
-                                <span className="material-icons-outlined">add</span> Novo Atendimento
+                            }} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold uppercase text-[10px] hover:bg-blue-700 shadow flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-95">
+                                <span className="material-icons-outlined text-sm">add</span> Novo Atendimento
                             </button>
                         </div>
                     </div>
 
-                    <div className={isFullscreen ? "fixed inset-0 z-50 bg-gray-50/95 overflow-hidden flex flex-col backdrop-blur-sm" : ""}>
+                    <div className={isFullscreen ? "fixed inset-0 z-50 bg-gray-100 overflow-hidden flex flex-col" : ""}>
                         {isFullscreen && (
-                            <div className="flex items-center justify-between p-4 bg-white border-b border-gray-200 shadow-sm animate-fade-in-down">
+                            <div className="flex items-center justify-between p-4 bg-white border-b border-gray-200 shadow-sm">
                                 <div className="flex items-center gap-2">
                                     <span className="material-icons-outlined text-blue-600 text-2xl">view_kanban</span>
-                                    <h2 className="text-lg font-black text-gray-900 uppercase tracking-tighter">CRM & Gestão (Modo Ampliado)</h2>
+                                    <h2 className="text-lg font-black text-gray-900 uppercase tracking-tighter">CRM & Vendas — Modo Ampliado</h2>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <button onClick={() => {
@@ -1098,7 +1181,7 @@ const ManagementPage: React.FC = () => {
                         )}
                     <div
                         ref={scrollContainerRef}
-                        className={`flex gap-4 cursor-grab active:cursor-grabbing select-none [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[::-webkit-scrollbar-thumb]:bg-gray-400 ${isFullscreen ? 'p-6 flex-1 overflow-x-auto overflow-y-hidden' : 'overflow-x-auto pb-4'}`}
+                        className={`flex gap-4 cursor-grab active:cursor-grabbing select-none [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[::-webkit-scrollbar-thumb]:bg-gray-400 ${isFullscreen ? 'p-6 flex-1 overflow-x-auto overflow-y-hidden items-stretch' : 'overflow-x-auto pb-4 items-start'}`}
                         onMouseDown={(e) => {
                             if (!scrollContainerRef.current) return;
                             setIsDraggingScroll(true);
@@ -1119,168 +1202,145 @@ const ManagementPage: React.FC = () => {
                             scrollContainerRef.current.scrollLeft = scrollLeft - walk;
                         }}
                     >
-                        {leadColumns.map(col => (
-                            <div
-                                key={col.id}
-                                className={`min-w-[280px] w-[280px] flex-shrink-0 flex flex-col transition-all rounded-xl border ${dragOverColumn === col.id ? 'ring-2 ring-blue-400' : ''} ${isFullscreen ? 'h-full max-h-none' : 'max-h-[calc(100vh-250px)]'}`}
-                                style={{ backgroundColor: `${col.color}12`, borderColor: dragOverColumn === col.id ? undefined : `${col.color}30` }}
-                                onDragOver={handleDragOver}
-                                onDragEnter={(e) => handleDragEnter(e, col.id)}
-                                onDragLeave={handleDragLeave}
-                                onDrop={(e) => handleDrop(e, col.id)}
-                            >
-                                <div className="p-4 flex justify-between items-center group/header">
-                                    <div className="flex items-center gap-2">
-                                        <span className="material-icons-outlined text-sm" style={{ color: col.color }}>{col.icon}</span>
-                                        <div
-                                            className="px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider shadow-sm border border-gray-100 bg-white"
-                                            style={{ color: col.color }}
-                                        >
-                                            {col.title}
-                                        </div>
-                                        <span className="text-[11px] font-bold text-gray-400 bg-gray-100/50 px-2 py-0.5 rounded-full">
-                                            {leads.filter(l => l.status === col.id).length}
-                                        </span>
-                                    </div>
-                                    <button className="opacity-0 group-hover/header:opacity-100 text-gray-400 hover:text-gray-600 transition-opacity">
-                                        <span className="material-icons-outlined text-sm">more_horiz</span>
-                                    </button>
-                                </div>
+                        {leadColumns.map(col => {
+                            const colLeads = leads.filter(l => l.status === col.id)
+                                .filter(l => kanbanSellerFilter === 'Todos' || l.salesperson === kanbanSellerFilter)
+                                .filter(l => {
+                                    if (kanbanPeriodFilter === 'Todos') return true;
+                                    const diff = new Date().getTime() - new Date(l.created_at).getTime();
+                                    const days = Math.floor(diff / 86400000);
+                                    if (kanbanPeriodFilter === 'Hoje') return days === 0;
+                                    if (kanbanPeriodFilter === '7d') return days <= 7;
+                                    if (kanbanPeriodFilter === '30d') return days <= 30;
+                                    return true;
+                                })
+                                .filter(l => {
+                                    if (!searchTerm) return true;
+                                    const term = searchTerm.toLowerCase();
+                                    return l.client_name.toLowerCase().includes(term) || (l.client_contact_name && l.client_contact_name.toLowerCase().includes(term)) || (l.client_phone && l.client_phone.includes(term)) || (l.salesperson && l.salesperson.toLowerCase().includes(term));
+                                });
 
-                                <div className="px-3 flex-1 overflow-y-auto space-y-3 pb-4">
-                                    {leads.filter(l => l.status === col.id).map(lead => {
-                                        const cleanPhone = lead.client_phone ? lead.client_phone.replace(/\D/g, '') : '';
-                                        const readyMessage = lead.closing_metadata?.wa_template || `Olâ ${lead.client_name}, tudo bem?`;
-                                        const waLink = cleanPhone ? `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(readyMessage)}` : null;
+                            const totalVal = colLeads.reduce((s, l) => s + (l.estimated_value || 0), 0);
+                            const isCollapsed = collapsedCols[col.id];
 
-                                        return (
-                                            <div
-                                                key={lead.id}
-                                                draggable
-                                                onDragStart={(e) => handleDragStart(e, lead)}
-                                                onDragEnd={handleDragEnd}
-                                                className={`bg-white rounded-xl shadow-sm border border-gray-100 border-l-[3px] hover:shadow-md hover:-translate-y-0.5 transition-all group relative cursor-pointer active:cursor-grabbing p-4 flex flex-col ${compactMode ? 'min-h-[80px]' : 'min-h-[140px]'}`}
-                                                style={{ borderLeftColor: col.color }}
-                                                onClick={() => {
-                                                    setEditingLead(lead);
-                                                    setNewLead(lead);
-                                                    setPartnerSaved(true);
-                                                    setIsLeadModalOpen(true);
-                                                }}
-                                            >
-                                                <div className="flex justify-between items-center mb-2">
-                                                    {lead.priority ? (
-                                                        <span className={`px-2 py-[2px] rounded text-[9px] font-bold tracking-wider ${lead.priority === 'ALTA' ? 'bg-red-50 text-red-600' :
-                                                            lead.priority === 'BAIXA' ? 'bg-gray-50 text-gray-500' : 'bg-blue-50 text-blue-600'
-                                                            }`}>
-                                                            {lead.priority}
-                                                        </span>
-                                                    ) : <span />}
-
-                                                    <div className="flex items-center text-gray-400 text-[10px] font-medium transition-colors group-hover:text-gray-600">
-                                                        <span className="material-icons-outlined text-[12px] mr-1">schedule</span>
-                                                        {formatDate(lead.created_at)}
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <div className="flex-1">
-                                                        <h4 className="font-bold text-gray-800 text-[14px] leading-snug line-clamp-2 mb-0.5 pr-2">{lead.client_name}</h4>
-                                                        {lead.client_contact_name && <p className="text-[10px] text-gray-500 font-medium line-clamp-1 flex items-center gap-1"><span className="material-icons-outlined text-[10px]">person</span> {lead.client_contact_name}</p>}
-                                                    </div>
-                                                    <button
-                                                        onClick={(e) => handleAttendLead(e, lead.id)}
-                                                        className="h-6 w-6 flex items-center justify-center rounded-full bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white transition-all shadow-sm border border-blue-100 flex-shrink-0"
-                                                        title="Marcar como Atendido (Resetar Tempo)"
-                                                    >
-                                                        <span className="material-icons-outlined text-[14px]">refresh</span>
-                                                    </button>
-                                                </div>
-
-                                                {lead.closing_metadata?.show_on_card && lead.description && (
-                                                    <div className="bg-blue-50/50 p-2 rounded-lg border border-blue-100/50 mt-1 mb-2">
-                                                        <p className="text-[10px] text-blue-700 italic line-clamp-2">
-                                                            <span className="material-icons-outlined text-[10px] mr-1">sticky_note_2</span>
-                                                            {lead.description}
-                                                        </p>
-                                                    </div>
-                                                )}
-
-                                                <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-50 opacity-80 group-hover:opacity-100 transition-opacity">
+                            return (
+                                <div
+                                    key={col.id}
+                                    className={`flex-shrink-0 flex flex-col transition-all rounded-xl border border-gray-200 border-t-[4px] bg-gray-50/50 ${dragOverColumn === col.id ? 'ring-2 ring-blue-400' : ''} ${isFullscreen ? 'h-full max-h-none overflow-hidden' : 'h-max'} ${isCollapsed ? 'min-w-[60px] w-[60px]' : 'min-w-[280px] md:min-w-[320px] w-[320px]'}`}
+                                    style={{ borderTopColor: col.color }}
+                                    onDragOver={handleDragOver}
+                                    onDragEnter={(e) => handleDragEnter(e, col.id)}
+                                    onDragLeave={handleDragLeave}
+                                    onDrop={(e) => handleDrop(e, col.id)}
+                                >
+                                    <div 
+                                        className={`p-3 flex justify-between items-start cursor-pointer hover:bg-black/5 transition-colors rounded-t-lg ${isCollapsed ? 'flex-col items-center py-6 h-full' : ''}`}
+                                        style={{ backgroundColor: `${col.color}15` }}
+                                        onClick={() => setCollapsedCols(prev => ({ ...prev, [col.id]: !prev[col.id] }))}
+                                    >
+                                        {isCollapsed ? (
+                                            <>
+                                                <span className="material-icons-outlined mb-2" style={{ color: col.color }}>{col.icon}</span>
+                                                <span className="text-[10px] font-bold px-2 py-1 rounded-full text-white" style={{ backgroundColor: col.color }}>{colLeads.length}</span>
+                                                <div className="rotate-180 text-[10px] font-black tracking-widest uppercase mt-4" style={{ color: col.color, writingMode: 'vertical-rl' }}>{col.title}</div>
+                                            </>
+                                        ) : (
+                                            <div className="w-full">
+                                                <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-2">
-                                                        {lead.salesperson && (
-                                                            <div
-                                                                className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 text-blue-600 font-bold text-[9px] border border-blue-100 shadow-sm"
-                                                                title={lead.salesperson}
-                                                            >
-                                                                {getSalespersonInitials(lead.salesperson)}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <div className="flex items-center gap-1.5">
-                                                        {/* WhatsApp Button removed from here (visible part) */}
+                                                        <span className="material-icons-outlined text-sm" style={{ color: col.color }}>{col.icon}</span>
+                                                        <span className="text-xs font-black uppercase tracking-tight" style={{ color: col.color }}>{col.title}</span>
+                                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white shadow-sm" style={{ backgroundColor: col.color }}>
+                                                            {colLeads.length}
+                                                        </span>
                                                     </div>
                                                 </div>
-
-                                                {/* Hover Quick Actions - Slide-up overlay design */}
-                                                <div className="absolute inset-x-0 bottom-0 h-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-around bg-white/95 backdrop-blur-md shadow-[0_-10px_20px_rgba(0,0,0,0.05)] border-t border-blue-50 rounded-b-xl z-20 translate-y-2 group-hover:translate-y-0">
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); navigate('/pedidos', { state: { clientName: lead.client_name } }); }}
-                                                        className="p-2 hover:bg-blue-50 rounded-xl text-blue-600 transition-all flex flex-col items-center gap-1 active:scale-90"
-                                                        title="Ver Pedidos"
-                                                    >
-                                                        <span className="material-icons-outlined text-xl">shopping_bag</span>
-                                                        {!compactMode && <span className="text-[8px] font-black uppercase tracking-tight">Pedidos</span>}
-                                                    </button>
-                                                    <button
-                                                        onClick={async (e) => {
-                                                            e.stopPropagation();
-                                                            let clientId = '';
-                                                            const conditions = [];
-                                                            if (lead.client_doc) conditions.push(`doc.eq."${lead.client_doc.replace(/"/g, '""')}"`);
-                                                            if (lead.client_email) conditions.push(`email.eq."${lead.client_email.replace(/"/g, '""')}"`);
-                                                            if (lead.client_phone) conditions.push(`phone.eq."${lead.client_phone.replace(/"/g, '""')}"`);
-                                                            const safeClientName = lead.client_name.replace(/"/g, '""');
-                                                            if (conditions.length === 0) conditions.push(`name.ilike."%${safeClientName}%"`);
-
-                                                            const { data } = await supabase.from('partners').select('id').or(conditions.join(',')).eq('type', 'CLIENTE').limit(1);
-                                                            if (data && data.length > 0) clientId = data[0].id;
-
-                                                            navigate('/orcamentos', { state: { clientName: lead.client_name, clientId: clientId } });
-                                                        }}
-                                                        className="p-2 hover:bg-emerald-50 rounded-xl text-emerald-600 transition-all flex flex-col items-center gap-1 active:scale-90"
-                                                        title="Orçamentos"
-                                                    >
-                                                        <span className="material-icons-outlined text-xl">request_quote</span>
-                                                        {!compactMode && <span className="text-[8px] font-black uppercase tracking-tight">Quotes</span>}
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); convertToBudget(lead); }}
-                                                        className="p-2 hover:bg-purple-50 rounded-xl text-purple-600 transition-all flex flex-col items-center gap-1 active:scale-90"
-                                                        title="Criar Orçamento"
-                                                    >
-                                                        <span className="material-icons-outlined text-xl">add_circle</span>
-                                                        {!compactMode && <span className="text-[8px] font-black uppercase tracking-tight">Novo</span>}
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setPendingStatusLead(lead);
-                                                            setIsFinalizeModalOpen(true);
-                                                        }}
-                                                        className="p-2 hover:bg-green-50 rounded-xl text-green-600 transition-all flex flex-col items-center gap-1 active:scale-90"
-                                                        title="Finalizar"
-                                                    >
-                                                        <span className="material-icons-outlined text-xl">check_circle</span>
-                                                        {!compactMode && <span className="text-[8px] font-black uppercase tracking-tight">Fechar</span>}
-                                                    </button>
-                                                </div>
+                                                <p className="text-[11px] font-bold text-gray-500 mt-1">{formatCurrency(totalVal)} em aberto</p>
                                             </div>
-                                        )
-                                    })}
+                                        )}
+                                    </div>
+
+                                    {!isCollapsed && (
+                                    <div className={`px-3 flex-1 space-y-3 py-3 ${isFullscreen ? 'overflow-y-auto' : ''}`}>
+                                        {colLeads.map(lead => {
+                                            const diffToNow = new Date().getTime() - new Date(lead.updated_at || lead.created_at).getTime();
+                                            const stoppedDays = Math.floor(diffToNow / 86400000);
+                                            
+                                            // Indicador de tempo parado
+                                            let timeColor = 'text-green-600';
+                                            let timeBg = 'bg-green-50';
+                                            let timeDot = 'bg-green-500';
+                                            if (stoppedDays >= 15) { timeColor = 'text-red-600'; timeBg = 'bg-red-50'; timeDot = 'bg-red-500'; }
+                                            else if (stoppedDays >= 7) { timeColor = 'text-yellow-600'; timeBg = 'bg-yellow-50'; timeDot = 'bg-yellow-500'; }
+
+                                            return (
+                                                <div
+                                                    key={lead.id}
+                                                    draggable
+                                                    onDragStart={(e) => handleDragStart(e, lead)}
+                                                    onDragEnd={handleDragEnd}
+                                                    className={`bg-white rounded-xl shadow-[0_2px_4px_rgba(0,0,0,0.02)] border border-gray-100 hover:border-blue-200 hover:shadow-md transition-all group relative cursor-grab active:cursor-grabbing p-3 flex flex-col min-h-[90px] ${searchTerm && lead.id === globalSearchTerm ? 'ring-2 ring-blue-500' : ''}`}
+                                                    onClick={() => {
+                                                        setEditingLead(lead);
+                                                        setNewLead(lead);
+                                                        setPartnerSaved(true);
+                                                        setIsLeadModalOpen(true);
+                                                    }}
+                                                >
+                                                    <div className="flex justify-between items-center mb-1.5">
+                                                        <span className={`px-2 py-[2px] rounded text-[8px] font-black uppercase tracking-widest ${lead.priority === 'ALTA' || lead.priority === 'URGENTE' ? 'bg-red-50 text-red-600' : lead.priority === 'VIP' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'}`}>
+                                                            {lead.priority || 'NORMAL'}
+                                                        </span>
+                                                        <div className="flex items-center text-gray-400 text-[9px] font-bold">
+                                                            <span className="material-icons-outlined text-[10px] mr-1">calendar_today</span>
+                                                            {formatDate(lead.created_at)}
+                                                        </div>
+                                                    </div>
+
+                                                    <h4 className="font-bold text-gray-900 text-[14px] leading-tight line-clamp-2 mt-1" title={lead.client_name}>{lead.client_name}</h4>
+                                                    <p className="text-[12px] text-gray-500 font-medium line-clamp-1 mt-0.5">{lead.client_contact_name || lead.client_phone}</p>
+
+                                                    {lead.estimated_value ? (
+                                                        <p className="text-[11px] font-black text-green-700 mt-1">{formatCurrency(lead.estimated_value)}</p>
+                                                    ) : null}
+
+                                                    <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-50">
+                                                        <div className="flex items-center gap-2">
+                                                            {lead.salesperson && (
+                                                                <div className="flex items-center justify-center px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-black text-[9px] border border-gray-200" title={lead.salesperson}>
+                                                                    {getSalespersonInitials(lead.salesperson)}
+                                                                </div>
+                                                            )}
+                                                            <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${timeBg} ${timeColor} text-[9px] font-bold`}>
+                                                                <span className="material-icons-outlined text-[10px]">schedule</span>
+                                                                {stoppedDays}d parado
+                                                                {stoppedDays >= 15 && <span className={`w-1 h-1 rounded-full ${timeDot} animate-pulse ml-0.5`}></span>}
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            onClick={(e) => handleAttendLead(e, lead.id)}
+                                                            className="h-6 w-6 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:bg-blue-500 hover:text-white transition-all shadow-sm border border-gray-200 hover:border-blue-500 opacity-60 group-hover:opacity-100"
+                                                            title="Marcar como atualizado"
+                                                        >
+                                                            <span className="material-icons-outlined text-[12px]">refresh</span>
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    {/* Hover Quick Actions */}
+                                                    <div className="absolute inset-x-0 bottom-0 h-[46px] opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-around bg-white/95 backdrop-blur shadow-[0_-10px_20px_rgba(0,0,0,0.05)] border-t border-gray-100 rounded-b-xl z-20">
+                                                        <button onClick={(e) => { e.stopPropagation(); navigate('/pedidos', { state: { clientName: lead.client_name } }); }} className="p-1 hover:bg-blue-50 rounded text-blue-600 transition-all"><span className="material-icons-outlined text-lg">shopping_bag</span></button>
+                                                        <button onClick={async (e) => { e.stopPropagation();  let clientId = ''; const conditions = []; if (lead.client_doc) conditions.push(`doc.eq."${lead.client_doc.replace(/"/g, '""')}"`); if (lead.client_email) conditions.push(`email.eq."${lead.client_email.replace(/"/g, '""')}"`); if (lead.client_phone) conditions.push(`phone.eq."${lead.client_phone.replace(/"/g, '""')}"`); const safeClientName = lead.client_name.replace(/"/g, '""'); if (conditions.length === 0) conditions.push(`name.ilike."%${safeClientName}%"`); const { data } = await supabase.from('partners').select('id').or(conditions.join(',')).eq('type', 'CLIENTE').limit(1); if (data && data.length > 0) clientId = data[0].id; navigate('/orcamentos', { state: { clientName: lead.client_name, clientId: clientId } }); }} className="p-1 hover:bg-emerald-50 rounded text-emerald-600 transition-all"><span className="material-icons-outlined text-lg">request_quote</span></button>
+                                                        <button onClick={(e) => { e.stopPropagation(); convertToBudget(lead); }} className="p-1 hover:bg-purple-50 rounded text-purple-600 transition-all"><span className="material-icons-outlined text-lg">add_circle</span></button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setPendingStatusLead(lead); setIsFinalizeModalOpen(true); }} className="p-1 hover:bg-green-50 rounded text-green-600 transition-all"><span className="material-icons-outlined text-lg">check_circle</span></button>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                    )}
                                 </div>
-                            </div>
-                        ))}
+                            )
+                        })}
                     </div>
                     </div>
                 </>

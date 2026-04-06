@@ -32,6 +32,9 @@ import ManagementPage from './pages/ManagementPage';
 import ProductsPage from './pages/ProductsPage';
 import InternalTasksPage from './pages/InternalTasksPage';
 import FinancialDashboardPage from './pages/FinancialDashboardPage';
+import UserManagementPage from './pages/UserManagementPage';
+import KanbanSupervisorPage from './pages/KanbanSupervisorPage';
+import SuperDashboardPage from './pages/SuperDashboardPage';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 
 import NotificationCenter from './src/components/NotificationCenter';
@@ -81,7 +84,17 @@ const Header: React.FC = () => {
   };
 
   const menuStructure = [
-    { name: 'CRM & Gestão', path: '/crm', permission: 'pedidos', icon: 'hub' },
+    {
+      name: 'CRM & Gestão',
+      permission: 'pedidos',
+      path: '#',
+      icon: 'hub',
+      subItems: [
+        { name: 'Atendimentos', path: '/crm', permission: 'pedidos', icon: 'view_kanban' },
+        { name: 'Supervisão Kanban', path: '/supervisao', permission: 'crm.performance', icon: 'dashboard_customize' },
+        { name: 'Super Dashboard', path: '/super-dashboard', permission: 'crm.performance', icon: 'monitoring' },
+      ]
+    },
     {
       name: 'Comercial',
       permission: 'pedidos',
@@ -120,7 +133,8 @@ const Header: React.FC = () => {
         { name: 'Clientes', path: '/clientes', permission: 'cadastros', icon: 'groups' },
         { name: 'Fornecedores', path: '/fornecedores', permission: 'cadastros', icon: 'local_shipping' },
         { name: 'Produtos', path: '/produtos', permission: 'produtos', icon: 'inventory_2' },
-        { name: 'Fatores', path: '/configuracoes', permission: 'fatores', icon: 'tune' }
+        { name: 'Fatores', path: '/configuracoes', permission: 'fatores', icon: 'tune' },
+        { name: 'Usuários', path: '/usuarios', permission: 'fatores', icon: 'manage_accounts' }
       ]
     }
   ];
@@ -300,6 +314,9 @@ const AppLayout: React.FC = () => {
           <Route path="/propostas" element={<ProtectedRoute permission="pedidos"><ProposalList /></ProtectedRoute>} />
           <Route path="/proposta/:id" element={<ProtectedRoute permission="pedidos"><ProposalDetail /></ProtectedRoute>} />
           <Route path="/crm" element={<ProtectedRoute permission="pedidos"><ManagementPage /></ProtectedRoute>} />
+          <Route path="/supervisao" element={<ProtectedRoute permission="crm.performance"><KanbanSupervisorPage /></ProtectedRoute>} />
+          <Route path="/super-dashboard" element={<ProtectedRoute permission="crm.performance"><SuperDashboardPage /></ProtectedRoute>} />
+          <Route path="/usuarios" element={<ProtectedRoute permission="fatores"><UserManagementPage /></ProtectedRoute>} />
           <Route path="/processos" element={<ProtectedRoute permission="financeiro"><InternalTasksPage /></ProtectedRoute>} />
           <Route path="/produtos" element={<ProtectedRoute permission="produtos"><ProductsPage /></ProtectedRoute>} />
           <Route path="/clientes" element={<ProtectedRoute permission="cadastros"><ClientList /></ProtectedRoute>} />

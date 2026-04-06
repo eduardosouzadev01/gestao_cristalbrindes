@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cristal Brindes - Sistema de Gestão</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1"
+        rel="stylesheet">
+    <link rel="icon" type="image/png" href="img/favicon.png">
+    <style>
+        /* =============================================
+           FLUENT 2 DESIGN SYSTEM
+           Inspired by New Microsoft Outlook
+           Clean · Flat · Professional · Calm
+           ============================================= */
+
+        :root {
+            /* ─── FLUENT BLUE ─── */
+            --fluent-brand: #0F6CBD;
+            --fluent-brand-hover: #115EA3;
+            --fluent-brand-active: #0C3B5E;
+            --fluent-brand-bg: #EBF3FC;
+            --fluent-brand-bg-hover: #CFE4FA;
+
+            /* ─── NEUTRAL PALETTE (Fluent 2) ─── */
+            --neutral-foreground-1: #242424;
+            --neutral-foreground-2: #424242;
+            --neutral-foreground-3: #616161;
+            --neutral-foreground-4: #707070;
+            --neutral-foreground-disabled: #BDBDBD;
+
+            --neutral-background-1: #FFFFFF;
+            --neutral-background-2: #FAFAFA;
+            --neutral-background-3: #F5F5F5;
+            --neutral-background-4: #F0F0F0;
+            --neutral-background-5: #E0E0E0;
+            --neutral-background-subtle: #F5F5F5;
+            --neutral-background-hover: #F5F5F5;
+            --neutral-background-selected: #EBF3FC;
+
+            --neutral-stroke-1: #D1D1D1;
+            --neutral-stroke-2: #E0E0E0;
+            --neutral-stroke-subtle: #E8E8E8;
+            --neutral-stroke-focus: #0F6CBD;
+
+            /* ─── SEMANTIC ─── */
+            --status-success-bg: #DFF6DD;
+            --status-success-fg: #0E700E;
+            --status-success-border: #9FD89F;
+            --status-warning-bg: #FFF1D6;
+            --status-warning-fg: #8A6116;
+            --status-warning-border: #FDCF72;
+            --status-danger-bg: #FDE7E9;
+            --status-danger-fg: #BC2F32;
+            --status-danger-border: #F6A2A5;
+            --status-info-bg: #EBF3FC;
+            --status-info-fg: #0F548C;
+            --status-info-border: #96C6FA;
+
+            /* ─── TIMING ─── */
+            --duration-fast: 0.1s;
+            --duration-normal: 0.2s;
+            --ease-fluent: cubic-bezier(0.33, 0, 0.67, 1);
+
+            /* ─── LEGACY ALIASES ─── */
+            --bg-page: transparent;
+            --bg-card: var(--neutral-background-1);
+            --bg-section: var(--neutral-background-2);
+            --bg-hover: var(--neutral-background-selected);
+            --text-primary: var(--neutral-foreground-1);
+            --text-body: var(--neutral-foreground-2);
+            --text-secondary: var(--neutral-foreground-3);
+            --text-label: var(--neutral-foreground-2);
+            --text-muted: var(--neutral-foreground-4);
+            --border-card: var(--neutral-stroke-2);
+            --border-input: var(--neutral-stroke-1);
+            --color-primary-700: var(--fluent-brand);
+            --color-primary-800: var(--fluent-brand-hover);
+        }
+
+        /* ─── BASE ─── */
+
+        #global-error {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            color: #ef4444;
+            padding: 2rem;
+            z-index: 9999;
+            overflow: auto;
+            font-family: monospace;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #FCFDFF 0%, #F4F7FA 100%);
+            background-attachment: fixed;
+            color: var(--neutral-foreground-2);
+            font-size: 14px;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        * {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* ─── SCROLLBAR (Fluent thin) ─── */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--neutral-stroke-1);
+            border-radius: 99px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #ABABAB;
+        }
+
+        /* ─── SELECTION ─── */
+        ::selection {
+            background: var(--fluent-brand-bg-hover);
+            color: var(--neutral-foreground-1);
+        }
+
+        /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+           GLOBAL COMPONENTS
+           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+        /* ─── INPUTS ─── */
+        input[type="text"],
+        input[type="number"],
+        input[type="email"],
+        input[type="password"],
+        input[type="tel"],
+        input[type="url"],
+        input[type="date"],
+        input[type="search"],
+        select,
+        textarea,
+        .form-input,
+        .form-select,
+        .form-textarea {
+            border: 1px solid var(--neutral-stroke-1) !important;
+            color: var(--neutral-foreground-1) !important;
+            background: var(--neutral-background-1) !important;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 400;
+            padding: 5px 10px;
+            transition: border-color var(--duration-fast) var(--ease-fluent);
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus,
+        .form-input:focus,
+        .form-select:focus {
+            border-color: var(--neutral-stroke-focus) !important;
+            box-shadow: none !important;
+            outline: 2px solid var(--fluent-brand) !important;
+            outline-offset: -2px;
+        }
+
+        ::placeholder {
+            color: var(--neutral-foreground-disabled) !important;
+            opacity: 1;
+            font-weight: 400;
+        }
+
+        /* ─── LABELS ─── */
+        label {
+            color: var(--neutral-foreground-2);
+            font-weight: 500;
+            font-size: 12px;
+            letter-spacing: normal;
+        }
+
+        /* ─── HEADINGS ─── */
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            color: var(--neutral-foreground-1);
+            letter-spacing: -0.01em;
+        }
+
+        h1,
+        h2 {
+            font-weight: 600;
+        }
+
+        h3,
+        h4,
+        h5,
+        h6 {
+            font-weight: 600;
+        }
+
+        /* ─── CARDS (Fluent: flat, border, no shadow) ─── */
+        .bg-white {
+            background: var(--neutral-background-1) !important;
+            border-color: var(--neutral-stroke-2) !important;
+            box-shadow: none !important;
+            border-radius: 8px;
+            transition: background var(--duration-fast) var(--ease-fluent);
+        }
+
+        /* ─── HEADER (Fluent: clean white, thin bottom border) ─── */
+        header.sticky,
+        header {
+            background: var(--neutral-background-1) !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            border-bottom: 1px solid var(--neutral-stroke-2) !important;
+            box-shadow: none !important;
+        }
+
+        /* ─── TABLES ─── */
+        table thead th {
+            background: var(--neutral-background-2) !important;
+            color: var(--neutral-foreground-3) !important;
+            font-weight: 600 !important;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            border-bottom: 1px solid var(--neutral-stroke-1) !important;
+            padding: 10px 12px !important;
+        }
+
+        table tbody td {
+            border-bottom: 1px solid var(--neutral-stroke-subtle) !important;
+            color: var(--neutral-foreground-2);
+            font-size: 13px;
+            font-weight: 400;
+            padding: 10px 12px !important;
+        }
+
+        table tbody tr {
+            transition: background var(--duration-fast) var(--ease-fluent);
+        }
+
+        /* No zebra — Outlook uses clean white */
+        table tbody tr:nth-child(even) {
+            background: transparent;
+        }
+
+        table tbody tr:hover {
+            background: var(--neutral-background-selected) !important;
+        }
+
+        /* ─── DROPDOWN MENUS ─── */
+        .group:hover>div,
+        [class*="absolute"][class*="bg-white"] {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+            border-color: var(--neutral-stroke-2) !important;
+            border-radius: 8px;
+        }
+
+        /* ─── BUTTONS (Fluent: flat, subtle, no lift) ─── */
+        button {
+            font-weight: 500;
+            transition: all var(--duration-fast) var(--ease-fluent);
+            cursor: pointer;
+        }
+
+        button[class*="bg-blue"],
+        a[class*="bg-blue"] {
+            box-shadow: none !important;
+            transition: background var(--duration-fast) var(--ease-fluent);
+        }
+
+        button[class*="bg-blue"]:hover,
+        a[class*="bg-blue"]:hover {
+            transform: none !important;
+            box-shadow: none !important;
+            filter: brightness(0.92);
+        }
+
+        button[class*="bg-blue"]:active,
+        a[class*="bg-blue"]:active {
+            transform: none !important;
+            filter: brightness(0.85);
+        }
+
+        /* ─── TAB CONTAINERS ─── */
+        .bg-gray-100 {
+            background: var(--neutral-background-subtle) !important;
+            border-radius: 8px;
+        }
+
+        /* ─── PAGINATION ─── */
+        nav[aria-label="Pagination"] button,
+        nav .pagination-btn {
+            border-color: var(--neutral-stroke-2) !important;
+        }
+
+        /* ─── FOOTER ─── */
+        footer {
+            background: var(--neutral-background-1) !important;
+            border-top: 1px solid var(--neutral-stroke-2) !important;
+        }
+
+        /* ─── LINKS ─── */
+        a {
+            transition: color var(--duration-fast) ease;
+        }
+
+        .material-icons-outlined {
+            transition: color var(--duration-fast) ease;
+        }
+
+        .rounded-full {
+            font-weight: 500;
+        }
+
+        /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+           FLUENT 2 DEEP OVERRIDES
+           Fixes patterns used across all 20 pages
+           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+        /* ═══ FONT WEIGHT NORMALIZATION ═══ */
+        .font-black {
+            font-weight: 600 !important;
+        }
+
+        .font-bold {
+            font-weight: 500 !important;
+        }
+
+        h1.font-black,
+        h2.font-black,
+        h3.font-black {
+            font-weight: 600 !important;
+        }
+
+        /* Numeric values stay strong */
+        .tabular-nums,
+        td .text-right.font-black {
+            font-weight: 600 !important;
+        }
+
+        /* ═══ TINY TEXT NORMALIZATION ═══ */
+        .text-\[8px\] {
+            font-size: 10px !important;
+            font-weight: 500 !important;
+            letter-spacing: 0.03em !important;
+        }
+
+        .text-\[9px\] {
+            font-size: 11px !important;
+            font-weight: 500 !important;
+            letter-spacing: 0.02em !important;
+        }
+
+        .text-\[10px\] {
+            font-size: 11px !important;
+            font-weight: 500 !important;
+        }
+
+        /* ═══ TRACKING NORMALIZATION ═══ */
+        .tracking-widest {
+            letter-spacing: 0.04em !important;
+        }
+
+        .tracking-tighter {
+            letter-spacing: -0.01em !important;
+        }
+
+        /* ═══ PAGE TITLES ═══ */
+        h1.text-xl,
+        h1.text-2xl,
+        h1.text-lg {
+            font-weight: 600 !important;
+            letter-spacing: -0.01em !important;
+            text-transform: none !important;
+            font-size: 18px !important;
+        }
+
+        /* ═══ STATUS BADGES (Fluent 2 style) ═══ */
+        .bg-yellow-400 {
+            background: var(--status-warning-bg) !important;
+            color: var(--status-warning-fg) !important;
+            border: 1px solid var(--status-warning-border) !important;
+            font-weight: 500 !important;
+            font-size: 11px !important;
+            border-radius: 4px !important;
+            box-shadow: none !important;
+            letter-spacing: 0.01em !important;
+        }
+
+        .bg-green-500,
+        .bg-emerald-500 {
+            background: var(--status-success-bg) !important;
+            color: var(--status-success-fg) !important;
+            border: 1px solid var(--status-success-border) !important;
+            font-weight: 500 !important;
+            font-size: 11px !important;
+            border-radius: 4px !important;
+            box-shadow: none !important;
+        }
+
+        .bg-red-500 {
+            background: var(--status-danger-bg) !important;
+            color: var(--status-danger-fg) !important;
+            border: 1px solid var(--status-danger-border) !important;
+            font-weight: 500 !important;
+            font-size: 11px !important;
+            border-radius: 4px !important;
+            box-shadow: none !important;
+        }
+
+        .bg-blue-500:not(button):not(a) {
+            background: var(--status-info-bg) !important;
+            color: var(--status-info-fg) !important;
+            border: 1px solid var(--status-info-border) !important;
+            font-weight: 500 !important;
+            border-radius: 4px !important;
+        }
+
+        /* ═══ FILTER LABELS ═══ */
+        label.text-\[9px\],
+        .text-\[9px\].text-gray-400 {
+            color: var(--neutral-foreground-3) !important;
+            font-size: 11px !important;
+            font-weight: 500 !important;
+        }
+
+        /* ═══ FILTER CONTAINER ═══ */
+        .bg-white.shadow-sm.rounded-lg.border {
+            padding: 12px 16px !important;
+            border-radius: 8px !important;
+        }
+
+        select.form-select,
+        select.text-xs {
+            font-weight: 400 !important;
+        }
+
+        /* ═══ ACTION ICONS IN TABLES ═══ */
+        td button .material-icons-outlined {
+            font-size: 18px !important;
+            color: var(--neutral-foreground-4);
+            transition: color var(--duration-fast) ease;
+        }
+
+        td button:hover .material-icons-outlined {
+            color: var(--fluent-brand) !important;
+        }
+
+        /* ═══ BORDER RADIUS (Fluent 2: subtle, 4-8px) ═══ */
+        .rounded-lg {
+            border-radius: 8px !important;
+        }
+
+        .rounded {
+            border-radius: 4px !important;
+        }
+
+        .rounded-xl,
+        .rounded-2xl {
+            border-radius: 8px !important;
+        }
+
+        /* ═══ CATEGORY CHIPS ═══ */
+        .bg-gray-100.text-\[8px\],
+        .bg-gray-100.text-gray-600 {
+            background: var(--neutral-background-subtle) !important;
+            border: 1px solid var(--neutral-stroke-2) !important;
+            font-weight: 400 !important;
+            font-size: 11px !important;
+            border-radius: 4px !important;
+            padding: 2px 8px !important;
+            box-shadow: none !important;
+        }
+
+        /* ═══ LINKS IN TABLES ═══ */
+        td .text-blue-600 {
+            color: var(--fluent-brand) !important;
+            font-weight: 500 !important;
+            text-decoration: none !important;
+        }
+
+        td .text-blue-600:hover {
+            color: var(--fluent-brand-hover) !important;
+            text-decoration: underline !important;
+        }
+
+        /* ═══ SUBTEXT IN ROWS ═══ */
+        td .text-gray-400.uppercase {
+            font-weight: 400 !important;
+            color: var(--neutral-foreground-4) !important;
+        }
+
+        /* ═══ NEW/ACTION BUTTONS (Fluent 2 compound button) ═══ */
+        .bg-blue-600.text-white:not(.bg-blue-700) {
+            border-radius: 4px !important;
+            font-weight: 500 !important;
+            letter-spacing: normal !important;
+            font-size: 12px !important;
+        }
+
+        /* ═══ EMPTY STATES ═══ */
+        .text-gray-400.italic {
+            color: var(--neutral-foreground-4) !important;
+            font-style: normal !important;
+            font-weight: 400 !important;
+        }
+
+        /* ═══ SHADOW CLASSES → FLAT ═══ */
+        .shadow-sm,
+        .shadow,
+        .shadow-md,
+        .shadow-lg,
+        .shadow-xl {
+            box-shadow: none !important;
+        }
+
+        /* ═══ KPI CARDS: Subtle hover ═══ */
+        .bg-white[class*="rounded-xl"]:hover,
+        .bg-white[class*="rounded-lg"]:hover {
+            background: var(--neutral-background-2) !important;
+        }
+
+        /* ═══ PAGINATION ACTIVE ═══ */
+        .bg-blue-600.text-white[class*="rounded"] {
+            border-radius: 4px !important;
+            font-weight: 500 !important;
+        }
+
+        /* ==========================================
+           ACCESSIBILITY: Reduced Motion Support
+           ========================================== */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* ─── RICH TEXT CONTENT ─── */
+        .rich-text-content ul, 
+        [contenteditable] ul {
+            list-style-type: disc !important;
+            padding-left: 1.25rem !important;
+            margin: 0.5rem 0 !important;
+        }
+        .rich-text-content ol,
+        [contenteditable] ol {
+            list-style-type: decimal !important;
+            padding-left: 1.25rem !important;
+            margin: 0.5rem 0 !important;
+        }
+        .rich-text-content li,
+        [contenteditable] li {
+            margin-bottom: 0.125rem !important;
+            display: list-item !important;
+        }
+        .rich-text-content b, .rich-text-content strong, [contenteditable] b, [contenteditable] strong {
+            font-weight: 900 !important;
+            color: #000000 !important;
+        }
+        .rich-text-content i, .rich-text-content em, [contenteditable] i, [contenteditable] em {
+            font-style: italic !important;
+        }
+        .rich-text-content u, [contenteditable] u {
+            text-decoration: underline !important;
+        }
+    </style>
+    <script>
+        // Polyfill for process.env
+        window.process = { env: { NODE_ENV: 'production' } };
+
+        // Global Error Handler for White Screen of Death debugging
+        window.addEventListener('error', function (event) {
+            var errorBox = document.getElementById('global-error');
+            if (errorBox) {
+                errorBox.style.display = 'block';
+                errorBox.innerHTML += '<h3>Erro Detectado:</h3><pre>' + event.message + '\n' + (event.filename || '') + ':' + (event.lineno || '') + '</pre><hr>';
+            }
+        });
+
+        window.addEventListener('unhandledrejection', function (event) {
+            var errorBox = document.getElementById('global-error');
+            if (errorBox) {
+                errorBox.style.display = 'block';
+                errorBox.innerHTML += '<h3>Promessa Rejeitada:</h3><pre>' + (event.reason ? (event.reason.stack || event.reason) : 'Unknown reason') + '</pre><hr>';
+            }
+        });
+    </script>
+</head>
+
+<body class="min-h-screen" style="color: var(--text-body, #374151);">
+    <div id="global-error">
+        <h1 class="text-2xl font-bold mb-4 text-black">Ops! Algo deu errado ao carregar.</h1>
+        <p class="text-gray-600 mb-4">Por favor, envie um print desta tela para o suporte.</p>
+        <hr class="my-4 border-gray-300">
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+</body>
+
+</html>

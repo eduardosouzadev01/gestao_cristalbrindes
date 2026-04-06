@@ -5,10 +5,24 @@ import { formatCurrency } from '../src/utils/formatCurrency';
 import { toast } from 'sonner';
 import html2pdf from 'html2pdf.js';
 
+const SENDER_ACCOUNTS: Record<string, { pass: string; name: string }> = {
+    'vendas01@cristalbrindes.com.br': { pass: 'CristalV01*01', name: 'Vendas 01' },
+    'vendas02@cristalbrindes.com.br': { pass: 'CristalV02*02', name: 'Vendas 02' },
+    'vendas03@cristalbrindes.com.br': { pass: 'CristalV03*03', name: 'Vendas 03' },
+    'vendas04@cristalbrindes.com.br': { pass: 'CristalV04*01', name: 'Vendas 04' }
+};
+
 const ProposalDetail: React.FC = () => {
     const { id } = useParams();
     const [proposal, setProposal] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [showEmailModal, setShowEmailModal] = useState(false);
+    const [isSendingEmail, setIsSendingEmail] = useState(false);
+    const [emailForm, setEmailForm] = useState({
+        to: '',
+        cc: '',
+        senderId: 'vendas01@cristalbrindes.com.br'
+    });
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -43,11 +57,73 @@ const ProposalDetail: React.FC = () => {
         }, 500);
     };
 
-    const handleSendEmail = () => {
+    const handleOpenEmailModal = () => {
         if (!proposal) return;
-        const subject = encodeURIComponent(`Proposta Comercial - ${proposal.proposal_number}`);
-        const body = encodeURIComponent(`Olá,\n\nSegue link para visualização da proposta comercial: ${window.location.href}\n\nAtenciosamente,\nEquipe Cristal Brindes`);
-        window.location.href = `mailto:${proposal.client?.email || ''}?subject=${subject}&body=${body}`;
+        
+        let initialSender = 'vendas01@cristalbrindes.com.br';
+        const salesEmail = getSalespersonEmail();
+        // If salesperson matches one of our accounts, select it auto
+        if (Object.keys(SENDER_ACCOUNTS).includes(salesEmail)) {
+            initialSender = salesEmail;
+        }
+
+        setEmailForm({
+            to: proposal.client?.email || '',
+            cc: '',
+            senderId: initialSender
+        });
+        setShowEmailModal(true);
+    };
+
+    const handleSendEmail = async () => {
+        if (!proposal) return;
+        if (!emailForm.to) {
+            toast.error('Preencha o e-mail do destinatário.');
+            return;
+        }
+
+        setIsSendingEmail(true);
+        const account = SENDER_ACCOUNTS[emailForm.senderId];
+        
+        try {
+            const subject = `Proposta Comercial #${proposal.proposal_number} - Cristal Brindes`;
+            const html = `
+                <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <h2 style="color: #2563eb;">Olá, ${proposal.client?.name || 'Cliente'}!</h2>
+                    <p>Sua proposta comercial <strong>#${proposal.proposal_number}</strong> já está disponível.</p>
+                    <p>Para visualizar todos os detalhes, valores e condições, acesse o link abaixo:</p>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="${window.location.href}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Visualizar Proposta</a>
+                    </div>
+                    <p style="font-size: 14px; color: #666;">Se o botão não funcionar, copie e cole o link abaixo no seu navegador:</p>
+                    <p style="font-size: 12px; color: #666; word-break: break-all;">${window.location.href}</p>
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+                    <p style="font-size: 14px;">Atenciosamente,<br><strong>Equipe Cristal Brindes</strong></p>
+                </div>
+            `;
+
+            const { data, error } = await supabase.functions.invoke('send-email', {
+                body: {
+                    to: emailForm.to + (emailForm.cc ? `, ${emailForm.cc}` : ''),
+                    subject: subject,
+                    html: html,
+                    replyTo: emailForm.senderId,
+                    smtpUser: emailForm.senderId,
+                    smtpPass: account.pass
+                }
+            });
+
+            if (error) throw new Error(error.message);
+            if (data?.error) throw new Error(data.error);
+
+            toast.success('E-mail enviado com sucesso!');
+            setShowEmailModal(false);
+        } catch (error: any) {
+            console.error('Erro ao enviar email:', error);
+            toast.error('Falha ao enviar e-mail: ' + (error.message || 'Erro desconhecido.'));
+        } finally {
+            setIsSendingEmail(false);
+        }
     };
 
     if (loading) return <div className="p-8 text-center">Carregando proposta...</div>;
@@ -101,7 +177,7 @@ const ProposalDetail: React.FC = () => {
                     <span className="material-icons-outlined">arrow_back</span> Voltar
                 </button>
                 <div className="flex gap-3">
-                    <button onClick={handleSendEmail} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 font-bold text-gray-700">
+                    <button onClick={handleOpenEmailModal} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 font-bold text-gray-700">
                         <span className="material-icons-outlined">email</span> Enviar por E-mail
                     </button>
                     <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg shadow-sm hover:bg-blue-600 font-bold">
@@ -319,6 +395,90 @@ const ProposalDetail: React.FC = () => {
                     .min-h-screen { min-height: 0 !important; }
                 }
             `}</style>
+            
+            {/* Modal Enviar E-mail */}
+            {showEmailModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+                        <div className="p-6 border-b flex justify-between items-center bg-gray-50">
+                            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                                <span className="material-icons-outlined text-blue-600">send</span>
+                                Enviar Proposta por E-mail
+                            </h2>
+                            <button onClick={() => !isSendingEmail && setShowEmailModal(false)} className="text-gray-400 hover:text-gray-600">
+                                <span className="material-icons-outlined">close</span>
+                            </button>
+                        </div>
+                        
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Conta de Envio (Remetente):</label>
+                                <select 
+                                    value={emailForm.senderId}
+                                    onChange={e => setEmailForm({...emailForm, senderId: e.target.value})}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                    disabled={isSendingEmail}
+                                >
+                                    {Object.entries(SENDER_ACCOUNTS).map(([email, account]) => (
+                                        <option key={email} value={email}>{account.name} - {email}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">E-mail do Destinatário (Cliente):</label>
+                                <input 
+                                    type="email"
+                                    value={emailForm.to}
+                                    onChange={e => setEmailForm({...emailForm, to: e.target.value})}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                    placeholder="cliente@exemplo.com"
+                                    disabled={isSendingEmail}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Adicionar Cópia (CC): <span className="text-gray-400 text-xs font-normal">Opcional</span></label>
+                                <input 
+                                    type="email"
+                                    value={emailForm.cc}
+                                    onChange={e => setEmailForm({...emailForm, cc: e.target.value})}
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                    placeholder="vendedor@cristalbrindes..."
+                                    disabled={isSendingEmail}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
+                            <button 
+                                onClick={() => setShowEmailModal(false)}
+                                disabled={isSendingEmail}
+                                className="px-5 py-2 font-bold text-gray-600 bg-white border rounded-lg hover:bg-gray-100 disabled:opacity-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                onClick={handleSendEmail}
+                                disabled={isSendingEmail || !emailForm.to}
+                                className="px-5 py-2 font-bold text-white bg-blue-600 rounded-lg shadow disabled:opacity-70 hover:bg-blue-700 flex items-center gap-2"
+                            >
+                                {isSendingEmail ? (
+                                    <>
+                                        <span className="material-icons-outlined animate-spin text-sm">autorenew</span>
+                                        Enviando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="material-icons-outlined text-sm">send</span>
+                                        Enviar Agora
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
