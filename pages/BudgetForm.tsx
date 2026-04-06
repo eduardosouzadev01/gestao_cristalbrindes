@@ -51,10 +51,12 @@ const CustomSelect: React.FC<{
         return () => document.removeEventListener('mousedown', click);
     }, []);
 
-    const filtered = options.filter(o =>
-        o.name.toLowerCase().includes(search.toLowerCase()) ||
-        (o.code && o.code.toLowerCase().includes(search.toLowerCase()))
-    );
+    const filtered = options.filter(o => {
+        const name = o.name || '';
+        const code = o.code || '';
+        return name.toLowerCase().includes(search.toLowerCase()) ||
+               code.toLowerCase().includes(search.toLowerCase());
+    });
 
     return (
         <div className="relative" ref={ref}>
@@ -384,15 +386,15 @@ const BudgetForm: React.FC = () => {
         let sortedFactors = f || [];
         const factorOrder = ["ideal", "médio", "médio", "mínimo", "minimo"];
         sortedFactors.sort((a, b) => {
-            const nameA = a.name.toLowerCase();
-            const nameB = b.name.toLowerCase();
+            const nameA = (a.name || '').toLowerCase();
+            const nameB = (b.name || '').toLowerCase();
             const indexA = factorOrder.findIndex(o => nameA.includes(o));
             const indexB = factorOrder.findIndex(o => nameB.includes(o));
 
             if (indexA !== indexB) {
-                if (indexA === -1) return 1;
-                if (indexB === -1) return -1;
-                return indexA - indexB;
+                const finalIndexA = indexA === -1 ? 999 : indexA;
+                const finalIndexB = indexB === -1 ? 999 : indexB;
+                return finalIndexA - finalIndexB;
             }
 
             // Se pertencerem à mesma categoria, o fator "limpo" (sem prazos) vem primeiro
@@ -1028,7 +1030,7 @@ const BudgetForm: React.FC = () => {
     return (
         <div className="font-sans-budget min-h-screen bg-[var(--bg-page-budget)] pb-24">
             {/* HEADER FIXED/STICKY */}
-            <header className="sticky top-0 z-50 bg-[var(--bg-surface-budget)] border-b border-[var(--border-subtle-budget)] px-6 py-3 flex justify-between items-center h-[56px]">
+            <header className="sticky top-[52px] z-40 bg-[var(--bg-surface-budget)] border-b border-[var(--border-subtle-budget)] px-6 py-3 flex justify-between items-center h-[56px]">
                 <div className="flex items-center gap-4">
                     <button onClick={() => navigate('/orcamentos')} className="text-[var(--text-secondary-budget)] hover:text-[var(--text-primary-budget)] transition-colors">
                         <span className="material-icons-outlined">arrow_back</span>
@@ -1076,7 +1078,7 @@ const BudgetForm: React.FC = () => {
                         {[
                             { label: 'Orcamento', value: `#${budgetNumber || 'NOVO'}`, icon: 'receipt_long', color: 'text-blue-500' },
                             { label: 'Data', value: new Date(dataOrcamento).toLocaleDateString('pt-BR'), icon: 'calendar_today', color: 'text-indigo-500' },
-                            { label: 'Empresa', value: issuer === 'CRISTAL' ? 'CB' : issuer, icon: 'business', color: 'text-slate-500', canEdit: true },
+                            { label: 'Empresa', value: issuer === 'CRISTAL' ? 'CB' : (issuer === 'EC' || issuer === 'EB') ? 'EB' : issuer, icon: 'business', color: 'text-slate-500', canEdit: true },
                             { label: 'Vendedor', value: vendedor || '—', icon: 'person', color: 'text-emerald-500' }
                         ].map(cell => (
                             <div key={cell.label} className="min-w-[120px] flex-1 px-5 py-4 hover:bg-[#EAEBEC]/50 transition-all group/cell">
@@ -1092,7 +1094,7 @@ const BudgetForm: React.FC = () => {
                                             onChange={e => setIssuer(e.target.value)}
                                         >
                                             <option value="CRISTAL">CB</option>
-                                            <option value="EC">EC</option>
+                                            <option value="EB">EB</option>
                                             <option value="NB">NB</option>
                                         </select>
                                     </div>

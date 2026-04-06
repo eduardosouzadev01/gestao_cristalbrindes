@@ -40,10 +40,12 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
         }
     }, [search, isOpen]);
 
-    const filtered = options.filter(o =>
-        o.name.toLowerCase().includes(search.toLowerCase()) ||
-        (o.code && o.code.toLowerCase().includes(search.toLowerCase()))
-    );
+    const filtered = options.filter(o => {
+        const name = (o.name || '').toLowerCase();
+        const code = (o.code || '').toLowerCase();
+        const searchTerm = (search || '').toLowerCase();
+        return name.includes(searchTerm) || code.includes(searchTerm);
+    });
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
