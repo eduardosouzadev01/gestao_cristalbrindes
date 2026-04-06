@@ -481,7 +481,7 @@ const BudgetForm: React.FC = () => {
             const mappedItems = await Promise.all(data.budget_items.map(async (it: any) => {
                 // Fetch variations and main image if missing
                 const { data: pData } = await supabase.from('products')
-                    .select('variations, color, stock, image_url, code')
+                    .select('variations, color, stock, image_url, image, code')
                     .eq('name', it.product_name)
                     .limit(10); // Find a few to aggregate variations if needed
 
@@ -573,7 +573,7 @@ const BudgetForm: React.FC = () => {
                     productDescription: it.product_description || '',
                     productColor: it.product_color || '',
                     productCode: it.product_code || (pData?.find(p => p.color === it.product_color)?.code) || (pData && pData[0]?.code) || '',
-                    productImage: it.product_image_url || (pData?.find(p => p.color === it.product_color)?.image_url) || (pData && pData[0]?.image_url) || '',
+                    productImage: it.product_image_url || (pData?.find(p => p.color === it.product_color)?.image_url) || (pData?.find(p => p.color === it.product_color)?.image) || (pData && (pData[0]?.image_url || pData[0]?.image)) || '',
                     variations: aggregatedVars
                 };
             }));
@@ -1160,7 +1160,7 @@ const BudgetForm: React.FC = () => {
                             { label: 'Natureza da Operação', value: natureza, setter: setNatureza, icon: 'swap_horiz' },
                             { label: 'Logística / Frete', value: shipping, setter: setShipping, icon: 'local_shipping', list: 'shipping-options' },
                             { label: 'Prazo de Entrega', value: deliveryDeadline, setter: setDeliveryDeadline, icon: 'event_available' },
-                            { label: 'Forma de Pagamento', value: paymentMethod, setter: setPaymentMethod, icon: 'payments' }
+                            { label: 'Forma de Pagamento', value: paymentMethod, setter: setPaymentMethod, icon: 'payments', list: 'payment-options' }
                         ].map(cond => (
                             <div key={cond.label} className="p-4 hover:bg-slate-50/50 transition-colors">
                                 <div className="flex items-center gap-2 mb-1.5">
@@ -1174,12 +1174,22 @@ const BudgetForm: React.FC = () => {
                                     disabled={status === 'PROPOSTA ACEITA'}
                                     list={cond.list}
                                 />
-                                {cond.list && (
-                                    <datalist id={cond.list}>
+                                {cond.list === 'shipping-options' && (
+                                    <datalist id="shipping-options">
                                         <option value="Frete incluso para Grande Vitória, exceto Guarapari." />
                                         <option value="Cliente retira" />
                                         <option value="Frete incluso" />
-                                        <option value="Frete por conta do cliente" />
+                                        <option value="Frete por parte do cliente" />
+                                    </datalist>
+                                )}
+                                {cond.list === 'payment-options' && (
+                                    <datalist id="payment-options">
+                                        <option value="50% na entrada e 50% no pedido pronto." />
+                                        <option value="100% à vista." />
+                                        <option value="7 dias faturados" />
+                                        <option value="15 dias faturados" />
+                                        <option value="21 dias faturados" />
+                                        <option value="30 dias faturados." />
                                     </datalist>
                                 )}
                             </div>

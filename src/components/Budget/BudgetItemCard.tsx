@@ -3,6 +3,7 @@ import { Draggable } from '@hello-pangea/dnd';
 import { formatCurrency, parseCurrencyToNumber } from '../../utils/formatCurrency';
 import { calculateItemTotal } from '../../utils/formulas';
 import RichTextEditor from '../common/RichTextEditor';
+import { supabase } from '../../../lib/supabase';
 
 interface BudgetItemCardProps {
     it: any;
@@ -89,14 +90,13 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                             <div className="flex-1 max-w-xl">
                                 <CustomSelect
                                     options={productsList}
-                                    onSelect={(p: any) => {
+                                    onSelect={async (p: any) => {
                                         updateItem(it.id, 'product_id', p.id);
                                         updateItem(it.id, 'productName', p.name);
                                         updateItem(it.id, 'productCode', p.code);
                                         updateItem(it.id, 'productImage', p.image_url || p.image);
                                         updateItem(it.id, 'productDescription', p.description);
                                         updateItem(it.id, 'productColor', p.color || '');
-                                        updateItem(it.id, 'variations', p.variations || []);
                                         
                                         // Auto-set supplier based on product source
                                         if (p.source) {
@@ -105,6 +105,29 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                                             if (supplier) {
                                                 updateItem(it.id, 'supplier_id', supplier.id);
                                             }
+                                        }
+
+                                        // ASIA/Flat Products Fix: Fetch variations if not present as JSON
+                                        if (!p.variations || p.variations.length === 0) {
+                                            const baseName = p.name.split(' - ')[0];
+                                            const { data: vData } = await supabase.from('products')
+                                                .select('color, stock, image_url, code, image')
+                                                .eq('name', baseName)
+                                                .limit(30);
+                                            
+                                            if (vData && vData.length > 1) {
+                                                const vars = vData.map((v: any) => ({
+                                                    color: v.color,
+                                                    stock: v.stock,
+                                                    image: v.image_url || v.image,
+                                                    code: v.code
+                                                }));
+                                                updateItem(it.id, 'variations', vars);
+                                            } else {
+                                                updateItem(it.id, 'variations', []);
+                                            }
+                                        } else {
+                                            updateItem(it.id, 'variations', p.variations);
                                         }
                                     }}
                                     placeholder="Buscar produto no catálogo..."
@@ -289,13 +312,13 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                                                 <div className="col-span-4 text-[12px] font-[600] text-[var(--text-secondary-budget)] truncate">{row.label}</div>
                                                 <div className="col-span-5">
                                                     <select
-                                                        className="w-full text-[12px] bg-transparent border-none p-0 focus:ring-0 text-[var(--text-primary-budget)] font-semibold"
+                                                        className="w-full text-[11px] bg-slate-50/50 border border-[#D0D3D6]/50 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500/30 focus:border-blue-400 transition-all text-[var(--text-primary-budget)] font-semibold cursor-pointer hover:bg-white"
                                                         value={it[row.suppKey] || ''}
                                                         onChange={e => updateItem(it.id, row.suppKey, e.target.value)}
                                                         disabled={isLocked}
                                                     >
                                                         <option value="">Fornecedor...</option>
-                                                        {suppliersList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                                        {suppliersList.map(s => <option key={s.id} value={s.id}>{s.name || s.nome}</option>)}
                                                     </select>
                                                 </div>
                                                 <div className="col-span-3">
@@ -317,8 +340,8 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                                         <div className="flex-1 space-y-2">
                                             <label className="text-[10px] uppercase font-[700] text-[var(--text-tertiary-budget)] tracking-[0.06em]">Impostos (NF)</label>
                                             <div className="flex bg-[var(--bg-surface-budget)] border border-[#D0D3D6] rounded-[var(--radius-md-budget)] p-1">
-                                                <button onClick={() => handleNFToggle(14)} className={`flex-1 py-1 rounded-[var(--radius-sm-budget)] text-[10px] font-[700] uppercase transition-all ${(it.mockNF ?? 14) === 14 ? 'bg-[var(--color-info-budget)] text-white shadow-sm' : 'text-[var(--text-tertiary-budget)] hover:text-[var(--text-secondary-budget)]'}`} type="button">14%</button>
-                                                <button onClick={() => handleNFToggle(0)} className={`flex-1 py-1 rounded-[var(--radius-sm-budget)] text-[10px] font-[700] uppercase transition-all ${(it.mockNF ?? 14) === 0 ? 'bg-[var(--color-info-budget)] text-white shadow-sm' : 'text-[var(--text-tertiary-budget)] hover:text-[var(--text-secondary-budget)]'}`} type="button">0%</button>
+                                                <button onClick={() => handleNFToggle(14)} className={`flex-1 py-1 rounded-[var(--radius-sm-budget)] text-[10px] font-[700] uppercase transition-all ${(it.mockNF ?? 14) === 14 ? 'bg-blue-600 text-white shadow-sm' : 'text-[var(--text-tertiary-budget)] hover:text-[var(--text-secondary-budget)]'}`} type="button">14%</button>
+                                                <button onClick={() => handleNFToggle(0)} className={`flex-1 py-1 rounded-[var(--radius-sm-budget)] text-[10px] font-[700] uppercase transition-all ${(it.mockNF ?? 14) === 0 ? 'bg-blue-600 text-white shadow-sm' : 'text-[var(--text-tertiary-budget)] hover:text-[var(--text-secondary-budget)]'}`} type="button">0%</button>
                                             </div>
                                         </div>
                                         <div className="flex-[2] space-y-2">
@@ -370,18 +393,23 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                                                 <span className="text-slate-600 font-mono-budget">{formatCurrency(totalVenda * ((it.mockNF ?? 14) / 100))}</span>
                                             </div>
                                             <div className="flex justify-between items-center bg-white/50 px-2 py-1 rounded">
-                                                <span>Custo Total</span>
-                                                <span className="text-slate-600 font-mono-budget">{formatCurrency(((it.quantity || 0) * (it.priceUnit || 0)) + (it.custoPersonalizacao || 0) + (it.layoutCost || 0) + (it.transpFornecedor || 0) + (it.transpCliente || 0))}</span>
+                                                <span>Custo Total (+ Imposto)</span>
+                                                <span className="text-slate-600 font-mono-budget">
+                                                    {formatCurrency(
+                                                        ((it.quantity || 0) * (it.priceUnit || 0)) + 
+                                                        (it.custoPersonalizacao || 0) + 
+                                                        (it.layoutCost || 0) + 
+                                                        (it.transpFornecedor || 0) + 
+                                                        (it.transpCliente || 0) + 
+                                                        (totalVenda * ((it.mockNF ?? 14) / 100))
+                                                    )}
+                                                </span>
                                             </div>
                                             <div className="flex justify-between items-center bg-emerald-50/50 px-2 py-1 rounded">
                                                 <span className="text-emerald-500">Lucro Estimado</span>
                                                 <span className="text-emerald-700 font-mono-budget">
                                                     {formatCurrency(totalVenda - (((it.quantity || 0) * (it.priceUnit || 0)) + (it.custoPersonalizacao || 0) + (it.layoutCost || 0) + (it.transpFornecedor || 0) + (it.transpCliente || 0)) - (totalVenda * ((it.mockNF ?? 14) / 100)))}
                                                 </span>
-                                            </div>
-                                            <div className="flex justify-between items-center bg-slate-100/50 px-2 py-1 rounded">
-                                                <span className="text-slate-500">Fator Aplicado</span>
-                                                <span className="text-slate-600 font-mono-budget">{it.fator?.toFixed(4) || '1.3500'}</span>
                                             </div>
                                         </div>
 

@@ -143,19 +143,27 @@ export async function fetchXBZProducts(
     const targetUrl = `${API_CONFIG.xbz.baseUrl}?cnpj=${API_CONFIG.xbz.cnpj}&token=${API_CONFIG.xbz.token}`;
     const response = await proxyFetch('xbz', targetUrl);
     const data = await response.json();
-
-    if (!Array.isArray(data)) throw new Error('XBZ: unexpected response format');
+    let productsData: any[] = [];
+    if (Array.isArray(data)) {
+        productsData = data;
+    } else if (data.produtos && Array.isArray(data.produtos)) {
+        productsData = data.produtos;
+    } else if (data.Data && Array.isArray(data.Data)) {
+        productsData = data.Data;
+    } else {
+        throw new Error('XBZ: unexpected response format');
+    }
 
     const BATCH_SIZE = 40;
     const allItems: Product[] = [];
 
-    for (let i = 0; i < data.length; i += BATCH_SIZE) {
-        const chunk = data.slice(i, i + BATCH_SIZE).map(mapXBZProduct);
+    for (let i = 0; i < productsData.length; i += BATCH_SIZE) {
+        const chunk = productsData.slice(i, i + BATCH_SIZE).map(mapXBZProduct);
         allItems.push(...chunk);
         onBatch?.(chunk);
 
         // Yield to the event loop so React can render
-        if (i + BATCH_SIZE < data.length) {
+        if (i + BATCH_SIZE < productsData.length) {
             await new Promise((r) => setTimeout(r, 0));
         }
     }
@@ -394,19 +402,20 @@ export async function fetchSpotProducts(
     const stockVariationsMap: Record<string, any[]> = {};
 
     stocksData.forEach((row) => {
-        if (row.ProdReference) {
-            stockMap[row.ProdReference] =
-                (stockMap[row.ProdReference] || 0) + (parseInt(row.Quantity) || 0);
+        const ref = row.ProdReference || (row.Reference ? row.Reference.split('-')[0] : null);
+        if (ref) {
+            stockMap[ref] =
+                (stockMap[ref] || 0) + (parseInt(row.Quantity) || 0);
             
             const color = row.ColorName || row.Color || 'N/A';
             if (color !== 'N/A' && color !== '') {
-                if (!stockVariationsMap[row.ProdReference]) stockVariationsMap[row.ProdReference] = [];
-                const existing = stockVariationsMap[row.ProdReference].find((v: any) => v.color === color);
+                if (!stockVariationsMap[ref]) stockVariationsMap[ref] = [];
+                const existing = stockVariationsMap[ref].find((v: any) => v.color === color);
                 if (existing) {
                     existing.stock += (parseInt(row.Quantity) || 0);
                 } else {
-                    stockVariationsMap[row.ProdReference].push({
-                        id: row.Reference || row.Sku || `${row.ProdReference}-${color}`,
+                    stockVariationsMap[ref].push({
+                        id: row.Reference || row.Sku || `${ref}-${color}`,
                         color: color,
                         image: '', // Fill later
                         stock: parseInt(row.Quantity) || 0,

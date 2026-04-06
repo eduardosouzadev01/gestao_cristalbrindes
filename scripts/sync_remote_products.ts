@@ -155,38 +155,98 @@ async function syncSpot() {
         return lines.slice(1).map(line => {
             const values = line.split(';').map(v => v.trim().replace(/"/g, ''));
             const row: any = {};
-            headers.forEach((h, i) => row[h] = values[i]);
+            headers.forEach((h, i) => row[h] = values[i] || '');
             return row;
         });
     };
 
-    const products = parseCSV(productsRaw);
-    const stocks = parseCSV(stocksRaw);
-    const optionals = parseCSV(optionalsRaw);
+    const productsData = parseCSV(productsRaw);
+    const stocksData = parseCSV(stocksRaw);
+    const optionalsData = parseCSV(optionalsRaw);
 
-    const stockMap: any = {};
-    stocks.forEach((s: any) => {
-        if (s.ProdReference) stockMap[s.ProdReference] = (stockMap[s.ProdReference] || 0) + (parseInt(s.Quantity) || 0);
+    const stockMap: Record<string, number> = {};
+    const stockVariationsMap: Record<string, any[]> = {};
+
+    stocksData.forEach((row) => {
+        const ref = row.ProdReference || (row.Reference ? row.Reference.split('-')[0] : null);
+        if (ref) {
+            stockMap[ref] =
+                (stockMap[ref] || 0) + (parseInt(row.Quantity) || 0);
+
+            const color = row.ColorName || row.Color || 'N/A';
+            if (color !== 'N/A' && color !== '') {
+                if (!stockVariationsMap[ref]) stockVariationsMap[ref] = [];
+                const existing = stockVariationsMap[ref].find((v: any) => v.color === color);
+                if (existing) {
+                    existing.stock += (parseInt(row.Quantity) || 0);
+                } else {
+                    stockVariationsMap[ref].push({
+                        id: row.Reference || row.Sku || `${ref}-${color}`,
+                        color: color,
+                        image: '', 
+                        stock: parseInt(row.Quantity) || 0,
+                        price: 0
+                    });
+                }
+            }
+        }
     });
 
-    const variationsMap: any = {};
-    optionals.forEach((row: any) => {
+    const variationsMap: Record<string, any[]> = {};
+    optionalsData.forEach((row) => {
         const ref = row.ProdReference;
         if (!ref) return;
-        const price = parseFloat((row.Value || row.Price || row.Preco || '0').replace(',', '.'));
+
+        const price = parseFloat(
+            (row.Value || row.Price || row.Preco || '0').replace(',', '.'),
+        );
+        const color = row.ColorName || 'N/A';
+        const img = row.ImageLink
+            ? row.ImageLink.startsWith('http')
+                ? row.ImageLink
+                : 'https://www.spotgifts.com.br/fotos/produtos/' + row.ImageLink
+            : '';
+
         if (!variationsMap[ref]) variationsMap[ref] = [];
-        variationsMap[ref].push({
-            id: row.Sku || `${ref}-${row.ColorName}`,
-            color: row.ColorName || 'N/A',
-            price: price,
-            stock: stockMap[ref] || 0
-        });
+        if (!variationsMap[ref].some((v: any) => v.color === color)) {
+            variationsMap[ref].push({
+                id: row.Sku || row.WebSku || `${ref}-${color}`,
+                color: color,
+                image: img,
+                stock: stockMap[ref] || 0,
+                price: price
+            });
+        }
     });
 
-    const items = products.filter((p: any) => p.ProdReference).map((p: any) => {
+    const items = productsData.filter((p: any) => p.ProdReference).map((p: any) => {
         const ref = p.ProdReference;
-        const vList = variationsMap[ref] || [];
-        const price = vList.length > 0 ? vList[0].price : 0;
+        
+        let variationList = variationsMap[ref] || [];
+        if (variationList.length === 0 && stockVariationsMap[ref]) {
+             variationList = stockVariationsMap[ref].map(sv => ({
+                 ...sv,
+                 price: parseFloat((p.Price || p.Preco || p.WebPrice || p.Value || '0').replace(',', '.'))
+             }));
+        }
+
+        const stock = stockMap[ref] || 0;
+        const prices = variationList.map(v => v.price).filter(p => p > 0);
+        const price = prices.length > 0 ? Math.min(...prices) : parseFloat((p.Price || p.Preco || p.WebPrice || p.Value || '0').replace(',', '.'));
+
+        const images: string[] = [];
+        const baseUrl = 'https://www.spotgifts.com.br/fotos/produtos/';
+        const addImg = (img: string | undefined) => {
+            if (!img) return;
+            const trimmed = img.trim();
+            if (!trimmed) return;
+            const url = trimmed.startsWith('http') ? trimmed : baseUrl + trimmed;
+            if (!images.includes(url)) images.push(url);
+        };
+
+        addImg(p.MainImage);
+        if (p.AllImageList) p.AllImageList.split(',').forEach(addImg);
+        if (p.AditionalImageList) p.AditionalImageList.split(',').forEach(addImg);
 
         return {
             source: 'Spot',
@@ -195,10 +255,16 @@ async function syncSpot() {
             description: p.Description || p.ShortDescription || '',
             code: ref,
             unit_price: price,
-            image_url: p.MainImage ? (p.MainImage.startsWith('http') ? p.MainImage : 'https://www.spotgifts.com.br/fotos/produtos/' + p.MainImage) : '',
-            images: [p.MainImage, p.AllImageList, p.AditionalImageList].filter(Boolean).map(img => img.startsWith('http') ? img : 'https://www.spotgifts.com.br/fotos/produtos/' + img),
-            stock: stockMap[ref] || 0,
-            variations: vList,
+            image_url: images[0] || '',
+            images: images,
+            stock: stock,
+            color: variationList.length > 0 ? variationList[0].color : 'N/A',
+            variations: variationList.length > 0 ? variationList : [{
+                id: `SPOT-${ref}`,
+                color: 'N/A',
+                stock: stock,
+                price: price
+            }],
             updated_at: new Date().toISOString()
         };
     });

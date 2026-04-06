@@ -18,6 +18,13 @@ export interface Lead {
     priority?: 'ALTA' | 'NORMAL' | 'BAIXA';
     lost_reason?: string;
     estimated_value?: number;
+    closing_metadata?: {
+        checklist?: { id: string; text: string; completed: boolean }[];
+        wa_template?: string;
+        show_on_card?: boolean;
+        quoted_item?: string;
+        [key: string]: any;
+    };
 }
 
 export function useLeads(startDate?: string, endDate?: string) {
