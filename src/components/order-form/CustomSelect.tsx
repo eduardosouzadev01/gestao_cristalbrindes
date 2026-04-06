@@ -121,7 +121,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                             ));
                         })()}
                         {filtered.length === 0 && (
-                            <div className="px-4 py-2 text-xs text-gray-400 italic">{label.includes('Fornecedor') ? 'Nenhum fornecedor encontrado.' : 'Nenhum item encontrado.'}</div>
+                            <div className="px-4 py-2 text-xs text-gray-400 italic">{(label || '').includes('Fornecedor') ? 'Nenhum fornecedor encontrado.' : 'Nenhum item encontrado.'}</div>
                         )}
                         <div
                             className="px-4 py-2 text-sm text-blue-600 font-bold hover:bg-blue-50 cursor-pointer border-t border-gray-100 flex items-center gap-2"

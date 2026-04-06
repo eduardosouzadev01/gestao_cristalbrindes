@@ -141,7 +141,7 @@ const CustomSelect: React.FC<{
                             <div className="px-4 py-6 text-center">
                                 <span className="material-icons-outlined text-gray-200 text-4xl mb-2 block">search_off</span>
                                 <div className="text-xs text-gray-400 italic">
-                                    {label.includes('Fornecedor') ? 'Nenhum fornecedor encontrado.' : 'Nenhum item encontrado.'}
+                                    {(label || '').includes('Fornecedor') ? 'Nenhum fornecedor encontrado.' : 'Nenhum item encontrado.'}
                                 </div>
                             </div>
                         )}
@@ -416,7 +416,7 @@ const BudgetForm: React.FC = () => {
 
         // Se for orçamento novo e encontramos o fator ideal, atualizar o fator dos itens
         if ((!id || id === 'novo') && items.length === 1 && items[0].productName === '') {
-            const idealFactor = sortedFactors.find(sf => sf.name.toLowerCase().includes('ideal'));
+            const idealFactor = sortedFactors.find(sf => (sf.name || '').toLowerCase().includes('ideal'));
             if (idealFactor) {
                 const multiplier = 1 + (idealFactor.tax_percent + idealFactor.contingency_percent + idealFactor.margin_percent) / 100;
                 setItems(prev => prev.map(it => ({ ...it, fator: multiplier })));
