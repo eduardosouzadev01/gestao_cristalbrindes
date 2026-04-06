@@ -93,8 +93,19 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                                         updateItem(it.id, 'product_id', p.id);
                                         updateItem(it.id, 'productName', p.name);
                                         updateItem(it.id, 'productCode', p.code);
-                                        updateItem(it.id, 'productImage', p.image_url);
+                                        updateItem(it.id, 'productImage', p.image_url || p.image);
                                         updateItem(it.id, 'productDescription', p.description);
+                                        updateItem(it.id, 'productColor', p.color || '');
+                                        updateItem(it.id, 'variations', p.variations || []);
+                                        
+                                        // Auto-set supplier based on product source
+                                        if (p.source) {
+                                            const sourceName = p.source.toUpperCase();
+                                            const supplier = suppliersList.find(s => s.name?.toUpperCase() === sourceName || s.name?.toUpperCase().includes(sourceName));
+                                            if (supplier) {
+                                                updateItem(it.id, 'supplier_id', supplier.id);
+                                            }
+                                        }
                                     }}
                                     placeholder="Buscar produto no catálogo..."
                                     value={it.productName}
@@ -200,14 +211,36 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-1.5">
                                         <label className="block text-[11px] uppercase font-[700] text-slate-500 tracking-wider">Cor do Produto</label>
-                                        <input 
-                                            type="text"
-                                            className="w-full bg-white border border-[#D0D3D6] rounded-[var(--radius-md-budget)] px-3 py-2 text-[14px] font-[600] uppercase focus:ring-2 focus:ring-slate-500/20 focus:border-slate-400 transition-all"
-                                            placeholder="Ex: Azul"
-                                            value={it.productColor || ''}
-                                            onChange={e => updateItem(it.id, 'productColor', e.target.value)}
-                                            disabled={isLocked}
-                                        />
+                                        {it.variations && it.variations.length > 0 ? (
+                                            <select
+                                                className="w-full bg-white border border-[#D0D3D6] rounded-[var(--radius-md-budget)] px-3 py-2 text-[14px] font-[600] uppercase focus:ring-2 focus:ring-slate-500/20 focus:border-slate-400 transition-all cursor-pointer"
+                                                value={it.productColor || ''}
+                                                onChange={e => {
+                                                    const selectedVar = it.variations.find((v: any) => v.color === e.target.value);
+                                                    updateItem(it.id, 'productColor', e.target.value);
+                                                    if (selectedVar) {
+                                                        if (selectedVar.image) updateItem(it.id, 'productImage', selectedVar.image);
+                                                        if (selectedVar.price) updateItem(it.id, 'priceUnit', selectedVar.price);
+                                                        // Update stock info if needed (maybe in productDescription or another field)
+                                                    }
+                                                }}
+                                                disabled={isLocked}
+                                            >
+                                                <option value="">Selecione a cor...</option>
+                                                {it.variations.map((v: any, vidx: number) => (
+                                                    <option key={`${v.color}-${vidx}`} value={v.color}>{v.color} {v.stock ? `(${v.stock} em estoque)` : ''}</option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <input 
+                                                type="text"
+                                                className="w-full bg-white border border-[#D0D3D6] rounded-[var(--radius-md-budget)] px-3 py-2 text-[14px] font-[600] uppercase focus:ring-2 focus:ring-slate-500/20 focus:border-slate-400 transition-all"
+                                                placeholder="Ex: Azul"
+                                                value={it.productColor || ''}
+                                                onChange={e => updateItem(it.id, 'productColor', e.target.value)}
+                                                disabled={isLocked}
+                                            />
+                                        )}
                                     </div>
                                     <div className="space-y-1.5">
                                         <label className="block text-[11px] uppercase font-[700] text-slate-500 tracking-wider">Fornecedor Produto</label>
