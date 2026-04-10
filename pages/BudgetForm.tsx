@@ -16,155 +16,24 @@ import { ProposalsHistoryModal } from '../src/components/modals/ProposalsHistory
 import BudgetItemCard from '../src/components/Budget/BudgetItemCard';
 
 
-// --- Custom Select Wrapper ---
-const CustomSelect: React.FC<{
-    label: string;
-    options: any[];
-    onSelect: (opt: any) => void;
-    onAdd: () => void;
-    placeholder?: string;
-    value?: string;
-    error?: boolean;
-    disabled?: boolean;
-    onSearch?: (term: string) => void;
-}> = ({ label, options, onSelect, onAdd, placeholder, value, error, disabled, onSearch }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [search, setSearch] = useState(value || '');
-    const ref = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        setSearch(value || '');
-    }, [value]);
-
-    useEffect(() => {
-        if (onSearch && isOpen) {
-            const timer = setTimeout(() => {
-                onSearch(search);
-            }, 500);
-            return () => clearTimeout(timer);
-        }
-    }, [search, isOpen]);
-
-    useEffect(() => {
-        const click = (e: any) => { if (ref.current && !ref.current.contains(e.target)) setIsOpen(false); };
-        document.addEventListener('mousedown', click);
-        return () => document.removeEventListener('mousedown', click);
-    }, []);
-
-    const filtered = options.filter(o => {
-        const name = o.name || '';
-        const code = o.code || '';
-        return name.toLowerCase().includes(search.toLowerCase()) ||
-               code.toLowerCase().includes(search.toLowerCase());
-    });
-
-    return (
-        <div className="relative" ref={ref}>
-            {label && <label className="block text-xs font-bold text-gray-400 uppercase mb-1">{label}</label>}
-            <div
-                onClick={() => !disabled && setIsOpen(!isOpen)}
-                className={`form-input w-full rounded border-gray-300 flex justify-between items-center cursor-pointer bg-white py-0.5 px-2 transition-all hover:border-blue-400 ${error ? 'ring-1 ring-red-500 border-red-500' : ''} ${disabled ? 'bg-gray-100 select-none' : 'hover:shadow-sm'}`}
-            >
-                <span className={`truncate flex-1 min-w-0 text-[11px] font-semibold ${!(search || value) ? 'text-gray-400' : 'text-gray-900'}`}>
-                    {value || search || placeholder || "Selecione..."}
-                </span>
-                <span className={`material-icons-outlined text-sm flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180 text-blue-500' : 'text-gray-400'}`}>expand_more</span>
-            </div>
-            {isOpen && !disabled && (
-                <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-150">
-                    <div className="p-2 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
-                        <span className="material-icons-outlined text-gray-400 text-sm">search</span>
-                        <input 
-                            autoFocus 
-                            className="w-full text-sm border-0 focus:ring-0 p-1 bg-transparent placeholder-gray-400" 
-                            placeholder="Digite para pesquisar..." 
-                            value={search} 
-                            onChange={e => setSearch(e.target.value)} 
-                        />
-                        {search && (
-                            <button onClick={() => setSearch('')} className="p-1 hover:bg-gray-200 rounded-full text-gray-400">
-                                <span className="material-icons-outlined text-xs">close</span>
-                            </button>
-                        )}
-                    </div>
-                    <div className="max-h-60 overflow-y-auto custom-scrollbar">
-                        {(() => {
-                            const hasCategories = filtered.some(o => o.supplier_category);
-                            if (hasCategories && filtered.length > 0) {
-                                const categories = Array.from(new Set(filtered.map(o => o.supplier_category).filter(Boolean)));
-                                const renderedItems = categories.map(cat => (
-                                    <div key={cat as string}>
-                                        <div className="px-3 py-1.5 text-[9px] font-black text-blue-600 bg-blue-50/50 uppercase tracking-widest border-y border-blue-50">{cat === 'GRAVACOES' ? 'PERSONALIZAÇÃO' : (cat as string)}</div>
-                                        {filtered.filter(o => o.supplier_category === cat).map(opt => (
-                                            <div key={opt.id} className="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer flex justify-between group transition-colors" onClick={() => { onSelect(opt); setSearch(opt.name); setIsOpen(false); }}>
-                                                <div className="flex flex-col">
-                                                    <span className="text-gray-700 font-medium group-hover:text-blue-600">{opt.name}</span>
-                                                    {opt.doc && <span className="text-[10px] text-gray-400">{opt.doc}</span>}
-                                                </div>
-                                                {opt.code && <span className="text-gray-400 text-xs font-mono group-hover:text-blue-500 self-center">{opt.code}</span>}
-                                            </div>
-                                        ))}
-                                    </div>
-                                ));
-
-                                // Add section for items without category
-                                const noCategory = filtered.filter(o => !o.supplier_category);
-                                if (noCategory.length > 0) {
-                                    renderedItems.push(
-                                        <div key="no-category">
-                                            <div className="px-3 py-1.5 text-[9px] font-black text-gray-400 bg-gray-50 uppercase tracking-widest border-y border-gray-100">OUTROS</div>
-                                            {noCategory.map(opt => (
-                                                <div key={opt.id} className="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer flex justify-between group transition-colors" onClick={() => { onSelect(opt); setSearch(opt.name); setIsOpen(false); }}>
-                                                    <div className="flex flex-col">
-                                                        <span className="text-gray-700 font-medium group-hover:text-blue-600">{opt.name}</span>
-                                                        {opt.doc && <span className="text-[10px] text-gray-400">{opt.doc}</span>}
-                                                    </div>
-                                                    {opt.code && <span className="text-gray-400 text-xs font-mono group-hover:text-blue-500 self-center">{opt.code}</span>}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    );
-                                }
-                                return renderedItems;
-                            }
-                            return filtered.map(opt => (
-                                <div key={opt.id} className="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer flex justify-between group transition-colors" onClick={() => { onSelect(opt); setSearch(opt.name); setIsOpen(false); }}>
-                                    <div className="flex flex-col">
-                                        <span className="text-gray-700 font-medium group-hover:text-blue-600">{opt.name}</span>
-                                        {opt.doc && <span className="text-[10px] text-gray-400">{opt.doc}</span>}
-                                    </div>
-                                    {opt.code && <span className="text-gray-400 text-xs font-mono group-hover:text-blue-500 self-center">{opt.code}</span>}
-                                </div>
-                            ));
-                        })()}
-                        {filtered.length === 0 && (
-                            <div className="px-4 py-6 text-center">
-                                <span className="material-icons-outlined text-gray-200 text-4xl mb-2 block">search_off</span>
-                                <div className="text-xs text-gray-400 italic">
-                                    {(label || '').includes('Fornecedor') ? 'Nenhum fornecedor encontrado.' : 'Nenhum item encontrado.'}
-                                </div>
-                            </div>
-                        )}
-                        <div className="px-4 py-2.5 text-[11px] text-blue-600 font-black hover:bg-blue-50 cursor-pointer border-t flex items-center gap-2 transition-colors uppercase tracking-tight" onClick={() => { onAdd(); setIsOpen(false); }}>
-                            <span className="material-icons-outlined text-sm">add_circle</span> Cadastrar Novo
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
+import { CustomSelect } from '../src/components/Budget/CustomSelect';
 
 // --- Budget Form Component ---
 const BudgetForm: React.FC = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const [loading, setLoading] = useState(false);
     const isSavingRef = useRef(false);
     const { appUser } = useAuth();
     const userSalesperson = appUser?.salesperson || '';
     const isSeller = !!appUser?.salesperson;
-    const [activeId, setActiveId] = useState<string | undefined>(id === 'novo' ? undefined : id);
+    const targetId = id === 'novo' ? null : id;
+    const [activeId, setActiveId] = useState<string | null>(targetId);
+    
+    // CRM Sync State
+    const [leadId, setLeadId] = useState<string | null>(location.state?.leadId || null);
+    const [initialQuotedItem, setInitialQuotedItem] = useState<string | null>(location.state?.quotedItem || null);
 
     // States
     const [budgetNumber, setBudgetNumber] = useState('');
@@ -189,7 +58,6 @@ const BudgetForm: React.FC = () => {
     const [suppliersList, setSuppliersList] = useState<any[]>([]);
     const [factors, setFactors] = useState<any[]>([]);
 
-    const location = useLocation();
     const [isClientLocked, setIsClientLocked] = useState(false);
 
     // Auto-save states
@@ -334,13 +202,25 @@ const BudgetForm: React.FC = () => {
         return null;
     };
 
+    useEffect(() => {
+        const handleFocus = () => loadBaseData();
+        window.addEventListener('focus', handleFocus);
+        return () => window.removeEventListener('focus', handleFocus);
+    }, []);
+
     const loadBaseData = async () => {
-        const { data: c } = await supabase.from('partners').select('*').eq('type', 'CLIENTE');
+        const { data: c } = await supabase.from('partners').select('*').eq('type', 'CLIENTE').order('name');
         const { data: p } = await supabase.from('products').select('*').limit(50);
         // fetch all FORNECEDOR so we don't miss any due to category mismatch
-        const { data: s } = await supabase.from('partners').select('*').eq('type', 'FORNECEDOR');
+        const { data: s } = await supabase.from('partners').select('*').eq('type', 'FORNECEDOR').order('name');
         const { data: f } = await supabase.from('calculation_factors').select('*');
         setClientsList(c || []);
+
+        // Normalize and unify name properties
+        const normalizedSuppliers = (s || []).map(sup => ({
+            ...sup,
+            name: sup.name || (sup as any).nome || 'Sem Nome'
+        }));
 
         // Enrich product names with color to distinguish variations in dropdown
         const enrichedProducts = (p || []).map(prod => ({
@@ -349,7 +229,7 @@ const BudgetForm: React.FC = () => {
         }));
         setProductsList(enrichedProducts);
 
-        let suppliers = s || [];
+        let suppliers = normalizedSuppliers;
         const required = ['XBZ', 'ASIA', 'SPOT'];
         const missing = required.filter(name => !suppliers.find((sup: any) => sup.name?.toUpperCase() === name));
 
@@ -439,7 +319,8 @@ const BudgetForm: React.FC = () => {
             // Do NOT group by code to preserve individual images per color
             const enriched = data.map(p => ({
                 ...p,
-                name: p.color ? `${p.name} - ${p.color}` : p.name
+                name: (p.color && !p.name.includes(p.color)) ? `${p.name} - ${p.color}` : p.name,
+                displayImage: p.image_url || (p.images && p.images[0]) || p.image
             }));
             setProductsList(enriched);
         }
@@ -481,7 +362,7 @@ const BudgetForm: React.FC = () => {
             const mappedItems = await Promise.all(data.budget_items.map(async (it: any) => {
                 // Fetch variations and main image if missing
                 const { data: pData } = await supabase.from('products')
-                    .select('variations, color, stock, image_url, image, code')
+                    .select('variations, color, stock, image_url, images, code')
                     .eq('name', it.product_name)
                     .limit(10); // Find a few to aggregate variations if needed
 
@@ -573,7 +454,7 @@ const BudgetForm: React.FC = () => {
                     productDescription: it.product_description || '',
                     productColor: it.product_color || '',
                     productCode: it.product_code || (pData?.find(p => p.color === it.product_color)?.code) || (pData && pData[0]?.code) || '',
-                    productImage: it.product_image_url || (pData?.find(p => p.color === it.product_color)?.image_url) || (pData?.find(p => p.color === it.product_color)?.image) || (pData && (pData[0]?.image_url || pData[0]?.image)) || '',
+                    productImage: it.product_image_url || (pData?.find(p => p.color === it.product_color)?.image_url) || (pData?.find(p => p.color === it.product_color)?.images?.[0]) || (pData && (pData[0]?.image_url || pData[0]?.images?.[0])) || '',
                     variations: aggregatedVars
                 };
             }));
@@ -634,7 +515,7 @@ const BudgetForm: React.FC = () => {
 
             const payload = {
                 budget_number: finalBudgetNumber,
-                salesperson: vendedor,
+                salesperson: vendedor || userSalesperson || 'Vendedor Padrão',
                 status,
                 client_id: resolvedClientId || null,
                 issuer,
@@ -702,6 +583,37 @@ const BudgetForm: React.FC = () => {
                 }
             }
             setLastSaved(new Date());
+
+            // --- CRM SYNC LOGIC ---
+            if (leadId) {
+                const totalVal = items.reduce((sum, it) => sum + calculateItemTotal(it), 0);
+                const leadUpdatePayload: any = {
+                    client_name: clientData.name,
+                    client_email: clientData.email,
+                    client_phone: clientData.phone,
+                    client_doc: clientData.doc,
+                    estimated_value: totalVal,
+                    updated_at: new Date().toISOString()
+                };
+
+                // Only move to ORCAMENTO if it's currently ATENDIMENTO
+                const { data: currentLead } = await supabase.from('crm_leads').select('status, closing_metadata').eq('id', leadId).single();
+                if (currentLead && currentLead.status === 'ATENDIMENTO') {
+                    leadUpdatePayload.status = 'ORCAMENTO';
+                }
+
+                // Sync quoted_item if we have items
+                if (items.length > 0 && items[0].productName) {
+                    const newMetadata = { 
+                        ...(currentLead?.closing_metadata || {}),
+                        quoted_item: items[0].productName 
+                    };
+                    leadUpdatePayload.closing_metadata = newMetadata;
+                }
+
+                await supabase.from('crm_leads').update(leadUpdatePayload).eq('id', leadId);
+            }
+
             return budgetId;
         } catch (e: any) {
             if (!silent) toast.error('Erro ao salvar: ' + e.message);
@@ -975,6 +887,13 @@ const BudgetForm: React.FC = () => {
                 budget_number: newNum,
                 client_id: clientData.id || null,
                 issuer,
+                salesperson: vendedor || userSalesperson || 'Vendedor Padrão',
+                status: 'EM ABERTO',
+                validity,
+                shipping,
+                delivery_deadline: deliveryDeadline,
+                payment_method: paymentMethod,
+                observation,
                 total_amount: items.reduce((sum, it) => sum + calculateItemTotal(it), 0),
                 created_at: new Date().toISOString()
             };
@@ -988,7 +907,7 @@ const BudgetForm: React.FC = () => {
                 return {
                     budget_id: newBudget.id,
                     product_name: it.productName,
-                    supplier_id: (suppIndex && suppIndex._isTemp) ? null : it.supplier_id,
+                    supplier_id: (suppIndex && suppIndex._isTemp) ? null : (it.supplier_id || null),
                     quantity: it.quantity,
                     unit_price: it.priceUnit,
                     customization_cost: it.custoPersonalizacao,
@@ -998,10 +917,18 @@ const BudgetForm: React.FC = () => {
                     layout_cost: it.layoutCost,
                     calculation_factor: it.fator,
                     bv_pct: it.bvPct,
+                    extra_pct: it.extraPct,
                     total_item_value: calculateItemTotal(it),
                     is_approved: false, // Reset approval on duplicate
-                    product_description: it.productDescription,
-                    product_color: it.productColor
+                    customization_supplier_id: it.customization_supplier_id || null,
+                    transport_supplier_id: it.transport_supplier_id || null,
+                    client_transport_supplier_id: it.client_transport_supplier_id || null,
+                    layout_supplier_id: it.layout_supplier_id || null,
+                    extra_supplier_id: it.extra_supplier_id || null,
+                    product_description: it.productDescription || null,
+                    product_color: it.productColor || null,
+                    product_code: it.productCode || null,
+                    product_image_url: it.productImage || null
                 };
             });
 
@@ -1010,19 +937,23 @@ const BudgetForm: React.FC = () => {
             }
 
             toast.success('Orçamento duplicado!');
-            navigate(`/ orcamento / ${newBudget.id} `);
-            window.location.reload(); // Force reload to clear state if needed
+            navigate(`/orcamento/${newBudget.id}`, { replace: true });
         } catch (error: any) {
             toast.error('Erro ao duplicar: ' + error.message);
             setLoading(false);
         }
     };
 
+    const openSupplierModal = (itemId: string | number, field: string) => {
+        setSupplierModalContext({ itemId, field });
+        setIsSupplierModalOpen(true);
+    };
+
     const statusBadgeColors: Record<string, string> = {
-        'EM ABERTO': 'bg-green-100 text-green-700 border-green-200',
+        'EM ABERTO': 'bg-[#F0FFF4] text-[#22543D] border-[#C6F6D5]',
         'EM NEGOCIAÇÃO': 'bg-yellow-100 text-yellow-700 border-yellow-200',
         'PROPOSTA ENVIADA': 'bg-blue-100 text-blue-700 border-blue-200',
-        'PROPOSTA ACEITA': 'bg-indigo-100 text-indigo-700 border-indigo-200',
+        'PROPOSTA ACEITA': 'bg-[#DCFCE7] text-[#166534] border-[#BBF7D0]',
         'PROPOSTA RECUSADA': 'bg-red-100 text-red-700 border-red-200',
         'CANCELADO': 'bg-gray-100 text-gray-700 border-gray-200',
     };
@@ -1048,22 +979,31 @@ const BudgetForm: React.FC = () => {
                 
                 <div className="flex items-center gap-3">
                     {activeId && (
-                        <button onClick={duplicateBudget} disabled={loading} className="px-4 py-2 text-[13px] font-[400] text-[var(--text-secondary-budget)] hover:bg-[var(--bg-muted-budget)] rounded-[var(--radius-md-budget)] transition-colors">
+                        <button onClick={duplicateBudget} disabled={loading} className="px-3 py-1.5 text-[12px] font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
                             Duplicar
                         </button>
                     )}
-                    <button onClick={handleGenerateProposal} className="px-4 py-2 text-[13px] font-[400] text-[var(--text-secondary-budget)] hover:bg-[var(--bg-muted-budget)] rounded-[var(--radius-md-budget)] transition-colors">
-                        Proposta
-                    </button>
+                    {activeId && (
+                        <button onClick={fetchProposalsHistory} className="px-3 py-1.5 text-[12px] font-medium text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
+                            Ver Propostas
+                        </button>
+                    )}
                     <button 
                         onClick={() => saveBudget(false)} 
                         disabled={loading} 
-                        className="bg-[var(--color-accent-budget)] text-white px-6 py-2 rounded-[var(--radius-md-budget)] text-[13px] font-[500] hover:opacity-90 transition-all flex items-center gap-2"
+                        className="bg-blue-600 text-white px-5 py-2 rounded-xl text-[13px] font-bold hover:bg-blue-700 shadow-sm transition-all flex items-center gap-2 active:scale-95"
                     >
-                        {loading && !isAutoSaving ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> : null}
+                        {loading && !isAutoSaving ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> : <span className="material-icons-outlined text-[18px]">save</span>}
                         Salvar
                     </button>
-                    <button onClick={handleGenerateOrderClick} className="bg-[var(--text-primary-budget)] text-white px-4 py-2 rounded-[var(--radius-md-budget)] text-[13px] font-[500] hover:opacity-90 transition-all">
+                    <button 
+                        onClick={handleGenerateProposal} 
+                        className="bg-slate-900 text-white px-5 py-2 rounded-xl text-[13px] font-bold hover:bg-slate-800 shadow-sm transition-all flex items-center gap-2 active:scale-95"
+                    >
+                        <span className="material-icons-outlined text-[18px]">picture_as_pdf</span>
+                        Gerar Proposta
+                    </button>
+                    <button onClick={handleGenerateOrderClick} className="bg-emerald-600 text-white px-5 py-2 rounded-xl text-[13px] font-bold hover:bg-emerald-700 shadow-sm transition-all active:scale-95">
                         Gerar Pedido
                     </button>
                 </div>
@@ -1072,58 +1012,67 @@ const BudgetForm: React.FC = () => {
             <div className="max-w-[1400px] mx-auto px-6 py-6 space-y-6">
                 {/* SIDE-BY-SIDE HEADER INFO: COMMERCIAL + CLIENT */}
                 {/* MODERNIZED HEADER INFO */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* MODERNIZED HEADER INFO - CLEAN & PROFESSIONAL */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
                     {/* COMMERCIAL INFO CARD */}
-                    <div className="lg:col-span-5 bg-[#F8F8F8] border border-[#D0D3D6] rounded-2xl shadow-sm overflow-hidden flex flex-wrap divide-x divide-[#D0D3D6]">
-                        {[
-                            { label: 'Orcamento', value: `#${budgetNumber || 'NOVO'}`, icon: 'receipt_long', color: 'text-blue-500' },
-                            { label: 'Data', value: new Date(dataOrcamento).toLocaleDateString('pt-BR'), icon: 'calendar_today', color: 'text-indigo-500' },
-                            { label: 'Empresa', value: issuer === 'CRISTAL' ? 'CB' : (issuer === 'EC' || issuer === 'EB') ? 'EB' : issuer, icon: 'business', color: 'text-slate-500', canEdit: true },
-                            { label: 'Vendedor', value: vendedor || '—', icon: 'person', color: 'text-emerald-500' }
-                        ].map(cell => (
-                            <div key={cell.label} className="min-w-[120px] flex-1 px-5 py-4 hover:bg-[#EAEBEC]/50 transition-all group/cell">
-                                <div className="flex items-center gap-2 mb-1.5">
-                                    <span className={`material-icons-outlined text-[14px] ${cell.color} opacity-70 group-hover/cell:opacity-100 transition-opacity`}>{cell.icon}</span>
-                                    <span className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">{cell.label}</span>
-                                </div>
-                                {cell.canEdit ? (
-                                    <div className="flex items-center gap-1">
-                                        <select 
-                                            className="bg-transparent border-none p-0 text-[14px] font-bold text-slate-700 focus:ring-0 cursor-pointer hover:text-blue-600 transition-colors"
-                                            value={issuer}
-                                            onChange={e => setIssuer(e.target.value)}
-                                        >
-                                            <option value="CRISTAL">CB</option>
-                                            <option value="EB">EB</option>
-                                            <option value="NB">NB</option>
-                                        </select>
-                                    </div>
-                                ) : (
-                                    <span className="block text-[14px] font-bold text-slate-700 truncate">
-                                        {cell.value}
-                                    </span>
-                                )}
+                    <div className="lg:col-span-5 bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden grid grid-cols-2 divide-x divide-slate-100 divide-y md:divide-y-0">
+                        <div className="p-5 flex flex-col justify-center">
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="material-icons-outlined text-[16px] text-blue-500">receipt_long</span>
+                                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Orçamento</span>
                             </div>
-                        ))}
+                            <span className="text-[16px] font-black text-slate-900">#{budgetNumber || 'NOVO'}</span>
+                        </div>
+                        <div className="p-5 flex flex-col justify-center">
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="material-icons-outlined text-[16px] text-slate-400">calendar_today</span>
+                                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Data Emissão</span>
+                            </div>
+                            <span className="text-[14px] font-bold text-slate-700">{new Date(dataOrcamento).toLocaleDateString('pt-BR')}</span>
+                        </div>
+                        <div className="col-span-2 p-5 bg-slate-50/50 border-t border-slate-100">
+                            <div className="flex items-center gap-2 mb-3">
+                                <span className="material-icons-outlined text-[16px] text-slate-400">business</span>
+                                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Empresa Responsável</span>
+                            </div>
+                            <div className="inline-flex p-1 bg-white border border-slate-200 rounded-2xl w-full">
+                                {['CRISTAL', 'ESPIRITO', 'NATUREZA'].map((ent) => (
+                                    <button
+                                        key={ent}
+                                        onClick={() => setIssuer(ent)}
+                                        className={`flex-1 py-2 px-3 rounded-xl text-[11px] font-black uppercase tracking-tight transition-all ${
+                                            issuer === ent 
+                                            ? 'bg-slate-900 text-white shadow-lg scale-[1.02]' 
+                                            : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        {ent === 'CRISTAL' ? 'Cristal Brindes' : ent === 'ESPIRITO' ? 'Espírito Brindes' : 'Natureza Brindes'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
                     {/* CLIENT INFO CARD */}
-                    <div className="lg:col-span-7 bg-[#F8F8F8] border border-[#D0D3D6] rounded-2xl shadow-sm flex flex-col md:flex-row overflow-hidden group">
-                        <div className="flex-[4] p-5 md:p-6 border-b md:border-b-0 md:border-r border-[#D0D3D6]">
-                            <div className="flex items-center justify-between mb-3">
+                    <div className="lg:col-span-7 bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col md:flex-row">
+                        <div className="flex-[4] p-6 border-b md:border-b-0 md:border-r border-slate-100 bg-white">
+                            <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-full bg-[#EAEBEC] flex items-center justify-center">
-                                        <span className="material-icons-outlined text-[14px] text-slate-500">assignment_ind</span>
+                                    <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center">
+                                        <span className="material-icons-outlined text-[18px] text-blue-600">person</span>
                                     </div>
-                                    <h4 className="text-[11px] uppercase font-bold text-slate-500 tracking-widest">Informações do Cliente</h4>
+                                    <div>
+                                        <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-widest leading-none">Cliente Selecionado</h4>
+                                        {clientData.email && (
+                                            <div className="flex items-center gap-1 mt-0.5">
+                                                <span className="material-icons-outlined text-[10px] text-blue-400">alternate_email</span>
+                                                <span className="text-[11px] font-medium text-blue-500 lowercase">{clientData.email}</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                                {clientData.id && (
-                                    <button onClick={() => setClientData({ id: '', name: '', doc: '', phone: '', email: '', emailFin: '' })} className="p-1.5 hover:bg-red-50 text-red-400 hover:text-red-600 rounded-full transition-all" title="Remover cliente">
-                                        <span className="material-icons-outlined text-sm">person_remove</span>
-                                    </button>
-                                )}
                             </div>
-                            <div className="relative">
+                            <div className="relative group">
                                 <CustomSelect
                                     options={clientsList}
                                     onSelect={(c: any) => setClientData({ id: c.id, name: c.name, doc: c.doc, phone: c.phone, email: c.email, emailFin: c.financial_email || c.emailFin })}
@@ -1131,23 +1080,39 @@ const BudgetForm: React.FC = () => {
                                     value={clientData.name}
                                     onAdd={() => navigate('/cadastros/novo')}
                                 />
+                                {clientData.id && (
+                                    <div className="mt-4 p-3 bg-slate-50 border border-slate-100 rounded-xl flex flex-wrap gap-4">
+                                        <div className="flex items-center gap-2 text-slate-500">
+                                            <span className="material-icons-outlined text-sm">badge</span>
+                                            <span className="text-xs font-bold uppercase">{clientData.doc || 'SEM DOC'}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-slate-500 border-l border-slate-200 pl-4">
+                                            <span className="material-icons-outlined text-sm">call</span>
+                                            <span className="text-xs font-bold">{clientData.phone || 'SEM TELEFONE'}</span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                         
-                        <div className="flex-[3] grid grid-cols-2 bg-[#EAEBEC]/30">
-                            <div className="p-5 flex flex-col justify-center border-r border-[#D0D3D6] hover:bg-white transition-colors">
-                                <div className="flex items-center gap-2 mb-1.5 text-slate-400">
-                                    <span className="material-icons-outlined text-[14px]">phone_enabled</span>
-                                    <span className="text-[9px] uppercase font-bold tracking-widest">Telefone</span>
+                        <div className="flex-[3] flex flex-col p-6 bg-slate-50/30 justify-between">
+                            <div className="space-y-4">
+                                <div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="material-icons-outlined text-[16px] text-slate-400">person_outline</span>
+                                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Vendedor Responsável</span>
+                                    </div>
+                                    <span className="block text-[14px] font-bold text-slate-800">{vendedor || '—'}</span>
                                 </div>
-                                <span className="block text-[13px] font-bold text-slate-600 font-mono-budget">{clientData.phone || '—'}</span>
-                            </div>
-                            <div className="p-5 flex flex-col justify-center hover:bg-white transition-colors">
-                                <div className="flex items-center gap-2 mb-1.5 text-slate-400">
-                                    <span className="material-icons-outlined text-[14px]">contact_mail</span>
-                                    <span className="text-[9px] uppercase font-bold tracking-widest">Financeiro</span>
+                                <div className="pt-4 border-t border-slate-100">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="material-icons-outlined text-[16px] text-slate-400">account_balance_wallet</span>
+                                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">E-mail Financeiro</span>
+                                    </div>
+                                    <span className="block text-[13px] font-bold text-slate-700 truncate hover:text-clip" title={clientData.emailFin}>
+                                        {clientData.emailFin || '—'}
+                                    </span>
                                 </div>
-                                <span className="block text-[13px] font-bold text-slate-600 truncate" title={clientData.emailFin}>{clientData.emailFin || '—'}</span>
                             </div>
                         </div>
                     </div>
@@ -1159,7 +1124,7 @@ const BudgetForm: React.FC = () => {
                             { label: 'Validade da Proposta', value: validity, setter: setValidity, icon: 'timer' },
                             { label: 'Natureza da Operação', value: natureza, setter: setNatureza, icon: 'swap_horiz' },
                             { label: 'Logística / Frete', value: shipping, setter: setShipping, icon: 'local_shipping', list: 'shipping-options' },
-                            { label: 'Prazo de Entrega', value: deliveryDeadline, setter: setDeliveryDeadline, icon: 'event_available' },
+                            { label: 'Prazo de Entrega', value: deliveryDeadline, setter: setDeliveryDeadline, icon: 'event_available', list: 'delivery-options' },
                             { label: 'Forma de Pagamento', value: paymentMethod, setter: setPaymentMethod, icon: 'payments', list: 'payment-options' }
                         ].map(cond => (
                             <div key={cond.label} className="p-4 hover:bg-slate-50/50 transition-colors">
@@ -1179,17 +1144,30 @@ const BudgetForm: React.FC = () => {
                                         <option value="Frete incluso para Grande Vitória, exceto Guarapari." />
                                         <option value="Cliente retira" />
                                         <option value="Frete incluso" />
-                                        <option value="Frete por parte do cliente" />
+                                        <option value="Frete por parte do cliente." />
+                                    </datalist>
+                                )}
+                                {cond.list === 'delivery-options' && (
+                                    <datalist id="delivery-options">
+                                        <option value="2/3 Dias Úteis" />
+                                        <option value="7 Dias Úteis" />
+                                        <option value="10 Dias Úteis" />
+                                        <option value="15 Dias Úteis" />
+                                        <option value="15/20 Dias Úteis" />
+                                        <option value="25 Dias Úteis" />
+                                        <option value="30 Dias Úteis." />
                                     </datalist>
                                 )}
                                 {cond.list === 'payment-options' && (
                                     <datalist id="payment-options">
-                                        <option value="50% na entrada e 50% no pedido pronto." />
-                                        <option value="100% à vista." />
+                                        <option value="50% na entrada + 50% no pedido pronto." />
+                                        <option value="À vista" />
+                                        <option value="1x no cartão de crédito" />
                                         <option value="7 dias faturados" />
-                                        <option value="15 dias faturados" />
-                                        <option value="21 dias faturados" />
-                                        <option value="30 dias faturados." />
+                                        <option value="10 dias Faturados" />
+                                        <option value="15 Dias Faturados" />
+                                        <option value="20 Dias Faturados" />
+                                        <option value="30 Dias Faturados." />
                                     </datalist>
                                 )}
                             </div>
@@ -1239,6 +1217,7 @@ const BudgetForm: React.FC = () => {
                                             suppliersList={suppliersList}
                                             searchProducts={searchProducts}
                                             CustomSelect={CustomSelect}
+                                            onAddSupplier={openSupplierModal}
                                         />
                                     ))}
                                     {provided.placeholder}

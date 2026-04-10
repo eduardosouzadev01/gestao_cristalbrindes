@@ -4,6 +4,7 @@ import { formatCurrency, parseCurrencyToNumber } from '../../utils/formatCurrenc
 import { calculateItemTotal } from '../../utils/formulas';
 import RichTextEditor from '../common/RichTextEditor';
 import { supabase } from '../../../lib/supabase';
+import { CustomSelect } from './CustomSelect';
 
 interface BudgetItemCardProps {
     it: any;
@@ -15,7 +16,7 @@ interface BudgetItemCardProps {
     productsList: any[];
     suppliersList: any[];
     searchProducts: (term: string) => void;
-    CustomSelect: any; 
+    onAddSupplier: (itemId: string | number, field: string) => void;
 }
 
 const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
@@ -28,7 +29,7 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
     productsList,
     suppliersList,
     searchProducts,
-    CustomSelect
+    onAddSupplier
 }) => {
     const isLocked = status === 'PROPOSTA ACEITA';
 
@@ -68,25 +69,32 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                 <div
                     ref={dragProvided.innerRef}
                     {...dragProvided.draggableProps}
-                    className={`font-sans-budget border border-[#D0D3D6] rounded-[var(--radius-lg-budget)] mb-6 transition-all bg-[var(--bg-surface-budget)] relative ${
+                    className={`font-sans-budget border rounded-[var(--radius-lg-budget)] mb-6 transition-all ${
                         it.isApproved 
-                            ? 'border-green-300 ring-1 ring-green-100 shadow-sm' 
-                            : 'shadow-sm hover:shadow-md'
-                    } ${
+                            ? 'bg-[#ebfbf0] border-[#86efac] ring-1 ring-[#bbf7d0] shadow-sm' 
+                            : 'bg-[var(--bg-surface-budget)] border-[#D0D3D6] shadow-sm hover:shadow-md'
+                    } relative ${
                         snapshot.isDragging ? 'shadow-2xl z-50 ring-2 ring-[var(--color-accent-budget)]/20 shadow-slate-300' : ''
                     }`}
                 >
                     {/* CARD HEADER: Item ID and Product Search */}
-                    <div className={`flex items-center justify-between px-6 py-4 border-b ${it.isApproved ? 'bg-green-50/50 border-green-200' : 'bg-[var(--bg-muted-budget)]/50 border-[var(--border-subtle-budget)]'}`}>
+                    <div className={`flex items-center justify-between px-6 py-4 border-b ${it.isApproved ? 'bg-[#dcfce7] border-[#86efac]' : 'bg-[var(--bg-muted-budget)]/50 border-[var(--border-subtle-budget)]'}`}>
                         <div className="flex items-center gap-4 flex-1">
-                            <div 
-                                {...dragProvided.dragHandleProps}
-                                className={`w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-lg border text-[14px] font-[800] shadow-sm cursor-grab active:cursor-grabbing transition-colors ${
-                                    it.isApproved ? 'bg-green-50 border-green-200 text-green-600' : 'bg-white border-[var(--border-medium-budget)] text-[var(--color-accent-budget)] hover:border-[var(--color-accent-budget)]'
-                                }`}
-                            >
-                                {idx + 1}
-                            </div>
+                                {it.isApproved ? (
+                                    <div {...dragProvided.dragHandleProps} className="bg-[#bbf7d0] border-[#86efac] text-[#166534] w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-lg border text-[14px] font-[800] shadow-sm">
+                                        {idx + 1}
+                                    </div>
+                                ) : (
+                                    <div 
+                                        {...dragProvided.dragHandleProps}
+                                        role="button"
+                                        tabIndex={0}
+                                        aria-label={`Arrastar item ${idx + 1}`}
+                                        className="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-lg border border-[var(--border-medium-budget)] text-[var(--color-accent-budget)] hover:border-[var(--color-accent-budget)] bg-white text-[14px] font-[800] shadow-sm cursor-grab active:cursor-grabbing transition-colors"
+                                    >
+                                        {idx + 1}
+                                    </div>
+                                )}
                             <div className="flex-1 max-w-xl">
                                 <CustomSelect
                                     options={productsList}
@@ -94,7 +102,7 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                                         updateItem(it.id, 'product_id', p.id);
                                         updateItem(it.id, 'productName', p.name);
                                         updateItem(it.id, 'productCode', p.code);
-                                        updateItem(it.id, 'productImage', p.image_url || p.image);
+                                        updateItem(it.id, 'productImage', p.image_url || (p.images && p.images[0]) || p.image);
                                         updateItem(it.id, 'productDescription', p.description);
                                         updateItem(it.id, 'productColor', p.color || '');
                                         
@@ -111,7 +119,7 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                                         if (!p.variations || p.variations.length === 0) {
                                             const baseName = p.name.split(' - ')[0];
                                             const { data: vData } = await supabase.from('products')
-                                                .select('color, stock, image_url, code, image')
+                                                .select('color, stock, image_url, code, images')
                                                 .eq('name', baseName)
                                                 .limit(30);
                                             
@@ -119,7 +127,7 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                                                 const vars = vData.map((v: any) => ({
                                                     color: v.color,
                                                     stock: v.stock,
-                                                    image: v.image_url || v.image,
+                                                    image: v.image_url || (v.images && v.images[0]) || v.image,
                                                     code: v.code
                                                 }));
                                                 updateItem(it.id, 'variations', vars);
@@ -140,8 +148,8 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                         
                         <div className="flex items-center gap-6 ml-6">
                             {/* APPROVAL TOGGLE AT TOP */}
-                            <div className={`flex items-center gap-3 px-3.5 py-2 rounded-xl border transition-all ${it.isApproved ? 'bg-green-50 border-green-200 shadow-sm' : 'bg-white border-[#D0D3D6] hover:border-slate-300'}`}>
-                                <span className={`text-[10px] font-black uppercase tracking-wider ${it.isApproved ? 'text-green-600' : 'text-slate-400'}`}>
+                             <div className={`flex items-center gap-3 px-3.5 py-2 rounded-xl border transition-all ${it.isApproved ? 'bg-[#C6F6D5] border-[#9AE6B4] shadow-sm' : 'bg-white border-[#D0D3D6] hover:border-slate-300'}`}>
+                                <span className={`text-[10px] font-black uppercase tracking-wider ${it.isApproved ? 'text-[#22543D]' : 'text-slate-400'}`}>
                                     {it.isApproved ? 'Aprovado' : 'Aprovar?'}
                                 </span>
                                 <input 
@@ -155,7 +163,7 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
 
                             <div className="flex flex-col items-end">
                                 <span className="text-[10px] uppercase font-[600] text-[var(--text-tertiary-budget)] tracking-[0.06em]">Total do Item</span>
-                                <span className={`text-[18px] font-[700] font-mono-budget leading-none mt-1 ${it.isApproved ? 'text-green-700' : 'text-[var(--color-accent-budget)]'}`}>
+                                <span className={`text-[18px] font-[700] font-mono-budget leading-none mt-1 ${it.isApproved ? 'text-[#22543D]' : 'text-[var(--color-accent-budget)]'}`}>
                                     {formatCurrency(totalVenda)}
                                 </span>
                             </div>
@@ -205,28 +213,34 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
 
                             {/* COL 2: SPECS + DESCRIPTION */}
                             <div className="col-span-12 lg:col-span-4 space-y-6">
-                                <div className="grid grid-cols-12 gap-4">
-                                    <div className="col-span-12 lg:col-span-5 space-y-1">
-                                        <label className="block text-[11px] uppercase font-[700] text-[var(--text-secondary-budget)] tracking-[0.06em]">Quantidade</label>
+                                <div className="grid grid-cols-12 gap-3 lg:gap-4">
+                                    <div className="col-span-4 lg:col-span-3 space-y-1">
+                                        <label className="block text-[10px] md:text-[11px] uppercase font-[700] text-[var(--text-secondary-budget)] tracking-[0.06em]">Qtd.</label>
                                         <input 
                                             type="number"
-                                            className="w-full bg-[var(--bg-surface-budget)] border border-[#D0D3D6] rounded-[var(--radius-md-budget)] px-3 py-2 text-[14px] font-[600] font-mono-budget focus:ring-[var(--color-accent-budget)] focus:border-[var(--color-accent-budget)]"
+                                            className="w-full bg-[var(--bg-surface-budget)] border border-[#D0D3D6] rounded-[var(--radius-md-budget)] px-2 py-2 text-[13px] md:text-[14px] font-[600] font-mono-budget focus:ring-[var(--color-accent-budget)] focus:border-[var(--color-accent-budget)]"
                                             value={it.quantity || ''}
                                             onChange={e => updateItem(it.id, 'quantity', Number(e.target.value))}
                                             disabled={isLocked}
                                         />
                                     </div>
-                                    <div className="col-span-12 lg:col-span-7 space-y-1">
-                                        <label className="block text-[11px] uppercase font-[700] text-[var(--text-secondary-budget)] tracking-[0.06em]">Valor Unit. (Custo p/ Fornecedor)</label>
+                                    <div className="col-span-8 lg:col-span-5 space-y-1">
+                                        <label className="block text-[10px] md:text-[11px] uppercase font-[700] text-[var(--text-secondary-budget)] tracking-[0.06em] truncate">Val. Unit. (Forn.)</label>
                                         <div className="relative">
                                             <input 
                                                 type="text"
-                                                className="w-full bg-white border border-[#D0D3D6] rounded-[var(--radius-md-budget)] px-3 py-2 text-[14px] font-[700] font-mono-budget text-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                                className="w-full bg-white border border-[#D0D3D6] rounded-[var(--radius-md-budget)] px-2 py-2 text-[13px] md:text-[14px] font-[700] font-mono-budget text-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                                                 value={formatCurrency(it.priceUnit || 0)}
                                                 onChange={e => updateItem(it.id, 'priceUnit', parseCurrencyToNumber(e.target.value))}
                                                 disabled={isLocked}
                                             />
-                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 material-icons-outlined text-xs text-slate-300">edit</span>
+                                            <span className="absolute right-2 top-1/2 -translate-y-1/2 material-icons-outlined text-[14px] text-slate-300">edit</span>
+                                        </div>
+                                    </div>
+                                    <div className="col-span-12 lg:col-span-4 space-y-1">
+                                        <label className="block text-[10px] md:text-[11px] uppercase font-[700] text-[var(--text-secondary-budget)] tracking-[0.06em]">Custo Total</label>
+                                        <div className="w-full bg-[var(--bg-muted-budget)] border border-[#D0D3D6]/50 rounded-[var(--radius-md-budget)] px-3 py-2 text-[13px] md:text-[14px] font-[700] font-mono-budget text-slate-500 flex items-center">
+                                            {formatCurrency((it.quantity || 0) * (it.priceUnit || 0))}
                                         </div>
                                     </div>
                                 </div>
@@ -267,15 +281,14 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                                     </div>
                                     <div className="space-y-1.5">
                                         <label className="block text-[11px] uppercase font-[700] text-slate-500 tracking-wider">Fornecedor Produto</label>
-                                        <select
-                                            className="w-full bg-white border border-[#D0D3D6] rounded-[var(--radius-md-budget)] px-3 py-2 text-[14px] font-[600] focus:ring-2 focus:ring-slate-500/20 focus:border-slate-400 transition-all cursor-pointer"
-                                            value={it.supplier_id || ''}
-                                            onChange={e => updateItem(it.id, 'supplier_id', e.target.value)}
+                                        <CustomSelect
+                                            options={suppliersList.filter(s => s.supplier_category === 'PRODUTOS' || !s.supplier_category)}
+                                            value={suppliersList.find(s => s.id === it.supplier_id)?.name}
+                                            onSelect={opt => updateItem(it.id, 'supplier_id', opt.id)}
+                                            onAdd={() => onAddSupplier(it.id, 'supplier_id')}
                                             disabled={isLocked}
-                                        >
-                                            <option value="">Selecione...</option>
-                                            {suppliersList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                        </select>
+                                            placeholder="Selecione..."
+                                        />
                                     </div>
                                 </div>
 
@@ -294,7 +307,7 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                             {/* COL 3: LOGISTICS + FINANCIALS */}
                             <div className="col-span-12 lg:col-span-5 space-y-6">
                                 {/* LOGISTICS TABLE */}
-                                <div className="bg-white border border-[#D0D3D6] rounded-[var(--radius-lg-budget)] overflow-hidden">
+                                <div className="bg-white border border-[#D0D3D6] rounded-[var(--radius-lg-budget)]">
                                     <div className="bg-[var(--bg-muted-budget)]/50 px-4 py-2 border-b border-[#D0D3D6]">
                                         <h5 className="text-[11px] font-[700] text-[var(--text-secondary-budget)] uppercase tracking-widest flex items-center gap-2">
                                             <span className="material-icons-outlined text-sm">local_shipping</span>
@@ -311,15 +324,20 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                                             <div key={row.key} className="grid grid-cols-12 gap-3 p-3 items-center hover:bg-[var(--bg-muted-budget)]/20 transition-colors">
                                                 <div className="col-span-4 text-[12px] font-[600] text-[var(--text-secondary-budget)] truncate">{row.label}</div>
                                                 <div className="col-span-5">
-                                                    <select
-                                                        className="w-full text-[11px] bg-slate-50/50 border border-[#D0D3D6]/50 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500/30 focus:border-blue-400 transition-all text-[var(--text-primary-budget)] font-semibold cursor-pointer hover:bg-white"
-                                                        value={it[row.suppKey] || ''}
-                                                        onChange={e => updateItem(it.id, row.suppKey, e.target.value)}
+                                                    <CustomSelect
+                                                        options={suppliersList.filter(s => {
+                                                            if (!s.supplier_category) return true;
+                                                            if (row.suppKey === 'customization_supplier_id' || row.suppKey === 'layout_supplier_id') {
+                                                                return ['GRAVACOES', 'PERSONALIZACAO', 'LOGISTICA'].includes(s.supplier_category);
+                                                            }
+                                                            return ['TRANSPORTADORA', 'LOGISTICA', 'PRODUTOS'].includes(s.supplier_category);
+                                                        })}
+                                                        value={suppliersList.find(s => s.id === it[row.suppKey])?.name}
+                                                        onSelect={opt => updateItem(it.id, row.suppKey, opt.id)}
+                                                        onAdd={() => onAddSupplier(it.id, row.suppKey)}
                                                         disabled={isLocked}
-                                                    >
-                                                        <option value="">Fornecedor...</option>
-                                                        {suppliersList.map(s => <option key={s.id} value={s.id}>{s.name || s.nome}</option>)}
-                                                    </select>
+                                                        placeholder="Fornecedor..."
+                                                    />
                                                 </div>
                                                 <div className="col-span-3">
                                                     <input
@@ -346,26 +364,45 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                                         </div>
                                         <div className="flex-[2] space-y-2">
                                             <label className="text-[10px] uppercase font-[700] text-[var(--text-tertiary-budget)] tracking-[0.06em]">Margem de Lucro</label>
-                                            <div className="flex gap-1.5 flex-wrap">
-                                                {[10, 15, 20, 30].map(m => {
+                                            <div className="flex gap-2 items-center flex-wrap">
+                                                {[10, 15, 20].map(m => {
                                                     const isActive = !it.isManualMargin && (it.mockMargin ?? 15) === m;
                                                     return (
-                                                        <button key={m} onClick={() => handleMarginClick(m)} className={`px-2.5 py-1.5 rounded-[var(--radius-md-budget)] text-[11px] font-[700] font-mono-budget transition-all border ${isActive ? 'bg-[var(--color-accent-budget)] border-[var(--color-accent-budget)] text-white' : 'bg-white border border-[var(--border-subtle-budget)] text-[var(--text-secondary-budget)] hover:border-[var(--color-accent-budget)]'}`} type="button">
+                                                        <button key={m} onClick={() => handleMarginClick(m)} className={`px-2.5 py-1.5 rounded-[var(--radius-md-budget)] text-[11px] font-[700] font-mono-budget transition-all border ${isActive ? 'bg-[var(--color-accent-budget)] border-[var(--color-accent-budget)] text-white shadow-sm' : 'bg-white border border-[var(--border-subtle-budget)] text-[var(--text-secondary-budget)] hover:border-[var(--color-accent-budget)]'}`} type="button">
                                                             {m}%
                                                         </button>
                                                     );
                                                 })}
+                                                <div className="relative">
+                                                    <input 
+                                                        type="number"
+                                                        className={`w-[60px] rounded-[var(--radius-md-budget)] border px-2.5 py-1.5 text-[11px] font-mono-budget font-[700] text-center focus:ring-0 transition-all ${it.isManualMargin ? 'bg-[var(--color-accent-budget)] text-white border-[var(--color-accent-budget)] shadow-sm' : 'bg-white border-[#D0D3D6] text-[var(--text-secondary-budget)]'}`}
+                                                        value={it.isManualMargin ? (it.mockMargin ?? '') : ''}
+                                                        placeholder="Outro"
+                                                        onChange={e => {
+                                                            const val = Number(e.target.value);
+                                                            updateItem(it.id, 'isManualMargin', true);
+                                                            updateItem(it.id, 'mockMargin', val);
+                                                            updateItem(it.id, 'fator', 1 + ((it.mockNF ?? 14) + val + (it.mockPayment ?? 0)) / 100);
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* BV % INPUT */}
+                                        <div className="flex-1 space-y-2">
+                                            <label className="text-[10px] uppercase font-[700] text-[var(--text-tertiary-budget)] tracking-[0.06em]">Agência (BV %)</label>
+                                            <div className="relative">
                                                 <input 
                                                     type="number"
-                                                    className={`w-12 rounded-[var(--radius-md-budget)] border border-[#D0D3D6] text-[11px] font-mono-budget text-center focus:ring-0 ${it.isManualMargin ? 'bg-[var(--color-accent-budget)] text-white border-[var(--color-accent-budget)]' : 'bg-white text-[var(--text-secondary-budget)]'}`}
-                                                    value={it.mockMargin ?? ''}
-                                                    onChange={e => {
-                                                        const val = Number(e.target.value);
-                                                        updateItem(it.id, 'isManualMargin', true);
-                                                        updateItem(it.id, 'mockMargin', val);
-                                                        updateItem(it.id, 'fator', 1 + ((it.mockNF ?? 14) + val + (it.mockPayment ?? 0)) / 100);
-                                                    }}
+                                                    className="w-full bg-white border border-[#D0D3D6] rounded-[var(--radius-md-budget)] px-2.5 py-1.5 text-[11px] font-mono-budget text-center focus:ring-[var(--color-accent-budget)] focus:border-[var(--color-accent-budget)]"
+                                                    value={it.bvPct || ''}
+                                                    placeholder="0"
+                                                    onChange={e => updateItem(it.id, 'bvPct', Number(e.target.value))}
+                                                    disabled={isLocked}
                                                 />
+                                                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">%</span>
                                             </div>
                                         </div>
                                     </div>
@@ -388,10 +425,23 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                                     {/* PRICING SUMARY DISCLOSURE */}
                                     <div className="pt-4 border-t border-[#D0D3D6] space-y-3">
                                         <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                            <div className="flex justify-between items-center bg-slate-50/80 px-2 py-1 rounded">
+                                                <span>Custo Parcial (S/ Imposto)</span>
+                                                <span className="text-slate-500 font-mono-budget">
+                                                    {formatCurrency(
+                                                        ((it.quantity || 0) * (it.priceUnit || 0)) + 
+                                                        (it.custoPersonalizacao || 0) + 
+                                                        (it.layoutCost || 0) + 
+                                                        (it.transpFornecedor || 0) + 
+                                                        (it.transpCliente || 0)
+                                                    )}
+                                                </span>
+                                            </div>
                                             <div className="flex justify-between items-center bg-white/50 px-2 py-1 rounded">
                                                 <span>Imposto</span>
                                                 <span className="text-slate-600 font-mono-budget">{formatCurrency(totalVenda * ((it.mockNF ?? 14) / 100))}</span>
                                             </div>
+                                            
                                             <div className="flex justify-between items-center bg-white/50 px-2 py-1 rounded">
                                                 <span>Custo Total (+ Imposto)</span>
                                                 <span className="text-slate-600 font-mono-budget">
@@ -405,10 +455,16 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                                                     )}
                                                 </span>
                                             </div>
-                                            <div className="flex justify-between items-center bg-emerald-50/50 px-2 py-1 rounded">
-                                                <span className="text-emerald-500">Lucro Estimado</span>
-                                                <span className="text-emerald-700 font-mono-budget">
-                                                    {formatCurrency(totalVenda - (((it.quantity || 0) * (it.priceUnit || 0)) + (it.custoPersonalizacao || 0) + (it.layoutCost || 0) + (it.transpFornecedor || 0) + (it.transpCliente || 0)) - (totalVenda * ((it.mockNF ?? 14) / 100)))}
+                                            <div className="flex justify-between items-center bg-orange-50/50 px-2 py-1 rounded group/bv relative">
+                                                <span className="text-orange-500">Comissão Agência (BV)</span>
+                                                <span className="text-orange-700 font-mono-budget">
+                                                    {formatCurrency(totalVenda * ((it.bvPct || 0) / 100))}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center bg-emerald-50/50 px-2 py-1 rounded col-span-2 mt-1">
+                                                <span className="text-emerald-600">Lucro Estimado</span>
+                                                <span className="text-emerald-700 font-mono-budget text-[12px]">
+                                                    {formatCurrency(totalVenda - (((it.quantity || 0) * (it.priceUnit || 0)) + (it.custoPersonalizacao || 0) + (it.layoutCost || 0) + (it.transpFornecedor || 0) + (it.transpCliente || 0)) - (totalVenda * ((it.mockNF ?? 14) / 100)) - (totalVenda * ((it.bvPct || 0) / 100)))}
                                                 </span>
                                             </div>
                                         </div>

@@ -10,6 +10,21 @@ import { maskPhone, maskCpfCnpj } from '../src/utils/maskUtils';
 import { PerformanceTab } from '../src/components/crm/PerformanceTab';
 import { FinanceiroTab } from '../src/components/crm/FinanceiroTab';
 import { Lead } from '../src/hooks/useCRM';
+import { fixClientName } from '../src/utils/textUtils';
+
+// --- SHARED STATUS CONFIGURATION ---
+export const CRM_STATUS_CONFIG: Record<string, { label: string, colorClass: string, icon: string }> = {
+    'ATENDIMENTO': { label: 'Em Atendimento', colorClass: 'bg-transparent text-slate-600', icon: 'chat' },
+    'ORCAMENTO': { label: 'Em Orçamento', colorClass: 'bg-transparent text-amber-700', icon: 'receipt_long' },
+    'PROPOSTA_ENVIADA': { label: 'Proposta Enviada', icon: 'send', colorClass: 'bg-transparent text-emerald-700' },
+    'PEDIDO_ABERTO': { label: 'Pedido Aberto', colorClass: 'bg-transparent text-sky-700', icon: 'shopping_bag' },
+    'FINALIZADO': { label: 'Finalizado (Venda)', colorClass: 'bg-transparent text-emerald-700', icon: 'verified' },
+    'NAO_APROVADO': { label: 'Não Aprovado', colorClass: 'bg-transparent text-rose-700', icon: 'cancel' }
+};
+
+export const getStatusStyle = (status: string) => {
+    return CRM_STATUS_CONFIG[status] || { label: status, colorClass: 'bg-gray-50 text-gray-600 border-gray-100', icon: 'help_outline' };
+};
 
 // --- Transfer Request Interface ---
 interface TransferRequest {
@@ -48,8 +63,8 @@ const ManagementPage: React.FC = () => {
         client_name: '', client_contact_name: '', client_phone: '', client_email: '', client_doc: ''
     };
 
-    const tabParam = searchParams.get('tab') as 'LEADS' | 'PERFORMANCE' | 'FINANCEIRO' | 'TRANSFERENCIAS' | 'RECORDS' | null;
-    const [activeTab, setActiveTab] = useState<'LEADS' | 'PERFORMANCE' | 'FINANCEIRO' | 'TRANSFERENCIAS' | 'RECORDS'>(tabParam || 'LEADS');
+    const tabParam = searchParams.get('tab') as 'LEADS' | 'PERFORMANCE' | 'FINANCEIRO' | 'TRANSFERENCIAS' | 'RECORDS' | 'ANALYTICS' | null;
+    const [activeTab, setActiveTab] = useState<'LEADS' | 'PERFORMANCE' | 'FINANCEIRO' | 'TRANSFERENCIAS' | 'RECORDS' | 'ANALYTICS'>(tabParam || 'LEADS');
     const [transferRequests, setTransferRequests] = useState<TransferRequest[]>([]);
     const [pendingTransferCount, setPendingTransferCount] = useState(0);
     const [loadingTransfers, setLoadingTransfers] = useState(false);
@@ -99,6 +114,7 @@ const ManagementPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [kanbanSellerFilter, setKanbanSellerFilter] = useState('Todos');
     const [kanbanPeriodFilter, setKanbanPeriodFilter] = useState('Todos');
+    const [kanbanStatusCategoryFilter, setKanbanStatusCategoryFilter] = useState('Todos');
     const [collapsedCols, setCollapsedCols] = useState<Record<string, boolean>>({});
     const [globalSearchTerm, setGlobalSearchTerm] = useState('');
 
@@ -123,7 +139,7 @@ const ManagementPage: React.FC = () => {
 
     // Finalize Modal State
     const [isFinalizeModalOpen, setIsFinalizeModalOpen] = useState(false);
-    const [finalizeForm, setFinalizeForm] = useState({ success: true, value: 0, notes: '' });
+    const [finalizeForm, setFinalizeForm] = useState({ success: true, value: 0, notes: '', category: '' });
     const [showClientForm, setShowClientForm] = useState(false);
     const [isSavingPartner, setIsSavingPartner] = useState(false);
     const [partnerSaved, setPartnerSaved] = useState(false);
@@ -375,7 +391,7 @@ const ManagementPage: React.FC = () => {
             const openStatuses = ['ATENDIMENTO', 'ORCAMENTO', 'PROPOSTA_ENVIADA', 'PEDIDO_ABERTO'];
             let checkQuery = supabase
                 .from('crm_leads')
-                .select('id, salesperson')
+                .select('id, salesperson, closing_metadata')
                 .eq('client_email', newLead.client_email)
                 .in('status', openStatuses);
 
@@ -383,7 +399,7 @@ const ManagementPage: React.FC = () => {
                 checkQuery = checkQuery.neq('id', editingLead.id);
             }
 
-            const { data: existingLeads } = await checkQuery;
+            const { data: existingLeads } = await checkQuery as { data: any[] };
 
             if (existingLeads && existingLeads.length > 0) {
                 // If it's the same item, block. If it's a different item, allow.
@@ -491,20 +507,41 @@ const ManagementPage: React.FC = () => {
         }
     };
 
+    const toggleFollowUp = async (lead: Lead) => {
+        try {
+            const nextDone = !lead.follow_up_done;
+            const { error } = await supabase.from('crm_leads').update({
+                follow_up_done: nextDone,
+                follow_up_at: nextDone ? new Date().toISOString() : null
+            }).eq('id', lead.id);
+            if (error) throw error;
+            toast.success(nextDone ? 'Acompanhamento marcado!' : 'Acompanhamento removido');
+            fetchLeads();
+        } catch (error: any) {
+            toast.error('Erro ao atualizar acompanhamento');
+        }
+    };
+
     const confirmFinalizeLead = async () => {
         if (!pendingStatusLead) return;
+        if (!finalizeForm.category) {
+            toast.error('A categoria do motivo é obrigatória.');
+            return;
+        }
 
         const metadata = {
             success: finalizeForm.success,
             final_value: finalizeForm.value,
             notes: finalizeForm.notes,
+            category: finalizeForm.category,
             finalized_at: new Date().toISOString()
         };
 
         const { error } = await supabase.from('crm_leads').update({
             status: 'FINALIZADO',
             closing_metadata: metadata,
-            estimated_value: finalizeForm.value // Update value with final value
+            estimated_value: finalizeForm.value,
+            finish_reason_category: finalizeForm.category
         }).eq('id', pendingStatusLead.id);
 
         if (!error) {
@@ -526,7 +563,8 @@ const ManagementPage: React.FC = () => {
 
         const { error } = await supabase.from('crm_leads').update({
             status: 'NAO_APROVADO',
-            lost_reason: `[${lostForm.category}] ${lostForm.reason}`
+            lost_reason: `[${lostForm.category}] ${lostForm.reason}`,
+            finish_reason_category: lostForm.category
         }).eq('id', pendingStatusLead.id);
 
         if (!error) {
@@ -568,7 +606,9 @@ const ManagementPage: React.FC = () => {
                     email: lead.client_email || '',
                     doc: lead.client_doc || ''
                 },
-                vendedor: lead.salesperson || ''
+                vendedor: lead.salesperson || '',
+                leadId: lead.id,
+                quotedItem: lead.closing_metadata?.quoted_item
             }
         });
     };
@@ -957,13 +997,18 @@ const ManagementPage: React.FC = () => {
         }
     };
 
-    const leadColumns = [
-        { id: 'ATENDIMENTO', title: 'Em Atendimento', color: '#7C3AED', icon: 'support_agent' },
-        { id: 'ORCAMENTO', title: 'Em Orçamento', color: '#F59E0B', icon: 'description' },
-        { id: 'PROPOSTA_ENVIADA', title: 'Proposta Enviada', color: '#10B981', icon: 'send' },
-        { id: 'PEDIDO_ABERTO', title: 'Pedido Aberto', color: '#3B82F6', icon: 'shopping_cart' },
-        { id: 'PEDIDO_ENTREGUE', title: 'Pedido Entregue', color: '#065F46', icon: 'local_shipping' },
-    ];
+    const leadColumns = Object.entries(CRM_STATUS_CONFIG)
+        .filter(([id]) => !['FINALIZADO', 'NAO_APROVADO'].includes(id)) // Keep only active columns in Kanban
+        .map(([id, cfg]) => ({
+            id,
+            title: cfg.label,
+            color: cfg.colorClass.includes('slate') ? '#475569' : 
+                   cfg.colorClass.includes('amber') ? '#b45309' :
+                   cfg.colorClass.includes('sky') ? '#0369a1' :
+                   cfg.colorClass.includes('emerald') ? '#047857' :
+                   cfg.colorClass.includes('rose') ? '#be123c' : '#6b7280',
+            icon: cfg.icon
+        }));
 
     const getSalespersonInitials = (name?: string) => {
         if (!name) return 'V';
@@ -1032,14 +1077,20 @@ const ManagementPage: React.FC = () => {
                         </div>
                     )}
                     {/* Exibe o seletor de abas apenas se o usuário tiver acesso a mais do que "LEADS" */}
-                    {(hasPermission('crm.performance') || hasPermission('crm.financeiro')) && (
-                        <div className="flex items-center gap-1 bg-transparent">
+                    <div className="flex items-center gap-1 bg-transparent">
                             <button
                                 onClick={() => setActiveTab('LEADS')}
                                 className={`px-4 py-2 rounded-lg text-[11px] font-black uppercase transition-all flex items-center gap-2 ${activeTab === 'LEADS' ? 'bg-[#1565C0] text-white' : 'bg-transparent text-gray-500 hover:text-[#1565C0] hover:underline decoration-2 underline-offset-4'}`}
                             >
                                 <span className="material-icons-outlined text-sm">view_kanban</span>
                                 Atendimentos
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('RECORDS')}
+                                className={`px-4 py-2 rounded-lg text-[11px] font-black uppercase transition-all flex items-center gap-2 ${activeTab === 'RECORDS' ? 'bg-[#1565C0] text-white' : 'bg-transparent text-gray-500 hover:text-[#1565C0] hover:underline decoration-2 underline-offset-4'}`}
+                            >
+                                <span className="material-icons-outlined text-sm">table_view</span>
+                                Planilha
                             </button>
                             {hasPermission('crm.performance') && (
                                 <button
@@ -1059,13 +1110,15 @@ const ManagementPage: React.FC = () => {
                                     Financeiro
                                 </button>
                             )}
-                            <button
-                                onClick={() => setActiveTab('RECORDS')}
-                                className={`px-4 py-2 rounded-lg text-[11px] font-black uppercase transition-all flex items-center gap-2 ${activeTab === 'RECORDS' ? 'bg-[#1565C0] text-white' : 'bg-transparent text-gray-500 hover:text-[#1565C0] hover:underline decoration-2 underline-offset-4'}`}
-                            >
-                                <span className="material-icons-outlined text-sm">table_view</span>
-                                Planilha
-                            </button>
+                            {hasPermission('crm.performance') && (
+                                <button
+                                    onClick={() => setActiveTab('ANALYTICS')}
+                                    className={`px-4 py-2 rounded-lg text-[11px] font-black uppercase transition-all flex items-center gap-2 ${activeTab === 'ANALYTICS' ? 'bg-[#1565C0] text-white' : 'bg-transparent text-gray-500 hover:text-[#1565C0] hover:underline decoration-2 underline-offset-4'}`}
+                                 >
+                                    <span className="material-icons-outlined text-sm">insights</span>
+                                    Análise
+                                </button>
+                            )}
                             <button
                                 onClick={() => setActiveTab('TRANSFERENCIAS')}
                                 className={`px-4 py-2 rounded-lg text-[11px] font-black uppercase transition-all flex items-center gap-2 ${activeTab === 'TRANSFERENCIAS' ? 'bg-[#1565C0] text-white' : 'bg-transparent text-gray-500 hover:text-[#1565C0] hover:underline decoration-2 underline-offset-4'}`}
@@ -1079,7 +1132,6 @@ const ManagementPage: React.FC = () => {
                                 )}
                             </button>
                         </div>
-                    )}
                 </div>
             </div>
 
@@ -1091,6 +1143,7 @@ const ManagementPage: React.FC = () => {
                             const proposalsWaiting = leads.filter(l => l.status === 'PROPOSTA_ENVIADA').length;
                             const openOrders = leads.filter(l => l.status === 'PEDIDO_ABERTO').length;
                             const delayedLeads = leads.filter(l => {
+                                if (['FINALIZADO', 'NAO_APROVADO'].includes(l.status)) return false;
                                 const diff = new Date().getTime() - new Date(l.updated_at || l.created_at).getTime();
                                 return Math.floor(diff / 86400000) > 15;
                             }).length;
@@ -1241,7 +1294,7 @@ const ManagementPage: React.FC = () => {
                             return (
                                 <div
                                     key={col.id}
-                                    className={`flex-shrink-0 flex flex-col transition-all rounded-xl border border-gray-200 border-t-[4px] bg-gray-50/50 ${dragOverColumn === col.id ? 'ring-2 ring-blue-400' : ''} ${isFullscreen ? 'h-full max-h-none overflow-hidden' : 'h-max'} ${isCollapsed ? 'min-w-[60px] w-[60px]' : 'min-w-[280px] md:min-w-[320px] w-[320px]'}`}
+                                    className={`flex-shrink-0 flex flex-col transition-all rounded-lg border border-slate-200 border-t-2 bg-slate-50/30 ${dragOverColumn === col.id ? 'ring-2 ring-slate-400' : ''} ${isFullscreen ? 'h-full max-h-none overflow-hidden' : 'h-max'} ${isCollapsed ? 'min-w-[60px] w-[60px]' : 'min-w-[280px] md:min-w-[320px] w-[320px]'}`}
                                     style={{ borderTopColor: col.color }}
                                     onDragOver={handleDragOver}
                                     onDragEnter={(e) => handleDragEnter(e, col.id)}
@@ -1249,8 +1302,7 @@ const ManagementPage: React.FC = () => {
                                     onDrop={(e) => handleDrop(e, col.id)}
                                 >
                                     <div 
-                                        className={`p-3 flex justify-between items-start cursor-pointer hover:bg-black/5 transition-colors rounded-t-lg ${isCollapsed ? 'flex-col items-center py-6 h-full' : ''}`}
-                                        style={{ backgroundColor: `${col.color}15` }}
+                                        className={`p-3 flex justify-between items-start cursor-pointer hover:bg-slate-100 transition-colors rounded-t-md border-b border-slate-200 bg-white ${isCollapsed ? 'flex-col items-center py-6 h-full' : ''}`}
                                         onClick={() => setCollapsedCols(prev => ({ ...prev, [col.id]: !prev[col.id] }))}
                                     >
                                         {isCollapsed ? (
@@ -1264,13 +1316,15 @@ const ManagementPage: React.FC = () => {
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-2">
                                                         <span className="material-icons-outlined text-sm" style={{ color: col.color }}>{col.icon}</span>
-                                                        <span className="text-xs font-black uppercase tracking-tight" style={{ color: col.color }}>{col.title}</span>
-                                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white shadow-sm" style={{ backgroundColor: col.color }}>
+                                                        <span className="text-xs font-bold uppercase tracking-tight text-slate-700">{col.title}</span>
+                                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded text-white shadow-sm" style={{ backgroundColor: col.color }}>
                                                             {colLeads.length}
                                                         </span>
                                                     </div>
                                                 </div>
-                                                <p className="text-[11px] font-bold text-gray-500 mt-1">{formatCurrency(totalVal)} em aberto</p>
+                                                {totalVal > 0 && (
+                                                    <p className="text-[11px] font-bold text-gray-500 mt-1">{formatCurrency(totalVal)} em aberto</p>
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -1294,7 +1348,8 @@ const ManagementPage: React.FC = () => {
                                                     draggable
                                                     onDragStart={(e) => handleDragStart(e, lead)}
                                                     onDragEnd={handleDragEnd}
-                                                    className={`bg-white rounded-xl shadow-[0_2px_4px_rgba(0,0,0,0.02)] border border-gray-100 hover:border-blue-200 hover:shadow-md transition-all group relative cursor-grab active:cursor-grabbing p-3 flex flex-col min-h-[90px] ${searchTerm && lead.id === globalSearchTerm ? 'ring-2 ring-blue-500' : ''}`}
+                                                    className={`bg-white rounded border-l-[3px] border-r border-t border-b border-slate-200 hover:border-r-slate-300 hover:border-t-slate-300 hover:border-b-slate-300 hover:shadow-md hover:-translate-y-[1px] transition-all group relative cursor-grab active:cursor-grabbing p-3 flex flex-col min-h-[90px] ${searchTerm && lead.id === globalSearchTerm ? 'ring-2 ring-slate-400' : ''}`}
+                                                    style={{ borderLeftColor: col.color }}
                                                     onClick={() => {
                                                         setEditingLead(lead);
                                                         setNewLead(lead);
@@ -1303,7 +1358,7 @@ const ManagementPage: React.FC = () => {
                                                     }}
                                                 >
                                                     <div className="flex justify-between items-center mb-1.5">
-                                                        <span className={`px-2 py-[2px] rounded text-[8px] font-black uppercase tracking-widest ${lead.priority === 'ALTA' || lead.priority === 'URGENTE' ? 'bg-red-50 text-red-600' : lead.priority === 'VIP' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'}`}>
+                                                        <span className={`px-1.5 py-[2px] rounded text-[9px] font-bold uppercase tracking-wider ${lead.priority === 'ALTA' || lead.priority === 'URGENTE' ? 'bg-red-50 text-red-600' : lead.priority === 'VIP' ? 'bg-amber-50 text-amber-600' : 'bg-slate-50 text-slate-500'}`}>
                                                             {lead.priority || 'NORMAL'}
                                                         </span>
                                                         <div className="flex items-center text-gray-400 text-[9px] font-bold">
@@ -1312,7 +1367,7 @@ const ManagementPage: React.FC = () => {
                                                         </div>
                                                     </div>
 
-                                                    <h4 className="font-bold text-gray-900 text-[14px] leading-tight line-clamp-2 mt-1" title={lead.client_name}>{lead.client_name}</h4>
+                                                    <h4 className="font-bold text-gray-900 text-[14px] leading-tight line-clamp-2 mt-1" title={fixClientName(lead.client_name)}>{fixClientName(lead.client_name)}</h4>
                                                     {lead.closing_metadata?.quoted_item && (
                                                         <div className="flex items-center gap-1 mt-1">
                                                             <span className="material-icons-outlined text-[12px] text-blue-500">inventory_2</span>
@@ -1333,24 +1388,62 @@ const ManagementPage: React.FC = () => {
                                                                 </div>
                                                             )}
                                                             <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${timeBg} ${timeColor} text-[9px] font-bold`}>
-                                                                <span className="material-icons-outlined text-[10px]">schedule</span>
-                                                                {stoppedDays}d parado
-                                                                {stoppedDays >= 15 && <span className={`w-1 h-1 rounded-full ${timeDot} animate-pulse ml-0.5`}></span>}
-                                                            </div>
-                                                        </div>
-                                                        <button
-                                                            onClick={(e) => handleAttendLead(e, lead.id)}
-                                                            className="h-6 w-6 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:bg-blue-500 hover:text-white transition-all shadow-sm border border-gray-200 hover:border-blue-500 opacity-60 group-hover:opacity-100"
-                                                            title="Marcar como atualizado"
-                                                        >
-                                                            <span className="material-icons-outlined text-[12px]">refresh</span>
-                                                        </button>
-                                                    </div>
+                                                                 <span className="material-icons-outlined text-[10px]">schedule</span>
+                                                                 {stoppedDays}d parado
+                                                                 {stoppedDays >= 15 && <span className={`w-1 h-1 rounded-full ${timeDot} animate-pulse ml-0.5`}></span>}
+                                                             </div>
+                                                             {lead.follow_up_done && (
+                                                                 <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 text-[9px] font-black uppercase ring-1 ring-blue-100">
+                                                                     <span className="material-icons-outlined text-[10px]">done_all</span>
+                                                                     Acompanhamento OK
+                                                                 </div>
+                                                             )}
+                                                         </div>
+                                                         <div className="flex items-center gap-1">
+                                                             <button
+                                                                 onClick={(e) => { e.stopPropagation(); toggleFollowUp(lead); }}
+                                                                 className={`h-6 w-6 flex items-center justify-center rounded-full transition-all shadow-sm border ${lead.follow_up_done ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-blue-500 hover:text-white hover:border-blue-500 opacity-60 group-hover:opacity-100'}`}
+                                                                 title={lead.follow_up_done ? "Desmarcar acompanhamento" : "Marcar acompanhamento feito"}
+                                                             >
+                                                                 <span className="material-icons-outlined text-[12px]">{lead.follow_up_done ? 'check' : 'notifications_active'}</span>
+                                                             </button>
+                                                             <button
+                                                                 onClick={(e) => handleAttendLead(e, lead.id)}
+                                                                 className="h-6 w-6 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:bg-blue-500 hover:text-white transition-all shadow-sm border border-gray-200 hover:border-blue-500 opacity-60 group-hover:opacity-100"
+                                                                 title="Marcar como atualizado"
+                                                             >
+                                                                 <span className="material-icons-outlined text-[12px]">refresh</span>
+                                                             </button>
+                                                         </div>
+                                                     </div>
                                                     
                                                     {/* Hover Quick Actions */}
                                                     <div className="absolute inset-x-0 bottom-0 h-[46px] opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-around bg-white/95 backdrop-blur shadow-[0_-10px_20px_rgba(0,0,0,0.05)] border-t border-gray-100 rounded-b-xl z-20">
                                                         <button onClick={(e) => { e.stopPropagation(); navigate('/pedidos', { state: { clientName: lead.client_name } }); }} className="p-1 hover:bg-blue-50 rounded text-blue-600 transition-all"><span className="material-icons-outlined text-lg">shopping_bag</span></button>
-                                                        <button onClick={async (e) => { e.stopPropagation();  let clientId = ''; const conditions = []; if (lead.client_doc) conditions.push(`doc.eq."${lead.client_doc.replace(/"/g, '""')}"`); if (lead.client_email) conditions.push(`email.eq."${lead.client_email.replace(/"/g, '""')}"`); if (lead.client_phone) conditions.push(`phone.eq."${lead.client_phone.replace(/"/g, '""')}"`); const safeClientName = lead.client_name.replace(/"/g, '""'); if (conditions.length === 0) conditions.push(`name.ilike."%${safeClientName}%"`); const { data } = await supabase.from('partners').select('id').or(conditions.join(',')).eq('type', 'CLIENTE').limit(1); if (data && data.length > 0) clientId = data[0].id; navigate('/orcamentos', { state: { clientName: lead.client_name, clientId: clientId } }); }} className="p-1 hover:bg-emerald-50 rounded text-emerald-600 transition-all"><span className="material-icons-outlined text-lg">request_quote</span></button>
+                                                        <button 
+                                                            onClick={async (e) => { 
+                                                                e.stopPropagation();  
+                                                                let clientId = ''; 
+                                                                const conditions = []; 
+                                                                if (lead.client_doc) conditions.push(`doc.eq."${lead.client_doc.replace(/"/g, '""')}"`); 
+                                                                if (lead.client_email) conditions.push(`email.eq."${lead.client_email.replace(/"/g, '""')}"`); 
+                                                                if (lead.client_phone) {
+                                                                    const cleanPhone = lead.client_phone.replace(/\D/g, '');
+                                                                    if (cleanPhone) conditions.push(`phone.ilike."%${cleanPhone}%"`);
+                                                                }
+                                                                const safeClientName = lead.client_name?.trim().replace(/"/g, '""'); 
+                                                                if (safeClientName) conditions.push(`name.ilike."%${safeClientName}%"`); 
+                                                                
+                                                                if (conditions.length > 0) {
+                                                                    const { data } = await supabase.from('partners').select('id').or(conditions.join(',')).eq('type', 'CLIENTE').limit(1); 
+                                                                    if (data && data.length > 0) clientId = data[0].id; 
+                                                                }
+                                                                navigate('/orcamentos', { state: { clientName: lead.client_name, clientId: clientId } }); 
+                                                            }} 
+                                                            className="p-1 hover:bg-emerald-50 rounded text-emerald-600 transition-all"
+                                                        >
+                                                            <span className="material-icons-outlined text-lg">request_quote</span>
+                                                        </button>
                                                         <button onClick={(e) => { e.stopPropagation(); convertToBudget(lead); }} className="p-1 hover:bg-purple-50 rounded text-purple-600 transition-all"><span className="material-icons-outlined text-lg">add_circle</span></button>
                                                         <button onClick={(e) => { e.stopPropagation(); setPendingStatusLead(lead); setIsFinalizeModalOpen(true); }} className="p-1 hover:bg-green-50 rounded text-green-600 transition-all"><span className="material-icons-outlined text-lg">check_circle</span></button>
                                                     </div>
@@ -1368,18 +1461,180 @@ const ManagementPage: React.FC = () => {
             )}
 
             {
-                activeTab === 'PERFORMANCE' && (
-                    <PerformanceTab
-                        totalBudgets={totalBudgets}
-                        totalApproved={totalApproved}
-                        totalValue={totalValue}
-                        stats={stats}
-                        recentBudgets={recentBudgets}
-                        formatCurrency={formatCurrency}
-                        leads={leads}
-                    />
-                )
-            }
+                 activeTab === 'PERFORMANCE' && (
+                     <PerformanceTab
+                         totalBudgets={totalBudgets}
+                         totalApproved={totalApproved}
+                         totalValue={totalValue}
+                         stats={stats}
+                         recentBudgets={recentBudgets}
+                         formatCurrency={formatCurrency}
+                         leads={leads}
+                     />
+                 )
+             }
+ 
+             {
+                 activeTab === 'ANALYTICS' && (
+                     <div className="space-y-6 animate-in fade-in duration-500">
+                         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 overflow-hidden">
+                             <div className="mb-0 flex items-center justify-between">
+                                 <div>
+                                     <h2 className="text-xl font-black text-gray-900 uppercase tracking-tighter flex items-center gap-2">
+                                         <span className="material-icons-outlined text-blue-600">insights</span>
+                                         Análise de Atendimentos Finalizados
+                                     </h2>
+                                     <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Metrificação de motivos de fechamento e perda</p>
+                                 </div>
+                                 <div className="flex items-center gap-2">
+                                     <button onClick={() => fetchLeads()} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Recarregar dados">
+                                         <span className={`material-icons-outlined ${loading ? 'animate-spin' : ''}`}>sync</span>
+                                     </button>
+                                 </div>
+                             </div>
+ 
+                             <div className="h-px bg-gray-100 w-full my-6"></div>
+ 
+                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                 <div className="bg-green-50 rounded-2xl p-6 border border-green-100 shadow-sm transition-all hover:shadow-md hover:scale-[1.01]">
+                                     <div className="flex items-center gap-3 mb-2">
+                                         <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center shadow-sm">
+                                             <span className="material-icons-outlined">verified</span>
+                                         </div>
+                                         <span className="text-[10px] font-black text-green-700 uppercase tracking-widest">Sucesso (Vendas)</span>
+                                     </div>
+                                     <p className="text-3xl font-black text-green-800">
+                                         {leads.filter(l => l.status === 'FINALIZADO' && ['QUALIDADE', 'PREÇO', 'ATENDIMENTO', 'PRAZO', 'FIDELIDADE'].includes(l.finish_reason_category || '')).length}
+                                     </p>
+                                     <p className="text-[10px] text-green-600 font-bold uppercase mt-1">Total de pedidos fechados</p>
+                                 </div>
+ 
+                                 <div className="bg-red-50 rounded-2xl p-6 border border-red-100 shadow-sm transition-all hover:shadow-md hover:scale-[1.01]">
+                                     <div className="flex items-center gap-3 mb-2">
+                                         <div className="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center shadow-sm">
+                                             <span className="material-icons-outlined">cancel</span>
+                                         </div>
+                                         <span className="text-[10px] font-black text-red-700 uppercase tracking-widest">Perdas (Leads)</span>
+                                     </div>
+                                     <p className="text-3xl font-black text-red-800">
+                                         {leads.filter(l => (l.status === 'NAO_APROVADO' || (l.status === 'FINALIZADO' && !['QUALIDADE', 'PREÇO', 'ATENDIMENTO', 'PRAZO', 'FIDELIDADE'].includes(l.finish_reason_category || '')))).length}
+                                     </p>
+                                     <p className="text-[10px] text-red-600 font-bold uppercase mt-1">Total de leads não convertidos</p>
+                                 </div>
+ 
+                                 <div className="bg-blue-50 rounded-2xl p-6 border border-blue-100 shadow-sm transition-all hover:shadow-md hover:scale-[1.01]">
+                                     <div className="flex items-center gap-3 mb-2">
+                                         <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shadow-sm">
+                                             <span className="material-icons-outlined">show_chart</span>
+                                         </div>
+                                         <span className="text-[10px] font-black text-blue-700 uppercase tracking-widest">Conversão Global</span>
+                                     </div>
+                                     <p className="text-3xl font-black text-blue-800">
+                                         {(() => {
+                                             const success = leads.filter(l => l.status === 'FINALIZADO' && ['QUALIDADE', 'PREÇO', 'ATENDIMENTO', 'PRAZO', 'FIDELIDADE'].includes(l.finish_reason_category || '')).length;
+                                             const total = leads.filter(l => l.status === 'FINALIZADO' || l.status === 'NAO_APROVADO').length;
+                                             return total > 0 ? ((success / total) * 100).toFixed(1) + '%' : '0%';
+                                         })()}
+                                     </p>
+                                     <p className="text-[10px] text-blue-600 font-bold uppercase mt-1">Taxa de fechamento geral</p>
+                                 </div>
+                             </div>
+ 
+                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                                 <div className="space-y-6">
+                                     <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 pb-2 border-b border-gray-50">
+                                         <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)] animate-pulse"></span>
+                                         Fatores de Conversão (Por que ganhamos?)
+                                     </h3>
+                                     <div className="space-y-4">
+                                         {['QUALIDADE', 'PREÇO', 'ATENDIMENTO', 'PRAZO', 'FIDELIDADE', 'OUTRO'].map(reason => {
+                                             const count = leads.filter(l => l.status === 'FINALIZADO' && l.finish_reason_category === reason).length;
+                                             const allPossible = leads.filter(l => l.status === 'FINALIZADO' && ['QUALIDADE', 'PREÇO', 'ATENDIMENTO', 'PRAZO', 'FIDELIDADE', 'OUTRO'].includes(l.finish_reason_category || ''));
+                                             const max = Math.max(...['QUALIDADE', 'PREÇO', 'ATENDIMENTO', 'PRAZO', 'FIDELIDADE', 'OUTRO'].map(r => leads.filter(l => l.status === 'FINALIZADO' && l.finish_reason_category === r).length), 1);
+                                             return (
+                                                 <div key={reason} className="group">
+                                                     <div className="flex justify-between items-center mb-1.5 px-1">
+                                                         <span className="text-xs font-black text-gray-700 uppercase tracking-tight">{reason}</span>
+                                                         <span className="text-[10px] font-black text-green-600 bg-green-50/50 px-2.5 py-1 rounded-full border border-green-200">{count} Atendimentos</span>
+                                                     </div>
+                                                     <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden p-0.5 border border-gray-200 shadow-inner">
+                                                         <div 
+                                                             className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full transition-all duration-1000 group-hover:scale-y-110 shadow-[0_0_12px_rgba(34,197,94,0.3)]"
+                                                             style={{ width: `${(count / max) * 100}%` }}
+                                                         ></div>
+                                                     </div>
+                                                 </div>
+                                             );
+                                         })}
+                                     </div>
+                                 </div>
+ 
+                                 <div className="space-y-6">
+                                     <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 pb-2 border-b border-gray-50">
+                                         <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)] animate-pulse"></span>
+                                         Principais Motivos de Perda
+                                     </h3>
+                                     <div className="space-y-4">
+                                         {['PREÇO ALTO', 'PRAZO LONGO', 'CONCORRÊNCIA', 'DESISTIU', 'FALTA ESTOQUE', 'OUTRO'].map(reason => {
+                                             const count = leads.filter(l => (l.status === 'NAO_APROVADO' || l.status === 'FINALIZADO') && l.finish_reason_category === reason).length;
+                                             const max = Math.max(...['PREÇO ALTO', 'PRAZO LONGO', 'CONCORRÊNCIA', 'DESISTIU', 'FALTA ESTOQUE', 'OUTRO'].map(r => leads.filter(l => (l.status === 'NAO_APROVADO' || l.status === 'FINALIZADO') && l.finish_reason_category === r).length), 1);
+                                             return (
+                                                 <div key={reason} className="group">
+                                                     <div className="flex justify-between items-center mb-1.5 px-1">
+                                                         <span className="text-xs font-black text-gray-700 uppercase tracking-tight">{reason}</span>
+                                                         <span className="text-[10px] font-black text-red-600 bg-red-100/50 px-2.5 py-1 rounded-full border border-red-200">{count} Atendimentos</span>
+                                                     </div>
+                                                     <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden p-0.5 border border-gray-200 shadow-inner">
+                                                         <div 
+                                                             className="h-full bg-gradient-to-r from-red-400 to-red-600 rounded-full transition-all duration-1000 group-hover:scale-y-110 shadow-[0_0_12px_rgba(239,68,68,0.3)]"
+                                                             style={{ width: `${(count / max) * 100}%` }}
+                                                         ></div>
+                                                     </div>
+                                                 </div>
+                                             );
+                                         })}
+                                     </div>
+                                 </div>
+                             </div>
+ 
+                             <div className="mt-12 pt-8 border-t border-gray-100">
+                                 <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-6">Desempenho de Conversão por Vendedor</h3>
+                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                     {Array.from(new Set(leads.map(l => l.salesperson))).filter(Boolean).map(seller => {
+                                         const sellerLeads = leads.filter(l => l.salesperson === seller);
+                                         const total = sellerLeads.filter(l => l.status === 'FINALIZADO' || l.status === 'NAO_APROVADO').length;
+                                         const success = sellerLeads.filter(l => l.status === 'FINALIZADO' && ['QUALIDADE', 'PREÇO', 'ATENDIMENTO', 'PRAZO', 'FIDELIDADE'].includes(l.finish_reason_category || '')).length;
+                                         return (
+                                             <div key={seller} className="bg-white rounded-2xl p-4 border border-gray-100 hover:shadow-xl transition-all group overflow-hidden relative">
+                                                 <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                                                     <span className="material-icons-outlined text-4xl">person</span>
+                                                 </div>
+                                                 <p className="text-[10px] font-black text-gray-400 uppercase mb-2 tracking-tighter">{seller}</p>
+                                                 <div className="flex justify-between items-end">
+                                                     <div>
+                                                         <p className="text-2xl font-black text-gray-900">{total > 0 ? ((success / total) * 100).toFixed(0) + '%' : '0%'}</p>
+                                                         <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Conversão</p>
+                                                     </div>
+                                                     <div className="text-right">
+                                                         <div className="flex items-center gap-1 justify-end">
+                                                             <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                                             <p className="text-[10px] font-black text-green-700">{success} Ganhos</p>
+                                                         </div>
+                                                         <div className="flex items-center gap-1 justify-end">
+                                                             <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+                                                             <p className="text-[10px] font-black text-red-500">{total - success} Perdas</p>
+                                                         </div>
+                                                     </div>
+                                                 </div>
+                                             </div>
+                                         );
+                                     })}
+                                 </div>
+                             </div>
+                         </div>
+                     </div>
+                 )
+             }
 
             {
                 activeTab === 'FINANCEIRO' && (
@@ -1400,14 +1655,24 @@ const ManagementPage: React.FC = () => {
             {
                 activeTab === 'RECORDS' && (
                     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-in fade-in duration-300">
-                        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                        <div className="p-6 border-b border-gray-100 flex flex-wrap justify-between items-center bg-gray-50/50 gap-4">
                             <div>
                                 <h2 className="text-lg font-black text-gray-900 uppercase">Planilha de Atendimentos</h2>
                                 <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Histórico completo de atendimentos (Ativos e Finalizados)</p>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <div className="relative min-w-[200px]">
+                                    <span className="material-icons-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">search</span>
+                                    <input 
+                                        type="text"
+                                        placeholder="Buscar na planilha..."
+                                        className="w-full pl-9 pr-4 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                        value={searchTerm}
+                                        onChange={e => setSearchTerm(e.target.value)}
+                                    />
+                                </div>
                                 <select 
-                                    className="bg-white border border-gray-200 text-xs font-bold text-gray-500 py-1.5 px-3 rounded-lg outline-none"
+                                    className="bg-white border border-gray-200 text-xs font-bold text-gray-500 py-1.5 px-3 rounded-lg outline-none cursor-pointer focus:ring-2 focus:ring-blue-500"
                                     value={kanbanSellerFilter}
                                     onChange={e => setKanbanSellerFilter(e.target.value)}
                                 >
@@ -1416,8 +1681,47 @@ const ManagementPage: React.FC = () => {
                                         <option key={s} value={s}>{s}</option>
                                     ))}
                                 </select>
-                                <button onClick={fetchLeads} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
-                                    <span className="material-icons-outlined">sync</span>
+                                <select
+                                    className="bg-white border border-gray-200 text-xs font-bold text-gray-500 py-1.5 px-3 rounded-lg outline-none cursor-pointer focus:ring-2 focus:ring-blue-500"
+                                    value={kanbanPeriodFilter}
+                                    onChange={e => setKanbanPeriodFilter(e.target.value)}
+                                >
+                                    <option value="Todos">Período: Todos</option>
+                                    <option value="Hoje">Hoje</option>
+                                    <option value="7d">Últimos 7 dias</option>
+                                    <option value="30d">Últimos 30 dias</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-4 py-4 px-6 bg-slate-50/50 border-b border-gray-100">
+                            <div className="flex flex-wrap items-center gap-4">
+                                <div className="relative">
+                                    <span className="material-icons-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">filter_list</span>
+                                    <select 
+                                        className="pl-9 pr-6 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 uppercase tracking-tighter outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer hover:border-gray-300 transition-all"
+                                        value={kanbanStatusCategoryFilter}
+                                        onChange={e => setKanbanStatusCategoryFilter(e.target.value)}
+                                    >
+                                        <option value="Todos">Status: Todos</option>
+                                        <option value="Ativos">Status: Ativos</option>
+                                        <option value="Finalizados">Status: Finalizados</option>
+                                        <option value="Perdidos">Status: Perdidos</option>
+                                        <optgroup label="Específicos">
+                                            {Object.entries(CRM_STATUS_CONFIG).map(([id, cfg]) => (
+                                                <option key={id} value={id}>{cfg.label}</option>
+                                            ))}
+                                        </optgroup>
+                                    </select>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] uppercase font-black text-gray-400">Total:</span>
+                                    <span className="text-xs font-black text-blue-600">{leads.length} Atendimentos</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => fetchLeads()} className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="Atualizar dados">
+                                    <span className="material-icons-outlined text-sm">refresh</span>
                                 </button>
                             </div>
                         </div>
@@ -1425,67 +1729,182 @@ const ManagementPage: React.FC = () => {
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200 text-[13px]">
                                 <thead>
-                                    <tr className="bg-gray-50/80">
-                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Data</th>
-                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Cliente</th>
-                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Item Quoted</th>
-                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Vendedor</th>
-                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Valor</th>
-                                        <th className="px-6 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Ações</th>
+                                    <tr className="bg-gray-50/50">
+                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Status / Funil</th>
+                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Prioridade</th>
+                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Data</th>
+                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Cliente / Empresa</th>
+                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Item / Projeto</th>
+                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Vendedor</th>
+                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Parado</th>
+                                        <th className="px-6 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Ações Rápidas</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-100">
                                     {loading ? (
-                                        <tr><td colSpan={7} className="px-6 py-10 text-center text-gray-400 font-bold uppercase text-xs">Carregando...</td></tr>
+                                        <tr><td colSpan={9} className="px-6 py-10 text-center text-gray-400 font-bold uppercase text-xs animate-pulse tracking-widest">Carregando dados da nuvem...</td></tr>
                                     ) : (leads || [])
                                         .filter(l => kanbanSellerFilter === 'Todos' || l.salesperson === kanbanSellerFilter)
-                                        .map(l => (
-                                        <tr key={l.id} className="hover:bg-gray-50/50 transition-colors group">
-                                            <td className="px-6 py-4">
-                                                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border ${
-                                                    l.status === 'FINALIZADO' ? 'bg-green-50 text-green-700 border-green-100' :
-                                                    l.status === 'NAO_APROVADO' ? 'bg-red-50 text-red-700 border-red-100' :
-                                                    'bg-blue-50 text-blue-700 border-blue-100'
-                                                }`}>
-                                                    {l.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 font-medium text-gray-500 tabular-nums">
-                                                {formatDate(l.created_at)}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="font-bold text-gray-900">{l.client_name}</div>
-                                                <div className="text-[11px] text-gray-400">{l.client_contact_name || l.client_phone}</div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                {l.closing_metadata?.quoted_item ? (
-                                                    <span className="font-bold text-blue-600 uppercase text-[11px] bg-blue-50 px-2 py-1 rounded border border-blue-100">{l.closing_metadata.quoted_item}</span>
-                                                ) : (
-                                                    <span className="text-gray-300 italic">Nenhum</span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className="font-bold text-gray-600">{l.salesperson}</span>
-                                            </td>
-                                            <td className="px-6 py-4 font-black text-gray-900">
-                                                {formatCurrency(l.estimated_value || 0)}
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <button 
-                                                    onClick={() => {
-                                                        setEditingLead(l);
-                                                        setNewLead(l);
-                                                        setPartnerSaved(true);
-                                                        setIsLeadModalOpen(true);
-                                                    }}
-                                                    className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                                                >
-                                                    <span className="material-icons-outlined text-lg">edit</span>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                        .filter(l => {
+                                            if (kanbanPeriodFilter === 'Todos') return true;
+                                            const diff = new Date().getTime() - new Date(l.created_at).getTime();
+                                            const days = Math.floor(diff / 86400000);
+                                            if (kanbanPeriodFilter === 'Hoje') return days === 0;
+                                            if (kanbanPeriodFilter === '7d') return days <= 7;
+                                            if (kanbanPeriodFilter === '30d') return days <= 30;
+                                            return true;
+                                        })
+                                        .filter(l => {
+                                            if (kanbanStatusCategoryFilter === 'Todos') return true;
+                                            if (kanbanStatusCategoryFilter === 'Ativos') return !['FINALIZADO', 'NAO_APROVADO'].includes(l.status);
+                                            if (kanbanStatusCategoryFilter === 'Finalizados') return l.status === 'FINALIZADO';
+                                            if (kanbanStatusCategoryFilter === 'Perdidos') return l.status === 'NAO_APROVADO';
+                                            return l.status === kanbanStatusCategoryFilter;
+                                        })
+                                        .filter(l => {
+                                            if (!searchTerm) return true;
+                                            const term = searchTerm.toLowerCase();
+                                            return l.client_name.toLowerCase().includes(term) || (l.client_contact_name && l.client_contact_name.toLowerCase().includes(term)) || (l.client_phone && l.client_phone.includes(term)) || (l.salesperson && l.salesperson.toLowerCase().includes(term)) || (l.closing_metadata?.quoted_item && l.closing_metadata.quoted_item.toLowerCase().includes(term));
+                                        })
+                                        .map(l => {
+                                            const diffToNow = new Date().getTime() - new Date(l.updated_at || l.created_at).getTime();
+                                            const stoppedDays = Math.floor(diffToNow / 86400000);
+                                            
+                                            let timeColor = 'text-green-600';
+                                            let timeBg = 'bg-green-50';
+                                            if (stoppedDays >= 15) { timeColor = 'text-red-600'; timeBg = 'bg-red-50'; }
+                                            else if (stoppedDays >= 7) { timeColor = 'text-yellow-600'; timeBg = 'bg-yellow-50'; }
+
+                                            return (
+                                                <tr key={l.id} className="hover:bg-blue-50/30 transition-colors group">
+                                                    <td className="px-6 py-4">
+                                                        <select
+                                                            className={`text-[10px] font-black uppercase tracking-tighter rounded border border-gray-100 py-1 px-2 outline-none focus:ring-1 focus:ring-blue-500 max-w-[140px] transition-colors ${
+                                                                getStatusStyle(l.status).colorClass
+                                                            }`}
+                                                            value={l.status}
+                                                            onChange={(e) => updateLeadStatus(l, e.target.value)}
+                                                        >
+                                                            {leadColumns.map(col => <option key={col.id} value={col.id}>{col.title}</option>)}
+                                                            <option value="FINALIZADO">FINALIZADO (Sucesso)</option>
+                                                            <option value="NAO_APROVADO">NÃO APROVADO (Perda)</option>
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${
+                                                            l.priority === 'ALTA' || l.priority === 'URGENTE' ? 'bg-red-50 text-red-600 border border-red-100' :
+                                                            l.priority === 'VIP' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' :
+                                                            'bg-gray-100 text-gray-600 border border-gray-200'
+                                                        }`}>
+                                                            {l.priority || 'NORMAL'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 font-medium text-gray-500 tabular-nums">
+                                                        {formatDate(l.created_at)}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="font-bold text-gray-900 line-clamp-1">{fixClientName(l.client_name)}</div>
+                                                        <div className="text-[11px] text-gray-400">{l.client_contact_name || l.client_phone}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        {l.closing_metadata?.quoted_item ? (
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="material-icons-outlined text-[14px] text-blue-500">inventory_2</span>
+                                                                <span className="font-black text-blue-700 uppercase text-[10px] tracking-tighter truncate max-w-[120px]">{l.closing_metadata.quoted_item}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-gray-300 italic text-[11px]">Não informado</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="flex items-center justify-center px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-black text-[9px] border border-gray-200">
+                                                                {getSalespersonInitials(l.salesperson)}
+                                                            </div>
+                                                            <span className="font-bold text-gray-600 text-[11px] truncate max-w-[80px]">{l.salesperson}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded ${timeBg} ${timeColor} text-[10px] font-black`}>
+                                                            <span className="material-icons-outlined text-[12px]">schedule</span>
+                                                            {stoppedDays}d
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <div className="flex items-center justify-end gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); navigate('/pedidos', { state: { clientName: l.client_name } }); }}
+                                                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                                                title="Ver Pedidos do Cliente"
+                                                            >
+                                                                <span className="material-icons-outlined text-lg">shopping_bag</span>
+                                                            </button>
+                                                            <button 
+                                                                onClick={async (e) => { 
+                                                                    e.stopPropagation(); 
+                                                                    let clientId = ''; 
+                                                                    const conditions = []; 
+                                                                    if (l.client_doc) conditions.push(`doc.eq."${l.client_doc.replace(/"/g, '""')}"`); 
+                                                                    if (l.client_email) conditions.push(`email.eq."${l.client_email.replace(/"/g, '""')}"`); 
+                                                                    if (l.client_phone) conditions.push(`phone.eq."${l.client_phone.replace(/"/g, '""')}"`); 
+                                                                    const safeClientName = l.client_name.replace(/"/g, '""');
+                                                                    if (conditions.length === 0) conditions.push(`name.ilike."%${safeClientName}%"`);
+                                                                    const { data } = await supabase.from('partners').select('id').or(conditions.join(',')).eq('type', 'CLIENTE').limit(1);
+                                                                    if (data && data.length > 0) clientId = data[0].id;
+                                                                    navigate('/orcamentos', { state: { clientName: l.client_name, clientId: clientId } });
+                                                                }}
+                                                                className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                                                title="Ver Orçamentos do Cliente"
+                                                            >
+                                                                <span className="material-icons-outlined text-lg">request_quote</span>
+                                                            </button>
+                                                            <div className="w-px h-4 bg-gray-200 mx-0.5"></div>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setEditingLead(l);
+                                                                    setNewLead(l);
+                                                                    setPartnerSaved(true);
+                                                                    setIsLeadModalOpen(true);
+                                                                }}
+                                                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                                                title="Editar Detalhes"
+                                                            >
+                                                                <span className="material-icons-outlined text-lg">edit</span>
+                                                            </button>
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); toggleFollowUp(l); }}
+                                                                className={`p-1.5 rounded-lg transition-all ${l.follow_up_done ? 'text-blue-600 bg-blue-50' : 'text-gray-400 hover:text-blue-500 hover:bg-blue-50'}`}
+                                                                title={l.follow_up_done ? "Desmarcar Acompanhamento" : "Marcar Acompanhamento"}
+                                                            >
+                                                                <span className="material-icons-outlined text-lg">{l.follow_up_done ? 'notifications_off' : 'notifications_active'}</span>
+                                                            </button>
+                                                            <button 
+                                                                onClick={(e) => handleAttendLead(e, l.id)}
+                                                                className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                                                title="Atualizar Atendimento"
+                                                            >
+                                                                <span className="material-icons-outlined text-lg">refresh</span>
+                                                            </button>
+                                                            <div className="w-px h-4 bg-gray-200 mx-0.5"></div>
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); convertToBudget(l); }}
+                                                                className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
+                                                                title="Gerar Novo Orçamento"
+                                                            >
+                                                                <span className="material-icons-outlined text-lg">add</span>
+                                                            </button>
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); setPendingStatusLead(l); setIsFinalizeModalOpen(true); }}
+                                                                className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all"
+                                                                title="Finalizar (Venda)"
+                                                            >
+                                                                <span className="material-icons-outlined text-lg">verified</span>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                 </tbody>
                             </table>
                         </div>
@@ -1800,45 +2219,67 @@ const ManagementPage: React.FC = () => {
                                     <p className="text-[9px] text-gray-400 mt-1 italic">Este item será exibido no card do Kanban para facilitar a identificação.</p>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    {editingLead && (
-                                        <>
-                                            <div className="col-span-2">
-                                                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Vendedor Responsável</label>
-                                                <select
-                                                    className={`form-select w-full rounded-lg border-gray-300 ${isSeller ? 'bg-gray-100' : ''}`}
-                                                    value={newLead.salesperson}
-                                                    onChange={e => setNewLead({ ...newLead, salesperson: e.target.value })}
-                                                    disabled={isSeller}
-                                                >
-                                                    <option value="VENDAS 01">VENDAS 01</option>
-                                                    <option value="VENDAS 02">VENDAS 02</option>
-                                                    <option value="VENDAS 03">VENDAS 03</option>
-                                                    <option value="VENDAS 04">VENDAS 04</option>
-                                                </select>
-                                            </div>
-                                            {/* Status do Funil removed from here to make it more minimalist as requested */}
-                                        </>
-                                    )}
-                                    <div className="col-span-2">
-                                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Prioridade</label>
-                                        <div className="flex gap-4">
-                                            {['BAIXA', 'NORMAL', 'ALTA'].map(p => (
-                                                <label key={p} className="flex items-center gap-2 cursor-pointer">
-                                                    <input
-                                                        type="radio"
-                                                        name="priority"
-                                                        checked={newLead.priority === p}
-                                                        onChange={() => setNewLead({ ...newLead, priority: p as any })}
-                                                        className="text-blue-600 focus:ring-blue-500"
-                                                    />
-                                                    <span className={`text-xs font-bold uppercase ${p === 'ALTA' ? 'text-red-500' : p === 'BAIXA' ? 'text-gray-500' : 'text-blue-500'
-                                                        }`}>{p}</span>
-                                                </label>
-                                            ))}
+                                <div className="col-span-2 space-y-4">
+                                    <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+                                        <label className="block text-xs font-black text-slate-500 uppercase mb-3 tracking-widest flex items-center gap-2">
+                                            <span className="material-icons-outlined text-sm">tapestry</span>
+                                            Status do Funil
+                                        </label>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                            {Object.entries(CRM_STATUS_CONFIG).map(([id, cfg]) => {
+                                                const isSelected = newLead.status === id;
+                                                return (
+                                                    <button
+                                                        key={id}
+                                                        type="button"
+                                                        onClick={() => setNewLead({ ...newLead, status: id })}
+                                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-[10px] font-black uppercase transition-all ${
+                                                            isSelected 
+                                                            ? `${cfg.colorClass} border-current shadow-sm ring-1 ring-current`
+                                                            : 'bg-white border-slate-100 text-slate-400 hover:border-slate-300 hover:text-slate-600'
+                                                        }`}
+                                                    >
+                                                        <span className="material-icons-outlined text-sm opacity-70">{cfg.icon}</span>
+                                                        <span className="truncate">{cfg.label}</span>
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
                                     </div>
 
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">Vendedor Responsável</label>
+                                            <select
+                                                className={`w-full rounded-lg border-slate-200 text-xs font-bold text-slate-700 uppercase focus:ring-blue-500 transition-all ${isSeller ? 'bg-slate-50' : 'bg-white'}`}
+                                                value={newLead.salesperson}
+                                                onChange={e => setNewLead({ ...newLead, salesperson: e.target.value })}
+                                                disabled={isSeller}
+                                            >
+                                                <option value="VENDAS 01">VENDAS 01</option>
+                                                <option value="VENDAS 02">VENDAS 02</option>
+                                                <option value="VENDAS 03">VENDAS 03</option>
+                                                <option value="VENDAS 04">VENDAS 04</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">Prioridade</label>
+                                            <div className="flex gap-4 h-[38px] items-center">
+                                                {['BAIXA', 'NORMAL', 'ALTA'].map(p => (
+                                                    <label key={p} className="flex items-center gap-2 cursor-pointer">
+                                                        <input
+                                                            type="radio"
+                                                            name="priority"
+                                                            checked={newLead.priority === p}
+                                                            onChange={() => setNewLead({ ...newLead, priority: p as any })}
+                                                            className="text-blue-600 focus:ring-blue-500"
+                                                        />
+                                                        <span className={`text-[10px] font-bold uppercase ${p === 'ALTA' ? 'text-red-500' : p === 'BAIXA' ? 'text-slate-400' : 'text-blue-500'}`}>{p}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {/* Checklist Section */}
@@ -1999,48 +2440,48 @@ const ManagementPage: React.FC = () => {
                                     <label className="block text-sm font-bold text-gray-800 mb-3 text-center">O cliente fez o pedido?</label>
                                     <div className="grid grid-cols-2 gap-3">
                                         <button
-                                            onClick={() => setFinalizeForm({ ...finalizeForm, success: true })}
-                                            className={`py-3 rounded-xl text-xs font-black uppercase transition-all border ${finalizeForm.success ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105' : 'bg-gray-50 text-gray-400 border-gray-100 hover:bg-gray-100'}`}
+                                            onClick={() => setFinalizeForm({ ...finalizeForm, success: true, category: '' })}
+                                            className={`py-3 rounded-xl text-xs font-black uppercase transition-all border ${finalizeForm.success ? 'bg-green-600 text-white border-green-600 shadow-md transform scale-105' : 'bg-gray-50 text-gray-400 border-gray-100 hover:bg-gray-100'}`}
                                         >
                                             Sim, Fez Pedido
                                         </button>
                                         <button
-                                            onClick={() => setFinalizeForm({ ...finalizeForm, success: false })}
-                                            className={`py-3 rounded-xl text-xs font-black uppercase transition-all border ${!finalizeForm.success ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105' : 'bg-gray-50 text-gray-400 border-gray-100 hover:bg-gray-100'}`}
+                                            onClick={() => setFinalizeForm({ ...finalizeForm, success: false, category: '' })}
+                                            className={`py-3 rounded-xl text-xs font-black uppercase transition-all border ${!finalizeForm.success ? 'bg-red-600 text-white border-red-600 shadow-md transform scale-105' : 'bg-gray-50 text-gray-400 border-gray-100 hover:bg-gray-100'}`}
                                         >
                                             Não Fez
                                         </button>
                                     </div>
                                 </div>
 
-                                {finalizeForm.success ? (
-                                    <>
-                                        <div className="animate-in slide-in-from-top-2 duration-300">
-                                            {/* Valor Final Removed as per request */}
-                                        </div>
-                                        <div className="animate-in slide-in-from-top-2 duration-300 delay-75">
-                                            <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Qual o feedback dele?</label>
-                                            <textarea
-                                                className="form-textarea w-full rounded-2xl border-gray-100 focus:ring-green-500 focus:border-green-500 text-sm font-medium bg-gray-50"
-                                                rows={3}
-                                                placeholder="Ex: Gostou muito do atendimento..."
-                                                value={finalizeForm.notes}
-                                                onChange={e => setFinalizeForm({ ...finalizeForm, notes: e.target.value })}
-                                            />
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="animate-in slide-in-from-top-2 duration-300">
-                                        <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Qual o motivo?</label>
-                                        <textarea
-                                            className="form-textarea w-full rounded-2xl border-gray-100 focus:ring-red-500 focus:border-red-500 text-sm font-medium bg-gray-50"
-                                            rows={3}
-                                            placeholder="Ex: Achou o preço alto..."
-                                            value={finalizeForm.notes}
-                                            onChange={e => setFinalizeForm({ ...finalizeForm, notes: e.target.value })}
-                                        />
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Qual o Motivo principal?</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {(finalizeForm.success 
+                                            ? ['QUALIDADE', 'PREÇO', 'ATENDIMENTO', 'PRAZO', 'FIDELIDADE', 'OUTRO']
+                                            : ['PREÇO ALTO', 'PRAZO LONGO', 'CONCORRÊNCIA', 'DESISTIU', 'FALTA ESTOQUE', 'OUTRO']
+                                        ).map(cat => (
+                                            <button
+                                                key={cat}
+                                                onClick={() => setFinalizeForm({ ...finalizeForm, category: cat })}
+                                                className={`py-2 px-3 rounded-xl border text-[10px] font-black uppercase transition-all ${finalizeForm.category === cat ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white border-gray-100 text-gray-400 hover:border-blue-300 hover:bg-blue-50'}`}
+                                            >
+                                                {cat}
+                                            </button>
+                                        ))}
                                     </div>
-                                )}
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Observações Adicionais</label>
+                                    <textarea
+                                        className="form-textarea w-full rounded-2xl border-gray-100 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium bg-gray-50"
+                                        rows={3}
+                                        placeholder="Detalhes sobre a finalização..."
+                                        value={finalizeForm.notes}
+                                        onChange={e => setFinalizeForm({ ...finalizeForm, notes: e.target.value })}
+                                    />
+                                </div>
 
                                 <div className="flex gap-4 pt-4">
                                     <button

@@ -35,6 +35,9 @@ import FinancialDashboardPage from './pages/FinancialDashboardPage';
 import UserManagementPage from './pages/UserManagementPage';
 import KanbanSupervisorPage from './pages/KanbanSupervisorPage';
 import SuperDashboardPage from './pages/SuperDashboardPage';
+import CatalogListPage from './pages/CatalogListPage';
+import CatalogEditorPage from './pages/CatalogEditorPage';
+import CatalogPreviewPage from './pages/CatalogPreviewPage';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 
 import NotificationCenter from './src/components/NotificationCenter';
@@ -103,6 +106,7 @@ const Header: React.FC = () => {
       subItems: [
         { name: 'Orçamentos', path: '/orcamentos', permission: 'pedidos', icon: 'request_quote' },
         { name: 'Propostas', path: '/propostas', permission: 'pedidos', icon: 'description' },
+        { name: 'Catálogos', path: '/catalogos', permission: 'pedidos', icon: 'auto_stories' },
         { name: 'Pedidos', path: '/pedidos', permission: 'pedidos', icon: 'receipt_long' }
       ]
     },
@@ -287,13 +291,48 @@ const Footer: React.FC = () => (
   </footer>
 );
 
+const RouteTracker: React.FC = () => {
+    const location = useLocation();
+    const { isAuthenticated } = useAuth();
+
+    React.useEffect(() => {
+        if (isAuthenticated && 
+            location.pathname !== '/login' && 
+            !location.pathname.startsWith('/proposta/')) {
+            localStorage.setItem('lastPath', location.pathname + location.search);
+        }
+    }, [location, isAuthenticated]);
+
+    return null;
+};
+
 const AppLayout: React.FC = () => {
-  const { isAuthenticated, appUser } = useAuth();
+  const { isAuthenticated, appUser, hasPermission } = useAuth();
+  
+  const getLandingPage = () => {
+    // 1. Check persistent history
+    const lastPath = localStorage.getItem('lastPath');
+    if (lastPath && lastPath !== '/' && lastPath !== '/login') {
+      return lastPath;
+    }
+
+    // 2. Role-based defaults
+    if (appUser?.salesperson) {
+      return '/crm?tab=RECORDS';
+    }
+    
+    if (hasPermission('crm.performance') || hasPermission('fatores')) {
+      return '/supervisao';
+    }
+
+    return '/pedidos';
+  };
 
   if (!isAuthenticated) {
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/proposta/:id" element={<ErrorBoundary><ProposalDetail /></ErrorBoundary>} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
@@ -301,10 +340,11 @@ const AppLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <RouteTracker />
       <Header />
       <main className="flex-1 py-6">
         <Routes>
-          <Route path="/" element={<ProtectedRoute permission="pedidos">{appUser?.salesperson ? <Navigate to="/crm" replace /> : <OrderList />}</ProtectedRoute>} />
+          <Route path="/" element={<ProtectedRoute permission="pedidos"><Navigate to={getLandingPage()} replace /></ProtectedRoute>} />
           <Route path="/pedidos" element={<ProtectedRoute permission="pedidos"><OrderList /></ProtectedRoute>} />
           <Route path="/pedido/novo" element={<ProtectedRoute permission="pedidos"><OrderForm /></ProtectedRoute>} />
           <Route path="/pedido/:id" element={<ProtectedRoute permission="pedidos"><OrderForm /></ProtectedRoute>} />
@@ -313,6 +353,10 @@ const AppLayout: React.FC = () => {
           <Route path="/orcamento/:id" element={<ProtectedRoute permission="pedidos"><BudgetForm /></ProtectedRoute>} />
           <Route path="/propostas" element={<ProtectedRoute permission="pedidos"><ProposalList /></ProtectedRoute>} />
           <Route path="/proposta/:id" element={<ProtectedRoute permission="pedidos"><ProposalDetail /></ProtectedRoute>} />
+          <Route path="/catalogos" element={<ProtectedRoute permission="pedidos"><CatalogListPage /></ProtectedRoute>} />
+          <Route path="/catalogo/novo" element={<ProtectedRoute permission="pedidos"><CatalogEditorPage /></ProtectedRoute>} />
+          <Route path="/catalogo/:id" element={<ProtectedRoute permission="pedidos"><CatalogEditorPage /></ProtectedRoute>} />
+          <Route path="/catalogo/:id/preview" element={<ProtectedRoute permission="pedidos"><CatalogPreviewPage /></ProtectedRoute>} />
           <Route path="/crm" element={<ProtectedRoute permission="pedidos"><ManagementPage /></ProtectedRoute>} />
           <Route path="/supervisao" element={<ProtectedRoute permission="crm.performance"><KanbanSupervisorPage /></ProtectedRoute>} />
           <Route path="/super-dashboard" element={<ProtectedRoute permission="crm.performance"><SuperDashboardPage /></ProtectedRoute>} />
@@ -335,7 +379,7 @@ const AppLayout: React.FC = () => {
           <Route path="/configuracoes/fatores/novo" element={<ProtectedRoute permission="fatores"><CalculationFactorForm /></ProtectedRoute>} />
           <Route path="/configuracoes/fatores/editar/:id" element={<ProtectedRoute permission="fatores"><CalculationFactorForm /></ProtectedRoute>} />
           <Route path="/login" element={<Navigate to="/" replace />} />
-          <Route path="*" element={appUser?.salesperson ? <Navigate to="/crm" replace /> : <OrderList />} />
+          <Route path="*" element={<Navigate to={getLandingPage()} replace />} />
         </Routes>
       </main>
     </div>

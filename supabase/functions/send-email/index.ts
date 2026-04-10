@@ -2,15 +2,14 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import nodemailer from "npm:nodemailer";
 
 Deno.serve(async (req: Request) => {
-    // 1. Manuseio de CORS preflight
+    const corsHeaders = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    };
+
     if (req.method === 'OPTIONS') {
-        return new Response('ok', {
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-client-info',
-            }
-        });
+        return new Response('ok', { headers: corsHeaders });
     }
 
     try {
@@ -43,13 +42,13 @@ Deno.serve(async (req: Request) => {
         });
 
         return new Response(JSON.stringify({ success: true, messageId: info.messageId }), {
-            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     } catch (err: any) {
         console.error('Email send error:', err);
         return new Response(JSON.stringify({ error: err.message || 'Failed to send email' }), {
             status: 500,
-            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     }
 });

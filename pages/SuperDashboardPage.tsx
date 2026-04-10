@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useSuperDashboard, daysSince, isOverdue, DashLead, DashBudget, DashProposal, DashOrder } from '../src/hooks/useSuperDashboard';
 import { formatDate } from '../src/utils/dateUtils';
+import { fixClientName } from '../src/utils/textUtils';
 
 // ─── Constants & Config ───────────────────────────────────────────────────────
 
@@ -159,7 +160,7 @@ const SuperDashboardPage: React.FC = () => {
         type: 'warning',
         icon: 'warning',
         title: `${stagnatedLeads.length} lead${stagnatedLeads.length > 1 ? 's' : ''} sem atualização há +3 dias`,
-        items: stagnatedLeads.map(l => `${l.client_name} (${l.salesperson})`).slice(0, 3),
+        items: stagnatedLeads.map(l => `${fixClientName(l.client_name)} (${l.salesperson})`).slice(0, 3),
         action: () => setActiveTab('kanban'),
         actionLabel: 'Ver no Kanban',
       });
@@ -175,7 +176,7 @@ const SuperDashboardPage: React.FC = () => {
         type: 'danger',
         icon: 'error',
         title: `${overdueOrders.length} pedido${overdueOrders.length > 1 ? 's' : ''} com entrega atrasada`,
-        items: overdueOrders.map(o => `#${o.order_number} — ${o.client_name}`).slice(0, 3),
+        items: overdueOrders.map(o => `#${o.order_number} — ${fixClientName(o.client_name)}`).slice(0, 3),
         action: () => setActiveTab('pedidos'),
         actionLabel: 'Ver Pedidos',
       });
@@ -191,7 +192,7 @@ const SuperDashboardPage: React.FC = () => {
         type: 'warning',
         icon: 'payments',
         title: `${awaitingPayment.length} pedido${awaitingPayment.length > 1 ? 's' : ''} aguardando 1ª parcela há +3 dias`,
-        items: awaitingPayment.map(o => `#${o.order_number} — ${o.client_name}`).slice(0, 3),
+        items: awaitingPayment.map(o => `#${o.order_number} — ${fixClientName(o.client_name)}`).slice(0, 3),
         action: () => setActiveTab('pedidos'),
         actionLabel: 'Ver Pedidos',
       });
@@ -446,7 +447,7 @@ const SuperDashboardPage: React.FC = () => {
                               >
                                 <div className="flex justify-between items-start mb-1">
                                   <span className="text-[10px] font-black text-gray-900 uppercase leading-tight truncate pr-1 group-hover:text-blue-600 transition-colors">
-                                    {lead.client_name}
+                                    {fixClientName(lead.client_name)}
                                   </span>
                                   {lead.priority === 'ALTA' && (
                                     <span className="material-icons-outlined text-[10px] text-red-500">priority_high</span>
@@ -531,7 +532,7 @@ const SuperDashboardPage: React.FC = () => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col">
-                        <span className="text-gray-900 font-black uppercase text-[11px] leading-none mb-1">{item.client_name}</span>
+                        <span className="text-gray-900 font-black uppercase text-[11px] leading-none mb-1">{fixClientName(item.client_name)}</span>
                         {item.client_doc && <span className="text-[9px] text-gray-400">{item.client_doc}</span>}
                       </div>
                     </td>

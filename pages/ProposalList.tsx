@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { formatCurrency } from '../src/utils/formatCurrency';
 import { toast } from 'sonner';
 import { useAuth } from '../lib/auth';
+import { fixClientName } from '../src/utils/textUtils';
 
 const ProposalList: React.FC = () => {
     const [proposals, setProposals] = useState<any[]>([]);
@@ -113,7 +114,7 @@ const ProposalList: React.FC = () => {
                                             <span className="text-xs font-black text-blue-600">#{item.proposal_number}</span>
                                         </td>
                                         <td className="px-3 py-1.5 whitespace-nowrap">
-                                            <span className="text-xs font-black text-gray-800 uppercase leading-none">{item.client?.name || 'Vários'}</span>
+                                            <span className="text-xs font-black text-gray-800 uppercase leading-none">{fixClientName(item.client?.name || 'Vários')}</span>
                                         </td>
                                         <td className="px-3 py-1.5 text-center whitespace-nowrap">
                                             <span className="text-gray-500 text-[10px] font-bold uppercase">{new Date(item.created_at).toLocaleDateString('pt-BR')}</span>

@@ -18,6 +18,9 @@ export interface Lead {
     priority?: 'ALTA' | 'NORMAL' | 'BAIXA';
     lost_reason?: string;
     estimated_value?: number;
+    follow_up_done?: boolean;
+    follow_up_at?: string;
+    finish_reason_category?: string;
     closing_metadata?: {
         checklist?: { id: string; text: string; completed: boolean }[];
         wa_template?: string;
@@ -46,10 +49,32 @@ export function useLeads(startDate?: string, endDate?: string) {
 export function useUpdateLeadStatus() {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: async ({ id, status }: { id: string; status: string }) => {
-            const { error } = await supabase.from('crm_leads').update({ status }).eq('id', id);
+        mutationFn: async ({ id, status, notes, lost_reason, finish_reason_category }: { id: string; status: string; notes?: string; lost_reason?: string; finish_reason_category?: string }) => {
+            const updates: any = { status };
+            if (notes) updates.notes = notes;
+            if (lost_reason) updates.lost_reason = lost_reason;
+            if (finish_reason_category) updates.finish_reason_category = finish_reason_category;
+            
+            const { error } = await supabase.from('crm_leads').update(updates).eq('id', id);
             if (error) throw error;
             return { id, status };
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['crm_leads'] });
+        },
+    });
+}
+
+export function useToggleFollowUp() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ id, done }: { id: string; done: boolean }) => {
+            const { error } = await supabase.from('crm_leads').update({
+                follow_up_done: done,
+                follow_up_at: done ? new Date().toISOString() : null
+            }).eq('id', id);
+            if (error) throw error;
+            return { id, done };
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['crm_leads'] });

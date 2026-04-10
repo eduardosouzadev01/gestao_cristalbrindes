@@ -48,23 +48,37 @@ const BudgetList: React.FC = () => {
                 .from('budgets')
                 .select('*, partners(name, doc)', { count: 'exact' });
 
-            if (location.state?.clientId) {
+            const normalizedSearch = searchTerm?.trim();
+            
+            // Priority: if we have a clientId from navigation AND the search term matches the client name, use the ID
+            // Otherwise fallback to name search
+            if (location.state?.clientId && normalizedSearch === location.state?.clientName?.trim()) {
                 query = query.eq('client_id', location.state.clientId);
-            } else if (searchTerm) {
-                // Escape searchTerm to prevent PostgREST .or() parsing errors with parenthesis/commas
-                const safeSearchTerm = searchTerm.replace(/"/g, '""');
+            } else if (normalizedSearch) {
+                // Escape searchTerm for PostgREST
+                const safeSearchTerm = normalizedSearch.replace(/"/g, '""');
                 
-                const { data: matchedPartners } = await supabase
-                    .from('partners')
-                    .select('id')
-                    .or(`name.ilike."%${safeSearchTerm}%",email.ilike."%${safeSearchTerm}%",doc.ilike."%${safeSearchTerm}%",phone.ilike."%${safeSearchTerm}%"`);
-
-                const pIds = matchedPartners?.map((p: any) => p.id) || [];
-
-                if (pIds.length > 0) {
-                    query = query.or(`budget_number.ilike."%${safeSearchTerm}%",client_id.in.(${pIds.join(',')})`);
+                // If search term is too short (< 3 chars), search only by budget number to avoid massive client list
+                if (normalizedSearch.length < 3) {
+                    query = query.ilike('budget_number', `%${normalizedSearch}%`);
                 } else {
-                    query = query.ilike('budget_number', `%${searchTerm}%`);
+                    // Search for partners that match the term
+                    const { data: matchedPartners } = await supabase
+                        .from('partners')
+                        .select('id')
+                        .or(`name.ilike."%${safeSearchTerm}%",email.ilike."%${safeSearchTerm}%",doc.ilike."%${safeSearchTerm}%",phone.ilike."%${safeSearchTerm}%"`)
+                        .limit(30);
+
+                    const pIds = matchedPartners?.map((p: any) => p.id) || [];
+
+                    if (pIds.length > 0) {
+                        // Search in budget_number OR link to one of the found partners
+                        // Limiting pIds to avoid URL length limit (Bad Request 400)
+                        query = query.or(`budget_number.ilike."%${safeSearchTerm}%",client_id.in.(${pIds.join(',')})`);
+                    } else {
+                        // Fallback to budget number search only
+                        query = query.ilike('budget_number', `%${normalizedSearch}%`);
+                    }
                 }
             }
 
@@ -93,6 +107,7 @@ const BudgetList: React.FC = () => {
             setBudgets(data || []);
             setTotalCount(count || 0);
         } catch (error: any) {
+            console.error('Erro ao buscar orçamentos:', error);
             toast.error('Erro ao carregar orçamentos.');
         } finally {
             setLoading(false);
@@ -140,10 +155,11 @@ const BudgetList: React.FC = () => {
         <div className="max-w-[1920px] w-full mx-auto px-4 py-4 space-y-4">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-xl font-black text-gray-900 uppercase tracking-tighter flex items-center gap-2">
-                        <span className="material-icons-outlined text-blue-500 text-2xl">quote_marker</span>
-                        ORÇAMENTOS (CRM)
+                    <h1 className="text-xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
+                        <span className="material-icons-outlined text-amber-600 text-2xl">receipt_long</span>
+                        LISTAGEM DE ORÇAMENTOS
                     </h1>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Gestão comercial e propostas em andamento</p>
                 </div>
             </div>
 
@@ -236,36 +252,44 @@ const BudgetList: React.FC = () => {
                         ) : (
                             budgets.map((b) => (
                                 <tr key={b.id} className="hover:bg-blue-50/50 transition-colors cursor-pointer group" onClick={() => navigate(`/orcamento/${b.id}`)}>
-                                    <td className="px-3 py-1.5 whitespace-nowrap text-xs font-black text-blue-600">#{b.budget_number}</td>
+                                    <td className="px-3 py-1.5 whitespace-nowrap text-xs font-black text-slate-900 group-hover:text-blue-600 transition-colors">#{b.budget_number}</td>
                                     <td className="px-3 py-1.5 whitespace-nowrap">
                                         <div className="flex flex-col">
-                                            <span className="text-xs font-black text-gray-900 leading-tight">{b.partners?.name || 'Vários'}</span>
+                                            <span className="text-xs font-black text-slate-700 leading-tight">{b.partners?.name || 'Cliente Vários'}</span>
                                             <div className="flex items-center gap-2 mt-0.5">
-                                                <span className="text-[9px] text-gray-400 font-black uppercase leading-none">{b.issuer || 'CRISTAL'} BRINDES</span>
-                                                <span className="text-[9px] text-gray-300 font-bold uppercase leading-none">•</span>
-                                                <span className="text-[9px] text-gray-400 font-bold uppercase leading-none">{formatDate(b.created_at)}</span>
+                                                <span className="text-[9px] text-slate-400 font-bold uppercase leading-none">{b.issuer || 'CRISTAL'} BRINDES</span>
+                                                <span className="text-[9px] text-slate-300 font-bold uppercase leading-none">•</span>
+                                                <span className="text-[9px] text-slate-400 font-bold uppercase leading-none">{formatDate(b.created_at)}</span>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-3 py-1.5 whitespace-nowrap text-[10px] text-gray-600 font-black uppercase">{b.salesperson}</td>
+                                    <td className="px-3 py-1.5 whitespace-nowrap text-[10px] text-slate-500 font-bold uppercase tracking-wider">{b.salesperson}</td>
                                     <td className="px-3 py-1.5 whitespace-nowrap">
-                                        <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase shadow-sm ${b.status === 'PROPOSTA ACEITA' ? 'bg-green-500 text-white' :
-                                            b.status === 'PROPOSTA RECUSADA' || b.status === 'CANCELADO' ? 'bg-red-500 text-white' :
-                                                'bg-yellow-400 text-gray-900'
-                                            }`}>
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider shadow-sm border ${
+                                            b.status === 'PROPOSTA ACEITA' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                            b.status === 'PROPOSTA RECUSADA' || b.status === 'CANCELADO' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                                            b.status === 'PROPOSTA ENVIADA' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' :
+                                            'bg-amber-50 text-amber-700 border-amber-100'
+                                        }`}>
+                                            <span className={`w-1 h-1 rounded-full mr-1.5 ${
+                                                b.status === 'PROPOSTA ACEITA' ? 'bg-emerald-500' :
+                                                b.status === 'PROPOSTA RECUSADA' || b.status === 'CANCELADO' ? 'bg-rose-500' :
+                                                b.status === 'PROPOSTA ENVIADA' ? 'bg-indigo-500' :
+                                                'bg-amber-500'
+                                            }`} />
                                             {b.status}
                                         </span>
                                     </td>
-                                    <td className="px-3 py-1.5 whitespace-nowrap text-right text-xs font-black text-gray-900">
+                                    <td className="px-3 py-1.5 whitespace-nowrap text-right text-xs font-black text-slate-900 group-hover:text-blue-600 transition-colors">
                                         {b.total_amount?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                     </td>
                                     <td className="px-3 py-1.5 whitespace-nowrap text-center space-x-1">
-                                        <button onClick={(e) => { e.stopPropagation(); navigate(`/orcamento/${b.id}`); }} className="text-gray-400 hover:text-blue-600 transition-colors" title="Editar"><span className="material-icons-outlined text-sm">edit</span></button>
+                                        <button onClick={(e) => { e.stopPropagation(); navigate(`/orcamento/${b.id}`); }} className="text-slate-300 hover:text-blue-600 transition-colors" title="Editar"><span className="material-icons-outlined text-sm">edit</span></button>
                                         {/* Só permite excluir se for Supervisor OU se o status for inicial/cancelado */}
                                         {(!['PROPOSTA ENVIADA', 'PROPOSTA ACEITA'].includes(b.status)) && (
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); deleteBudget(b); }}
-                                                className="text-gray-400 hover:text-red-500 transition-colors"
+                                                className="text-slate-300 hover:text-rose-500 transition-colors"
                                                 title="Excluir Orçamento"
                                             >
                                                 <span className="material-icons-outlined text-sm">delete</span>
