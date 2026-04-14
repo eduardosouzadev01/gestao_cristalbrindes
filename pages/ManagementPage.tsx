@@ -87,7 +87,7 @@ const ManagementPage: React.FC = () => {
     const { hasPermission, appUser } = useAuth();
 
     const userSalesperson = appUser?.salesperson || '';
-    const isSeller = !!appUser?.salesperson;
+    const isSeller = !!appUser?.salesperson && !hasPermission('adm') && !hasPermission('gestao') && !hasPermission('crm.performance');
 
     const initialLeadState: Partial<Lead> = {
         status: 'ATENDIMENTO',
@@ -957,7 +957,7 @@ const ManagementPage: React.FC = () => {
                 <div className="animate-in fade-in slide-in-from-top-4 duration-500">
                     {/* Summary Counters */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-4 mb-6">
-                        {((hasPermission('adm') || hasPermission('gestao'))
+                        {((hasPermission('adm') || hasPermission('gestao') || hasPermission('crm.performance'))
                             ? ['VENDAS 01', 'VENDAS 02', 'VENDAS 03', 'VENDAS 04']
                             : [userSalesperson].filter(Boolean)
                         ).map((seller) => {
@@ -1385,7 +1385,7 @@ const ManagementPage: React.FC = () => {
                                                                         key={l.id} 
                                                                         className="px-5 py-4 hover:bg-blue-50 cursor-pointer flex items-center justify-between group transition-all"
                                                                         onClick={() => {
-                                                                            const isManager = appUser?.role === 'ADMIN' || appUser?.role === 'GESTOR';
+                                                                            const isManager = appUser?.role === 'ADMIN' || appUser?.role === 'GESTAO' || appUser?.role === 'SUPERVISOR';
                                                                             if (!isManager && l.salesperson && userSalesperson && l.salesperson !== userSalesperson) {
                                                                                 setSelectedClientToTransfer(l);
                                                                                 setIsTransferModalOpen(true);

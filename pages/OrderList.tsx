@@ -58,7 +58,7 @@ const OrderList: React.FC = () => {
         `, { count: 'exact' });
 
       // If user can only view own orders, force filter by their salesperson
-      if (appUser?.permissions?.viewOwnOrdersOnly && appUser?.salesperson) {
+      if (!hasPermission('pedidos.all') && appUser?.salesperson) {
         query = query.eq('salesperson', appUser.salesperson);
       } else if (vendedorFilter !== 'Todos os Vendedores') {
         // Only apply manual vendedor filter if not restricted

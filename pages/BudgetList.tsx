@@ -77,8 +77,8 @@ const BudgetList: React.FC = () => {
                 }
             }
 
-            // Force sellers to only see their own budgets
-            if (appUser?.permissions?.viewOwnOrdersOnly && appUser?.salesperson) {
+            // If user can only view own orders, force filter by their salesperson
+            if (!hasPermission('pedidos.all') && appUser?.salesperson) {
                 query = query.eq('salesperson', appUser.salesperson);
             } else if (vendedorFilter !== 'Todos os Vendedores') {
                 query = query.eq('salesperson', vendedorFilter);

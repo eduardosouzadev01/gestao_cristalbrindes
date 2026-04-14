@@ -26,6 +26,7 @@ export interface UserPermissions {
 export interface AppUser {
   email: string;
   name: string;
+  role?: string;
   permissions: UserPermissions;
   salesperson?: string; // Maps to VENDAS 01, VENDAS 02, etc.
 }
@@ -52,6 +53,7 @@ const fetchUserProfile = async (userId: string): Promise<AppUser | null> => {
     return {
       email: data.email,
       name: data.name,
+      role: data.role,
       salesperson: data.salesperson_id,
       permissions: data.permissions as UserPermissions,
     };
@@ -158,7 +160,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       case 'pedidos':
         return true; // All users can see orders (filtered by their own if needed)
       case 'pedidos.all':
-        return appUser.permissions.viewAllOrders;
+        return appUser.permissions.viewAllOrders || appUser.salesperson === 'VENDAS 04';
+      case 'adm':
+      case 'gestao':
+        return appUser.permissions.fullAccess || appUser.role === 'ADMIN' || appUser.role === 'GESTAO' || appUser.role === 'SUPERVISOR' || appUser.salesperson === 'VENDAS 04';
       case 'cadastros':
         return appUser.permissions.cadastros;
       case 'produtos':
@@ -166,7 +171,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       case 'canDelete':
         return appUser.permissions.canDelete;
       case 'crm.performance':
-        return appUser.permissions.crmPerformance;
+        return appUser.permissions.crmPerformance || appUser.salesperson === 'VENDAS 04';
       case 'crm.financeiro':
         return appUser.permissions.crmFinanceiro;
       case 'financeiro':
