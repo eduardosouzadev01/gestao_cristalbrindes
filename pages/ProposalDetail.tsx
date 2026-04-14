@@ -5,7 +5,8 @@ import { formatCurrency } from '../src/utils/formatCurrency';
 import { toast } from 'sonner';
 import { fixClientName } from '../src/utils/textUtils';
 import { useAuth } from '../lib/auth';
-
+import { generateBudgetExcel } from '../src/utils/excelExport';
+import { calculateItemTotal } from '../src/utils/formulas';
 const SENDER_ACCOUNTS: Record<string, { pass: string; name: string }> = {
     'vendas01@cristalbrindes.com.br': { pass: 'CristalV01*01', name: 'Vendas 01' },
     'vendas02@cristalbrindes.com.br': { pass: 'CristalV02*02', name: 'Vendas 02' },
@@ -20,7 +21,7 @@ const ISSUER_INFO: any = {
         email: 'cristalbrindes@cristalbrindes.com.br',
         phone: '(27) 99992-0408',
         address: 'RUA PORTO ALEGRE, 590 - ALTEROSAS - CEP: 29167-036 - SERRA - ES',
-        logo: '/img/Cristal Brindes 3.png'
+        logo: '/img/logo_proposta.png'
     },
     'NATUREZA': {
         name: 'Natureza Brindes',
@@ -28,7 +29,7 @@ const ISSUER_INFO: any = {
         email: 'vendas04@naturezabrindes.com.br',
         phone: '(27) 9995-47137',
         address: 'R. Porto Alegre, 590 - casa 02 - Alterosas, Serra - ES, 29167-036',
-        logo: 'https://placehold.co/200x80?text=NATUREZA+BRINDES'
+        logo: '/img/logo_proposta.png'
     },
     'ESPIRITO': {
         name: 'ESPIRITO BRINDES LTDA',
@@ -36,7 +37,7 @@ const ISSUER_INFO: any = {
         email: 'vendas@espiritobrindes.com.br',
         phone: '(27) 99992-0408',
         address: 'RUA PORTO ALEGRE, 590 - ALTEROSAS - CEP: 29167-036 - SERRA - ES',
-        logo: '/img/Cristal Brindes 3.png'
+        logo: '/img/logo_proposta.png'
     }
 };
 
@@ -101,11 +102,137 @@ const ProposalDetail: React.FC = () => {
         }, 500);
     };
 
+    const handleExportExcel = async () => {
+        if (!proposal) return;
+        try {
+            // Fetch budget data with items (contains all internal costs)
+            const { data: budgetData, error: budgetError } = await supabase
+                .from('budgets')
+                .select('*, budget_items(*)')
+                .eq('id', proposal.budget_id)
+                .single();
+
+            if (budgetError || !budgetData) {
+                toast.error('Erro ao carregar dados do orçamento para exportação.');
+                return;
+            }
+
+            // Map budget items to Excel format with all cost details
+            const excelItems = budgetData.budget_items
+                .filter((bi: any) => bi.is_approved)
+                .map((bi: any) => {
+                    const fator = bi.calculation_factor || 1.35;
+                    const totalPct = Math.round((fator - 1) * 100);
+
+                    // Reconstruct NF, Margin, Payment from factor
+                    let mockNF = 14;
+                    let mockMargin = 15;
+                    let mockPayment = 0;
+                    const standardMargins = [10, 15, 20];
+                    const paymentOptions = [0, 3, 4, 8];
+                    let found = false;
+                    for (const nf of [14, 0]) {
+                        for (const margin of standardMargins) {
+                            for (const pay of paymentOptions) {
+                                if (nf + margin + pay === totalPct) {
+                                    mockNF = nf;
+                                    mockMargin = margin;
+                                    mockPayment = pay;
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (found) break;
+                        }
+                        if (found) break;
+                    }
+                    if (!found) {
+                        if (totalPct < 14) mockNF = 0;
+                        mockPayment = 0;
+                        mockMargin = totalPct - mockNF;
+                    }
+
+                    // Use the stored total OR recalculate
+                    const totalVenda = bi.total_item_value || calculateItemTotal({
+                        quantity: bi.quantity,
+                        priceUnit: bi.unit_price,
+                        custoPersonalizacao: bi.customization_cost || 0,
+                        transpFornecedor: bi.supplier_transport_cost || 0,
+                        transpCliente: bi.client_transport_cost || 0,
+                        despesaExtra: bi.extra_expense || 0,
+                        layoutCost: bi.layout_cost || 0,
+                        fator: fator,
+                        bvPct: bi.bv_pct || 0,
+                        extraPct: bi.extra_pct || 0,
+                    });
+
+                    return {
+                        productName: bi.product_name || '',
+                        productCode: bi.product_code || '',
+                        productColor: bi.product_color || '',
+                        quantity: bi.quantity || 0,
+                        priceUnit: bi.unit_price || 0,
+                        custoPersonalizacao: bi.customization_cost || 0,
+                        layoutCost: bi.layout_cost || 0,
+                        transpFornecedor: bi.supplier_transport_cost || 0,
+                        transpCliente: bi.client_transport_cost || 0,
+                        despesaExtra: bi.extra_expense || 0,
+                        fator: fator,
+                        mockNF,
+                        mockMargin,
+                        mockPayment,
+                        bvPct: bi.bv_pct || 0,
+                        extraPct: bi.extra_pct || 0,
+                        totalVenda,
+                    };
+                });
+
+            if (excelItems.length === 0) {
+                toast.error('Nenhum item aprovado encontrado para exportação.');
+                return;
+            }
+
+            generateBudgetExcel({
+                proposalNumber: proposal.proposal_number,
+                budgetNumber: budgetData.budget_number || '',
+                date: new Date(proposal.created_at).toLocaleDateString('pt-BR'),
+                salesperson: proposal.salesperson || '',
+                issuer: proposal.issuer || 'CRISTAL',
+                client: {
+                    name: fixClientName(proposal.client?.name || ''),
+                    doc: proposal.client?.doc || '',
+                    email: proposal.client?.email || '',
+                    phone: proposal.client?.phone || '',
+                    contact_name: proposal.client?.contact_name || '',
+                },
+                validity: proposal.validity || '15 dias',
+                shipping: proposal.shipping || 'Cliente retira',
+                deliveryDeadline: proposal.delivery_deadline || '15 / 20 dias úteis',
+                paymentMethod: proposal.payment_method || 'À vista ou parcelado',
+                observation: proposal.observation || '',
+                items: excelItems,
+            });
+
+            toast.success('Planilha de base de cálculo exportada!');
+        } catch (err: any) {
+            console.error('Excel export error:', err);
+            toast.error('Erro ao exportar planilha: ' + err.message);
+        }
+    };
+
+    const handleDownloadAll = () => {
+        handleDownloadPDF();
+        handleExportExcel();
+    };
+
     const handleOpenEmailModal = () => {
         if (!proposal) return;
         
         let initialSender = 'vendas01@cristalbrindes.com.br';
         const salesEmail = getSalespersonEmail();
+        
+        // Se o e-mail do vendedor estiver nas contas permitidas, usa ele.
+        // Caso contrário, mantém o padrão vendas01.
         if (Object.keys(SENDER_ACCOUNTS).includes(salesEmail)) {
             initialSender = salesEmail;
         }
@@ -131,6 +258,14 @@ const ProposalDetail: React.FC = () => {
         try {
             if (updateClientEmail && proposal.client?.id) {
                 await supabase.from('partners').update({ email: emailForm.to }).eq('id', proposal.client.id);
+            }
+
+            const rawLogo = info.logo.startsWith('http') ? info.logo : (window.location.origin + info.logo);
+            let logoSrc = rawLogo.replace(/ /g, '%20');
+            
+            // Garante que a logo apareça no e-mail com uma URL pública hospedada no Supabase (não é bloqueada por e-mails)
+            if (info.logo.includes('logo_proposta.png')) {
+                logoSrc = 'https://agjrnmpgudrciorchpog.supabase.co/storage/v1/object/public/catalog-assets/logo-images/logo_proposta_1776133418337.png';
             }
 
             const subject = `Proposta Comercial #${proposal.proposal_number} - ${info.name}`;
@@ -166,8 +301,8 @@ const ProposalDetail: React.FC = () => {
                         <div class="item-header" style="padding: 20px; border-bottom: 1px solid #e2e8f0;">
                             <table width="100%" cellpadding="0" cellspacing="0" style="border: none;" class="responsive-table">
                                 <tr>
-                                    <td class="img-container" valign="top" style="padding-right: 20px; width: 200px; text-align: center;">
-                                        ${group.product_image_url ? `<img src="${encodeURI(group.product_image_url)}" alt="Produto" style="width: 100%; max-width: 200px; height: auto; border-radius: 8px; border: 1px solid #e2e8f0; display: block; margin: 0 auto;" />` : `<div style="width: 100%; max-width: 200px; height: 200px; background: #f1f5f9; border-radius: 8px; text-align: center; line-height: 200px; color: #94a3b8; font-size: 12px; border: 1px solid #e2e8f0; margin: 0 auto;">Sem Imagem</div>`}
+                                    <td class="img-container" valign="top" style="padding-right: 24px; width: 300px; text-align: center;">
+                                        ${group.product_image_url ? `<img src="${encodeURI(group.product_image_url)}" alt="Produto" style="width: 100%; max-width: 300px; height: auto; border-radius: 8px; border: 1px solid #e2e8f0; display: block; margin: 0 auto;" />` : `<div style="width: 100%; max-width: 300px; height: 300px; background: #f1f5f9; border-radius: 8px; text-align: center; line-height: 300px; color: #94a3b8; font-size: 12px; border: 1px solid #e2e8f0; margin: 0 auto;">Sem Imagem</div>`}
                                     </td>
                                     <td class="info-container" valign="top">
                                         <h3 style="margin: 0 0 12px 0; color: #0f172a; font-size: 20px; text-transform: uppercase;">${group.product_name}</h3>
@@ -199,10 +334,6 @@ const ProposalDetail: React.FC = () => {
                 `;
             });
 
-            const rawLogo = info.logo.startsWith('http') ? info.logo : (window.location.origin + info.logo);
-            // Replace spaces with %20 so emails render it properly
-            const logoSrc = rawLogo.replace(/ /g, '%20');
-
             const html = `
                 <!DOCTYPE html>
                 <html>
@@ -229,8 +360,8 @@ const ProposalDetail: React.FC = () => {
                 <body>
                     <div class="container">
                         <!-- Header -->
-                        <div style="text-align: center; margin-bottom: 32px; padding: 32px 20px; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
-                            <img src="${logoSrc}" alt="${info.name}" style="max-height: 90px; width: auto; margin-bottom: 20px; display: inline-block;">
+                        <div style="text-align: center; margin-bottom: 16px; padding: 24px 20px; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
+                            <img src="${logoSrc}" alt="${info.name}" style="max-height: 160px; max-width: 100%; height: auto; margin-bottom: 12px; display: inline-block;">
                             <br>
                             <div style="display: inline-block; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 24px; border-radius: 100px; font-size: 13px; font-weight: bold; color: #64748b; text-transform: uppercase;">
                                 Proposta: <span style="color: #2563eb;">#${proposal.proposal_number}</span> &nbsp;|&nbsp; 
@@ -239,7 +370,7 @@ const ProposalDetail: React.FC = () => {
                         </div>
 
                         <div class="content-box">
-                            <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; font-weight: 800; margin-bottom: 16px;">Olá, ${fixClientName(proposal.client?.name || 'Cliente')}!</h2>
+                            <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; font-weight: 800; margin-bottom: 16px;">Olá, ${proposal.client?.contact_name && proposal.client?.contact_name !== 'Não informado' ? proposal.client.contact_name : (fixClientName(proposal.client?.name || 'Cliente'))}!</h2>
                             <p style="font-size: 15px; line-height: 1.6; color: #475569; margin-bottom: 32px;">
                                 Sua proposta comercial foi gerada. Abaixo você encontra todos os detalhes técnicos, valores e prazos:
                             </p>
@@ -343,6 +474,15 @@ const ProposalDetail: React.FC = () => {
             if (data?.error) throw new Error(data.error);
 
             toast.success('E-mail enviado com sucesso!');
+            
+            // Update sent timestamp and budget status
+            const sentAt = new Date().toISOString();
+            await supabase.from('proposals').update({ last_sent_at: sentAt }).eq('id', proposal.id);
+            if (proposal.budget_id) {
+                await supabase.from('budgets').update({ status: 'PROPOSTA_ENVIADA' }).eq('id', proposal.budget_id);
+            }
+            
+            setProposal((prev: any) => ({ ...prev, last_sent_at: sentAt }));
             setShowEmailModal(false);
         } catch (error: any) {
             console.error('Erro ao enviar email:', error);
@@ -367,7 +507,10 @@ const ProposalDetail: React.FC = () => {
                         <button onClick={handleOpenEmailModal} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow hover:border-blue-200 transition-all font-bold text-gray-700 text-sm">
                             <span className="material-icons-outlined text-blue-500 text-base">email</span> Enviar por E-mail
                         </button>
-                        <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg shadow-lg hover:bg-blue-700 transition-all font-bold text-sm">
+                        <button onClick={handleExportExcel} className="flex items-center gap-2 px-4 py-2 bg-white border border-emerald-200 rounded-lg shadow-sm hover:shadow hover:border-emerald-400 hover:bg-emerald-50 transition-all font-bold text-emerald-700 text-sm">
+                            <span className="material-icons-outlined text-emerald-500 text-base">table_chart</span> Exportar Planilha
+                        </button>
+                        <button onClick={handleDownloadAll} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg shadow-lg hover:bg-blue-700 transition-all font-bold text-sm">
                             <span className="material-icons-outlined text-base">picture_as_pdf</span> Baixar PDF / Imprimir
                         </button>
                     </div>
@@ -385,17 +528,25 @@ const ProposalDetail: React.FC = () => {
             {/* Proposal Content */}
             <div id="proposal-canvas" className="bg-white max-w-[800px] w-full shadow-xl p-10 font-sans text-gray-800 print:shadow-none print:max-w-none print:w-full print:p-0 rounded-xl overflow-hidden mb-12">
                 {/* Header */}
-                <div className="text-center mb-10 border-b pb-10">
-                    <div className="flex justify-center mb-6">
+                <div className="text-center mb-6 border-b pb-8">
+                    <div className="flex justify-center mb-4">
                         <img
                             src={info.logo}
                             alt={info.name}
-                            className="max-h-32 w-auto object-contain"
+                            className="max-h-48 w-auto max-w-full object-contain"
                         />
                     </div>
-                    <div className="mt-4 flex justify-center gap-8 text-sm font-black bg-gray-50 border py-3 rounded-full inline-flex px-10 border-gray-200 uppercase tracking-tight">
-                        <span className="text-gray-500">Proposta: <span className="text-blue-600">#{proposal.proposal_number}</span></span>
-                        <span className="text-gray-500">Data: <span className="text-blue-600">{new Date(proposal.created_at).toLocaleDateString('pt-BR')}</span></span>
+                    <div className="mt-4 flex flex-col items-center gap-2">
+                        <div className="flex justify-center gap-8 text-sm font-black bg-gray-50 border py-3 rounded-full inline-flex px-10 border-gray-200 uppercase tracking-tight">
+                            <span className="text-gray-500">Proposta: <span className="text-blue-600">#{proposal.proposal_number}</span></span>
+                            <span className="text-gray-500">Data: <span className="text-blue-600">{new Date(proposal.created_at).toLocaleDateString('pt-BR')}</span></span>
+                        </div>
+                        {proposal.last_sent_at && (
+                            <div className="flex items-center gap-1.5 text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-4 py-1.5 rounded-full border border-emerald-100">
+                                <span className="material-icons-outlined text-xs">verified</span>
+                                Enviada por e-mail em {new Date(proposal.last_sent_at).toLocaleDateString('pt-BR')} às {new Date(proposal.last_sent_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -445,7 +596,7 @@ const ProposalDetail: React.FC = () => {
 
                                 <div className="border border-gray-100 rounded-2xl overflow-hidden shadow-sm bg-white">
                                     <div className="flex flex-col md:flex-row print:flex-row gap-8 print:gap-4 p-8 print:p-4">
-                                        <div className="w-full md:w-1/3 print:w-40 aspect-square print:aspect-square bg-gray-50 flex items-center justify-center border rounded-2xl overflow-hidden shrink-0 shadow-inner">
+                                        <div className="w-full md:w-[45%] print:w-72 aspect-square print:aspect-square bg-gray-50 flex items-center justify-center border rounded-2xl overflow-hidden shrink-0 shadow-inner">
                                             {group.product_image_url ? (
                                                 <img
                                                     src={group.product_image_url}
@@ -603,16 +754,9 @@ const ProposalDetail: React.FC = () => {
                         <div className="p-8 space-y-6">
                             <div>
                                 <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Conta de Envio (Remetente):</label>
-                                <select 
-                                    value={emailForm.senderId}
-                                    onChange={e => setEmailForm({...emailForm, senderId: e.target.value})}
-                                    className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-bold text-sm bg-gray-50"
-                                    disabled={isSendingEmail}
-                                >
-                                    {Object.entries(SENDER_ACCOUNTS).map(([email, acc]) => (
-                                        <option key={email} value={email}>{acc.name} — {email}</option>
-                                    ))}
-                                </select>
+                                <div className="w-full px-4 py-3 border rounded-xl bg-gray-50 font-bold text-sm text-gray-600">
+                                    {SENDER_ACCOUNTS[emailForm.senderId]?.name || 'Vendas'} — {emailForm.senderId}
+                                </div>
                             </div>
                             
                             <div>

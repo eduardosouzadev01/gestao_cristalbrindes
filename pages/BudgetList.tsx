@@ -51,35 +51,28 @@ const BudgetList: React.FC = () => {
 
             const normalizedSearch = searchTerm?.trim().toLowerCase();
             
-            // Priority: if we have a clientId from navigation AND the search term contains the client name
-            // Otherwise fallback to name search
-            const stateName = location.state?.clientName?.trim().toLowerCase();
-            if (location.state?.clientId && stateName && normalizedSearch.includes(stateName)) {
-                query = query.eq('client_id', location.state.clientId);
-            } else if (normalizedSearch) {
-                // Escape searchTerm for PostgREST
-                const safeSearchTerm = normalizedSearch.replace(/"/g, '""');
-                
-                // If search term is too short (< 3 chars), search only by budget number to avoid massive client list
-                if (normalizedSearch.length < 3) {
-                    query = query.ilike('budget_number', `%${normalizedSearch}%`);
+            if (normalizedSearch) {
+                // Keep spaces for searching names/emails, only strip characters that could break the OR string
+                const safeSearchTerm = normalizedSearch.replace(/[,()]/g, '');
+                const searchPattern = `%${safeSearchTerm}%`;
+
+                if (normalizedSearch.length < 2) {
+                    // If short, only search by budget number
+                    query = query.ilike('budget_number', searchPattern);
                 } else {
-                    // Search for partners that match the term
+                    // If longer, search for related partners first
                     const { data: matchedPartners } = await supabase
                         .from('partners')
                         .select('id')
-                        .or(`name.ilike."%${safeSearchTerm}%",email.ilike."%${safeSearchTerm}%",doc.ilike."%${safeSearchTerm}%",phone.ilike."%${safeSearchTerm}%"`)
-                        .limit(30);
-
-                    const pIds = matchedPartners?.map((p: any) => p.id) || [];
-
-                    if (pIds.length > 0) {
-                        // Search in budget_number OR link to one of the found partners
-                        // Limiting pIds to avoid URL length limit (Bad Request 400)
-                        query = query.or(`budget_number.ilike."%${safeSearchTerm}%",client_id.in.(${pIds.join(',')})`);
+                        .or(`name.ilike."${searchPattern}",email.ilike."${searchPattern}",doc.ilike."${searchPattern}",phone.ilike."${searchPattern}"`)
+                        .limit(50);
+                    
+                    const partnerIds = matchedPartners?.map(p => p.id) || [];
+                    
+                    if (partnerIds.length > 0) {
+                        query = query.or(`budget_number.ilike."${searchPattern}",client_id.in.(${partnerIds.join(',')})`);
                     } else {
-                        // Fallback to budget number search only
-                        query = query.ilike('budget_number', `%${normalizedSearch}%`);
+                        query = query.ilike('budget_number', searchPattern);
                     }
                 }
             }
@@ -171,14 +164,14 @@ const BudgetList: React.FC = () => {
                 <div className="flex flex-wrap gap-2 items-end">
                     <div className="flex-1 min-w-[300px]">
                         <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Buscar</label>
-                        <div className="relative">
-                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <span className="material-icons-outlined text-gray-400 text-sm">search</span>
+                        <div className="relative group">
+                            <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none z-10">
+                                <span className="material-icons-outlined text-gray-400 group-focus-within:text-blue-500 transition-colors text-lg">search</span>
                             </span>
                             <input
                                 type="text"
-                                placeholder="Pedido, Cliente, CPF/CNPJ..."
-                                className="form-input block w-full pl-12 rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-0 text-xs h-8 font-bold"
+                                placeholder="Nº Pedido, Cliente, CNPJ..."
+                                className="block w-full pl-10 pr-3 py-1.5 rounded-lg border-gray-200 bg-gray-50 focus:bg-white border shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs font-bold transition-all placeholder:text-gray-400 placeholder:font-normal"
                                 value={searchTerm}
                                 onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
                             />

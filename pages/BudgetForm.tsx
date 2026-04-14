@@ -335,12 +335,17 @@ const BudgetForm: React.FC = () => {
 
         setFactors(sortedFactors);
 
-        // Se for orçamento novo e encontramos o fator ideal, atualizar o fator dos itens
+        // Se for orçamento novo e encontramos o fator médio (15% padrão), atualizar o fator dos itens
         if ((!id || id === 'novo') && items.length === 1 && items[0].productName === '') {
-            const idealFactor = sortedFactors.find(sf => (sf.name || '').toLowerCase().includes('ideal'));
-            if (idealFactor) {
-                const multiplier = 1 + (idealFactor.tax_percent + idealFactor.contingency_percent + idealFactor.margin_percent) / 100;
-                setItems(prev => prev.map(it => ({ ...it, fator: multiplier })));
+            const medioFactor = sortedFactors.find(sf => (sf.name || '').toLowerCase().includes('médio') && !sf.name?.toLowerCase().includes('prazo'));
+            if (medioFactor) {
+                const multiplier = 1 + (medioFactor.tax_percent + medioFactor.contingency_percent + medioFactor.margin_percent) / 100;
+                setItems(prev => prev.map(it => ({ 
+                    ...it, 
+                    fator: multiplier,
+                    mockMargin: medioFactor.margin_percent,
+                    mockNF: medioFactor.tax_percent
+                })));
             }
         }
     };
