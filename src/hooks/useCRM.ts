@@ -10,7 +10,8 @@ export interface Lead {
     client_email?: string;
     client_doc?: string;
     description?: string;
-    status: 'ATENDIMENTO' | 'ORCAMENTO' | 'PROPOSTA_ENVIADA' | 'PEDIDO_ABERTO' | 'PEDIDO_ENTREGUE' | 'NAO_APROVADO' | 'FINALIZADO';
+    status: 'ATENDIMENTO' | 'ACOMPANHAMENTO_01' | 'ACOMPANHAMENTO_02' | 'ORCAMENTO' | 'PROPOSTA_ENVIADA' | 'PEDIDO_ABERTO' | 'PEDIDO_ENTREGUE' | 'NAO_APROVADO' | 'FINALIZADO' | 'ENVIO_CATALOGO' | 'NAO_ATENDE_PRAZO';
+    atendimento_status?: string;
     salesperson?: string;
     next_action_date?: string;
     notes?: string;
@@ -65,22 +66,6 @@ export function useUpdateLeadStatus() {
     });
 }
 
-export function useToggleFollowUp() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: async ({ id, done }: { id: string; done: boolean }) => {
-            const { error } = await supabase.from('crm_leads').update({
-                follow_up_done: done,
-                follow_up_at: done ? new Date().toISOString() : null
-            }).eq('id', id);
-            if (error) throw error;
-            return { id, done };
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['crm_leads'] });
-        },
-    });
-}
 
 // Hook de Performance
 export function usePerformanceStats() {

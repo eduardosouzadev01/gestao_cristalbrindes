@@ -267,15 +267,33 @@ const ProductsPage: React.FC = () => {
                                             </div>
                                         </td>
                                         <td className="px-4 py-1.5 text-right whitespace-nowrap">
-                                            <button
-                                                onClick={() => {
-                                                    setEditingProduct(product);
-                                                    setIsModalOpen(true);
-                                                }}
-                                                className="opacity-0 group-hover:opacity-100 p-1 text-[9px] font-black uppercase tracking-widest text-blue-600 hover:bg-blue-100 rounded transition-all cursor-pointer"
-                                            >
-                                                {(product as any).source === 'LOCAL' ? 'EDITAR' : 'DETALHES'}
-                                            </button>
+                                            <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={() => {
+                                                        setEditingProduct(product);
+                                                        setIsModalOpen(true);
+                                                    }}
+                                                    className="p-1 px-2 text-[9px] font-black uppercase tracking-widest text-blue-600 hover:bg-blue-100 rounded transition-colors cursor-pointer"
+                                                >
+                                                    {(product as any).source === 'LOCAL' ? 'EDITAR' : 'DETALHES'}
+                                                </button>
+                                                <button
+                                                    onClick={async () => {
+                                                        if (!window.confirm('Excluir este produto? Esta ação não pode ser desfeita.')) return;
+                                                        try {
+                                                            const { error } = await supabase.from('products').delete().eq('id', product.id);
+                                                            if (error) throw error;
+                                                            toast.success('Produto excluído com sucesso');
+                                                            fetchProducts();
+                                                        } catch (e: any) {
+                                                            toast.error('Erro ao excluir: ' + e.message);
+                                                        }
+                                                    }}
+                                                    className="p-1 px-2 text-[9px] font-black uppercase tracking-widest text-red-600 hover:bg-red-100 rounded transition-colors cursor-pointer"
+                                                >
+                                                    EXCLUIR
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))

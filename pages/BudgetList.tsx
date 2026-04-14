@@ -5,11 +5,12 @@ import { supabase } from '../lib/supabase';
 import { formatDate } from '../src/utils/dateUtils';
 import { toast } from 'sonner';
 import { useAuth } from '../lib/auth';
+import { fixClientName } from '../src/utils/textUtils';
 
 const BudgetList: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { appUser } = useAuth();
+    const { appUser, hasPermission } = useAuth();
 
     // State
     const [budgets, setBudgets] = useState<any[]>([]);
@@ -19,17 +20,15 @@ const BudgetList: React.FC = () => {
     const [totalCount, setTotalCount] = useState(0);
 
     // Filters
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState(location.state?.clientName || '');
     const [vendedorFilter, setVendedorFilter] = useState('Todos os Vendedores');
     const [statusFilter, setStatusFilter] = useState('Todos');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
 
-    useEffect(() => {
-        if (location.state?.clientName) {
-            setSearchTerm(location.state.clientName);
-        }
-    }, [location.state]);
+    // Summary State
+    const [stats, setStats] = useState<Record<string, number>>({});
+    const salespeople = ['VENDAS 01', 'VENDAS 02', 'VENDAS 03', 'VENDAS 04'];
 
     useEffect(() => {
         if (appUser?.salesperson) {
@@ -41,6 +40,8 @@ const BudgetList: React.FC = () => {
         fetchBudgets();
     }, [page, searchTerm, vendedorFilter, statusFilter, startDate, endDate]);
 
+
+
     const fetchBudgets = async () => {
         try {
             setLoading(true);
@@ -48,11 +49,12 @@ const BudgetList: React.FC = () => {
                 .from('budgets')
                 .select('*, partners(name, doc)', { count: 'exact' });
 
-            const normalizedSearch = searchTerm?.trim();
+            const normalizedSearch = searchTerm?.trim().toLowerCase();
             
-            // Priority: if we have a clientId from navigation AND the search term matches the client name, use the ID
+            // Priority: if we have a clientId from navigation AND the search term contains the client name
             // Otherwise fallback to name search
-            if (location.state?.clientId && normalizedSearch === location.state?.clientName?.trim()) {
+            const stateName = location.state?.clientName?.trim().toLowerCase();
+            if (location.state?.clientId && stateName && normalizedSearch.includes(stateName)) {
                 query = query.eq('client_id', location.state.clientId);
             } else if (normalizedSearch) {
                 // Escape searchTerm for PostgREST
@@ -155,26 +157,28 @@ const BudgetList: React.FC = () => {
         <div className="max-w-[1920px] w-full mx-auto px-4 py-4 space-y-4">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
-                        <span className="material-icons-outlined text-amber-600 text-2xl">receipt_long</span>
-                        LISTAGEM DE ORÇAMENTOS
-                    </h1>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Gestão comercial e propostas em andamento</p>
+                    <h2 className="text-xl font-black leading-none text-gray-900 uppercase tracking-tighter flex items-center gap-2">
+                        <span className="material-icons-outlined text-blue-600 text-2xl">request_quote</span>
+                        PLANILHA DE ORÇAMENTOS
+                    </h2>
+                    <p className="mt-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Controle financeiro e comercial de orçamentos</p>
                 </div>
             </div>
+
+
 
             <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-3">
                 <div className="flex flex-wrap gap-2 items-end">
                     <div className="flex-1 min-w-[300px]">
                         <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Buscar</label>
                         <div className="relative">
-                            <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                 <span className="material-icons-outlined text-gray-400 text-sm">search</span>
                             </span>
                             <input
                                 type="text"
                                 placeholder="Pedido, Cliente, CPF/CNPJ..."
-                                className="form-input block w-full pl-8 rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-0 text-xs h-8"
+                                className="form-input block w-full pl-12 rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-0 text-xs h-8 font-bold"
                                 value={searchTerm}
                                 onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
                             />
@@ -226,9 +230,6 @@ const BudgetList: React.FC = () => {
                             onChange={(e) => { setEndDate(e.target.value); setPage(0); }}
                         />
                     </div>
-                    <button onClick={() => navigate('/orcamento/novo')} className="h-8 px-4 bg-blue-600 text-white rounded text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-blue-700 ml-auto whitespace-nowrap">
-                        + NOVO ORÇAMENTO
-                    </button>
                 </div>
             </div>
 
@@ -255,7 +256,7 @@ const BudgetList: React.FC = () => {
                                     <td className="px-3 py-1.5 whitespace-nowrap text-xs font-black text-slate-900 group-hover:text-blue-600 transition-colors">#{b.budget_number}</td>
                                     <td className="px-3 py-1.5 whitespace-nowrap">
                                         <div className="flex flex-col">
-                                            <span className="text-xs font-black text-slate-700 leading-tight">{b.partners?.name || 'Cliente Vários'}</span>
+                                            <span className="text-xs font-black text-slate-700 leading-tight">{fixClientName(b.partners?.name) || 'Cliente Vários'}</span>
                                             <div className="flex items-center gap-2 mt-0.5">
                                                 <span className="text-[9px] text-slate-400 font-bold uppercase leading-none">{b.issuer || 'CRISTAL'} BRINDES</span>
                                                 <span className="text-[9px] text-slate-300 font-bold uppercase leading-none">•</span>

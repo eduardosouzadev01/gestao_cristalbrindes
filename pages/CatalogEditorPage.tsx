@@ -9,6 +9,7 @@ import PageCanvas from '../src/components/catalog/PageCanvas';
 import PageThumbnailList from '../src/components/catalog/PageThumbnailList';
 import ProductSearchDrawer from '../src/components/catalog/ProductSearchDrawer';
 import CoverEditor from '../src/components/catalog/CoverEditor';
+import BackCoverEditor from '../src/components/catalog/BackCoverEditor';
 import SlotEditorModal from '../src/components/catalog/SlotEditorModal';
 import { supabase } from '../lib/supabase';
 import type { CatalogSlot, UpdateCatalogInput, SlotProduct } from '../src/types/catalog';
@@ -38,6 +39,7 @@ const CatalogEditorPage: React.FC = () => {
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null);
   const [editingSlot, setEditingSlot] = useState<CatalogSlot | null>(null);
   const [showCoverEditor, setShowCoverEditor] = useState(false);
+  const [showBackCoverEditor, setShowBackCoverEditor] = useState(false);
   const [addingPage, setAddingPage] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<UpdateCatalogInput>({});
   const [saving, setSaving] = useState(false);
@@ -164,6 +166,7 @@ const CatalogEditorPage: React.FC = () => {
         onChange={handleCatalogChange}
         onLogoUpload={handleLogoUpload}
         onCoverEdit={() => setShowCoverEditor(true)}
+        onBackCoverEdit={() => setShowBackCoverEditor(true)}
       />
 
       {/* Middle: Page Thumbnails */}
@@ -270,6 +273,15 @@ const CatalogEditorPage: React.FC = () => {
           catalog={displayCatalog as any}
           onChange={handleCatalogChange}
           onClose={() => setShowCoverEditor(false)}
+        />
+      )}
+
+      {/* Back Cover Editor */}
+      {showBackCoverEditor && (
+        <BackCoverEditor
+          catalog={displayCatalog as any}
+          onChange={handleCatalogChange}
+          onClose={() => setShowBackCoverEditor(false)}
         />
       )}
     </div>

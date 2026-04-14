@@ -1,48 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './lib/auth';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-});
-import OrderList from './pages/OrderList';
-import OrderForm from './pages/OrderForm';
-import ClientList from './pages/ClientList';
-import SupplierList from './pages/SupplierList';
-import RegistrationForm from './pages/RegistrationForm';
-import CalculationFactors from './pages/CalculationFactors';
-import CalculationFactorForm from './pages/CalculationFactorForm';
-import CommissionPage from './pages/CommissionPage';
-// Redundant ReportsPage removed as it's merged into ManagementPage
-import OrdersReceivablesPage from './pages/OrdersReceivablesPage';
-import PayablesPage from './pages/PayablesPage';
-import LoginPage from './pages/LoginPage';
-import BudgetList from './pages/BudgetList';
-import BudgetForm from './pages/BudgetForm';
-import ProposalList from './pages/ProposalList';
-import ProposalDetail from './pages/ProposalDetail';
-import ManagementPage from './pages/ManagementPage';
-import ProductsPage from './pages/ProductsPage';
-import InternalTasksPage from './pages/InternalTasksPage';
-import FinancialDashboardPage from './pages/FinancialDashboardPage';
-import UserManagementPage from './pages/UserManagementPage';
-import KanbanSupervisorPage from './pages/KanbanSupervisorPage';
-import SuperDashboardPage from './pages/SuperDashboardPage';
-import CatalogListPage from './pages/CatalogListPage';
-import CatalogEditorPage from './pages/CatalogEditorPage';
-import CatalogPreviewPage from './pages/CatalogPreviewPage';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
-
 import NotificationCenter from './src/components/NotificationCenter';
 
-// Protected Route wrapper
+// ─── Lazy-loaded pages ───────────────────────────────────────────────────────
+const OrderList            = React.lazy(() => import('./pages/OrderList'));
+const OrderForm            = React.lazy(() => import('./pages/OrderForm'));
+const ClientList           = React.lazy(() => import('./pages/ClientList'));
+const SupplierList         = React.lazy(() => import('./pages/SupplierList'));
+const RegistrationForm     = React.lazy(() => import('./pages/RegistrationForm'));
+const CalculationFactors   = React.lazy(() => import('./pages/CalculationFactors'));
+const CalculationFactorForm = React.lazy(() => import('./pages/CalculationFactorForm'));
+const CommissionPage       = React.lazy(() => import('./pages/CommissionPage'));
+const OrdersReceivablesPage = React.lazy(() => import('./pages/OrdersReceivablesPage'));
+const PayablesPage         = React.lazy(() => import('./pages/PayablesPage'));
+const LoginPage            = React.lazy(() => import('./pages/LoginPage'));
+const BudgetList           = React.lazy(() => import('./pages/BudgetList'));
+const BudgetForm           = React.lazy(() => import('./pages/BudgetForm'));
+const ProposalList         = React.lazy(() => import('./pages/ProposalList'));
+const ProposalDetail       = React.lazy(() => import('./pages/ProposalDetail'));
+const ManagementPage       = React.lazy(() => import('./pages/ManagementPage'));
+const ProductsPage         = React.lazy(() => import('./pages/ProductsPage'));
+const InternalTasksPage    = React.lazy(() => import('./pages/InternalTasksPage'));
+const FinancialDashboardPage = React.lazy(() => import('./pages/FinancialDashboardPage'));
+const UserManagementPage   = React.lazy(() => import('./pages/UserManagementPage'));
+const CatalogListPage      = React.lazy(() => import('./pages/CatalogListPage'));
+const CatalogEditorPage    = React.lazy(() => import('./pages/CatalogEditorPage'));
+const CatalogPreviewPage   = React.lazy(() => import('./pages/CatalogPreviewPage'));
+
+// ─── Loading fallback ────────────────────────────────────────────────────────
+const PageLoader: React.FC = () => (
+  <div className="flex items-center justify-center min-h-[60vh]">
+    <div style={{
+      width: 36,
+      height: 36,
+      border: '3px solid #EBF3FC',
+      borderTop: '3px solid #0F6CBD',
+      borderRadius: '50%',
+      animation: 'spin 0.7s linear infinite',
+    }} />
+    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+  </div>
+);
+
+// ─── Protected Route ─────────────────────────────────────────────────────────
 const ProtectedRoute: React.FC<{ children: React.ReactNode; permission?: string }> = ({ children, permission }) => {
   const { isAuthenticated, hasPermission } = useAuth();
 
@@ -69,14 +73,17 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; permission?: string 
   return <>{children}</>;
 };
 
+// ─── Header ──────────────────────────────────────────────────────────────────
 const Header: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { appUser, logout, hasPermission } = useAuth();
+  const queryClient = useQueryClient();
   const [showMenu, setShowMenu] = useState(false);
 
   const handleLogout = async () => {
     await logout();
+    queryClient.clear(); // Clear all cached data on logout
     setShowMenu(false);
     navigate('/login');
   };
@@ -93,9 +100,7 @@ const Header: React.FC = () => {
       path: '#',
       icon: 'hub',
       subItems: [
-        { name: 'Atendimentos', path: '/crm', permission: 'pedidos', icon: 'view_kanban' },
-        { name: 'Supervisão Kanban', path: '/supervisao', permission: 'crm.performance', icon: 'dashboard_customize' },
-        { name: 'Super Dashboard', path: '/super-dashboard', permission: 'crm.performance', icon: 'monitoring' },
+        { name: 'Atendimentos', path: '/crm', permission: 'pedidos', icon: 'view_kanban' }
       ]
     },
     {
@@ -106,8 +111,16 @@ const Header: React.FC = () => {
       subItems: [
         { name: 'Orçamentos', path: '/orcamentos', permission: 'pedidos', icon: 'request_quote' },
         { name: 'Propostas', path: '/propostas', permission: 'pedidos', icon: 'description' },
-        { name: 'Catálogos', path: '/catalogos', permission: 'pedidos', icon: 'auto_stories' },
         { name: 'Pedidos', path: '/pedidos', permission: 'pedidos', icon: 'receipt_long' }
+      ]
+    },
+    {
+      name: 'Marketing',
+      permission: 'fatores',
+      path: '#',
+      icon: 'campaign',
+      subItems: [
+        { name: 'Catálogos', path: '/catalogos', permission: 'fatores', icon: 'auto_stories' }
       ]
     },
     {
@@ -283,6 +296,7 @@ const Header: React.FC = () => {
   );
 };
 
+// ─── Footer ──────────────────────────────────────────────────────────────────
 const Footer: React.FC = () => (
   <footer className="bg-white border-t border-[#EDEBE9] mt-auto">
     <div className="max-w-[1920px] w-full mx-auto py-4 px-4 sm:px-6 lg:px-8">
@@ -291,50 +305,45 @@ const Footer: React.FC = () => (
   </footer>
 );
 
+// ─── Route Tracker ───────────────────────────────────────────────────────────
 const RouteTracker: React.FC = () => {
-    const location = useLocation();
-    const { isAuthenticated } = useAuth();
+  const location = useLocation();
+  const { isAuthenticated } = useAuth();
 
-    React.useEffect(() => {
-        if (isAuthenticated && 
-            location.pathname !== '/login' && 
-            !location.pathname.startsWith('/proposta/')) {
-            localStorage.setItem('lastPath', location.pathname + location.search);
-        }
-    }, [location, isAuthenticated]);
+  React.useEffect(() => {
+    if (isAuthenticated &&
+      location.pathname !== '/login' &&
+      !location.pathname.startsWith('/proposta/')) {
+      localStorage.setItem('lastPath', location.pathname + location.search);
+    }
+  }, [location, isAuthenticated]);
 
-    return null;
+  return null;
 };
 
+// ─── App Layout ──────────────────────────────────────────────────────────────
 const AppLayout: React.FC = () => {
   const { isAuthenticated, appUser, hasPermission } = useAuth();
-  
+
   const getLandingPage = () => {
-    // 1. Check persistent history
     const lastPath = localStorage.getItem('lastPath');
     if (lastPath && lastPath !== '/' && lastPath !== '/login') {
       return lastPath;
     }
-
-    // 2. Role-based defaults
-    if (appUser?.salesperson) {
-      return '/crm?tab=RECORDS';
-    }
-    
-    if (hasPermission('crm.performance') || hasPermission('fatores')) {
-      return '/supervisao';
-    }
-
+    if (appUser?.salesperson) return '/crm?tab=RECORDS';
+    if (hasPermission('crm.performance') || hasPermission('fatores')) return '/crm';
     return '/pedidos';
   };
 
   if (!isAuthenticated) {
     return (
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/proposta/:id" element={<ErrorBoundary><ProposalDetail /></ErrorBoundary>} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/proposta/:id" element={<ErrorBoundary><ProposalDetail /></ErrorBoundary>} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Suspense>
     );
   }
 
@@ -343,50 +352,61 @@ const AppLayout: React.FC = () => {
       <RouteTracker />
       <Header />
       <main className="flex-1 py-6">
-        <Routes>
-          <Route path="/" element={<ProtectedRoute permission="pedidos"><Navigate to={getLandingPage()} replace /></ProtectedRoute>} />
-          <Route path="/pedidos" element={<ProtectedRoute permission="pedidos"><OrderList /></ProtectedRoute>} />
-          <Route path="/pedido/novo" element={<ProtectedRoute permission="pedidos"><OrderForm /></ProtectedRoute>} />
-          <Route path="/pedido/:id" element={<ProtectedRoute permission="pedidos"><OrderForm /></ProtectedRoute>} />
-          <Route path="/orcamentos" element={<ProtectedRoute permission="pedidos"><BudgetList /></ProtectedRoute>} />
-          <Route path="/orcamento/novo" element={<ProtectedRoute permission="pedidos"><BudgetForm /></ProtectedRoute>} />
-          <Route path="/orcamento/:id" element={<ProtectedRoute permission="pedidos"><BudgetForm /></ProtectedRoute>} />
-          <Route path="/propostas" element={<ProtectedRoute permission="pedidos"><ProposalList /></ProtectedRoute>} />
-          <Route path="/proposta/:id" element={<ProtectedRoute permission="pedidos"><ProposalDetail /></ProtectedRoute>} />
-          <Route path="/catalogos" element={<ProtectedRoute permission="pedidos"><CatalogListPage /></ProtectedRoute>} />
-          <Route path="/catalogo/novo" element={<ProtectedRoute permission="pedidos"><CatalogEditorPage /></ProtectedRoute>} />
-          <Route path="/catalogo/:id" element={<ProtectedRoute permission="pedidos"><CatalogEditorPage /></ProtectedRoute>} />
-          <Route path="/catalogo/:id/preview" element={<ProtectedRoute permission="pedidos"><CatalogPreviewPage /></ProtectedRoute>} />
-          <Route path="/crm" element={<ProtectedRoute permission="pedidos"><ManagementPage /></ProtectedRoute>} />
-          <Route path="/supervisao" element={<ProtectedRoute permission="crm.performance"><KanbanSupervisorPage /></ProtectedRoute>} />
-          <Route path="/super-dashboard" element={<ProtectedRoute permission="crm.performance"><SuperDashboardPage /></ProtectedRoute>} />
-          <Route path="/usuarios" element={<ProtectedRoute permission="fatores"><UserManagementPage /></ProtectedRoute>} />
-          <Route path="/processos" element={<ProtectedRoute permission="financeiro"><InternalTasksPage /></ProtectedRoute>} />
-          <Route path="/produtos" element={<ProtectedRoute permission="produtos"><ProductsPage /></ProtectedRoute>} />
-          <Route path="/clientes" element={<ProtectedRoute permission="cadastros"><ClientList /></ProtectedRoute>} />
-          <Route path="/fornecedores" element={<ProtectedRoute permission="cadastros"><SupplierList /></ProtectedRoute>} />
-          <Route path="/cadastros/novo" element={<ProtectedRoute permission="cadastros"><RegistrationForm /></ProtectedRoute>} />
-          <Route path="/cadastros/editar/:id" element={<ProtectedRoute permission="cadastros"><RegistrationForm /></ProtectedRoute>} />
-          <Route path="/cadastros" element={<Navigate to="/clientes" replace />} />
-          <Route path="/comissoes" element={<ProtectedRoute permission="comissoes"><CommissionPage /></ProtectedRoute>} />
-          <Route path="/relatorios" element={<Navigate to="/crm" replace />} />
-          <Route path="/painel-financeiro" element={<ProtectedRoute permission="financeiro.receber"><FinancialDashboardPage /></ProtectedRoute>} />
-          <Route path="/pedidos-recebiveis" element={<ProtectedRoute permission="financeiro.receber"><OrdersReceivablesPage /></ProtectedRoute>} />
-          <Route path="/saldo-pedidos" element={<Navigate to="/pedidos-recebiveis" replace />} />
-          <Route path="/receivables" element={<Navigate to="/pedidos-recebiveis" replace />} />
-          <Route path="/payables" element={<ProtectedRoute permission="financeiro.pagar"><PayablesPage /></ProtectedRoute>} />
-          <Route path="/configuracoes" element={<ProtectedRoute permission="fatores"><CalculationFactors /></ProtectedRoute>} />
-          <Route path="/configuracoes/fatores/novo" element={<ProtectedRoute permission="fatores"><CalculationFactorForm /></ProtectedRoute>} />
-          <Route path="/configuracoes/fatores/editar/:id" element={<ProtectedRoute permission="fatores"><CalculationFactorForm /></ProtectedRoute>} />
-          <Route path="/login" element={<Navigate to="/" replace />} />
-          <Route path="*" element={<Navigate to={getLandingPage()} replace />} />
-        </Routes>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/" element={<ProtectedRoute permission="pedidos"><Navigate to={getLandingPage()} replace /></ProtectedRoute>} />
+            <Route path="/pedidos" element={<ProtectedRoute permission="pedidos"><OrderList /></ProtectedRoute>} />
+            <Route path="/pedido/novo" element={<ProtectedRoute permission="pedidos"><OrderForm /></ProtectedRoute>} />
+            <Route path="/pedido/:id" element={<ProtectedRoute permission="pedidos"><OrderForm /></ProtectedRoute>} />
+            <Route path="/orcamentos" element={<ProtectedRoute permission="pedidos"><BudgetList /></ProtectedRoute>} />
+            <Route path="/orcamento/novo" element={<ProtectedRoute permission="pedidos"><BudgetForm /></ProtectedRoute>} />
+            <Route path="/orcamento/:id" element={<ProtectedRoute permission="pedidos"><BudgetForm /></ProtectedRoute>} />
+            <Route path="/propostas" element={<ProtectedRoute permission="pedidos"><ProposalList /></ProtectedRoute>} />
+            <Route path="/proposta/:id" element={<ProtectedRoute permission="pedidos"><ProposalDetail /></ProtectedRoute>} />
+            <Route path="/catalogos" element={<ProtectedRoute permission="fatores"><CatalogListPage /></ProtectedRoute>} />
+            <Route path="/catalogo/novo" element={<ProtectedRoute permission="fatores"><CatalogEditorPage /></ProtectedRoute>} />
+            <Route path="/catalogo/:id" element={<ProtectedRoute permission="fatores"><CatalogEditorPage /></ProtectedRoute>} />
+            <Route path="/catalogo/:id/preview" element={<ProtectedRoute permission="fatores"><CatalogPreviewPage /></ProtectedRoute>} />
+            <Route path="/crm" element={<ProtectedRoute permission="pedidos"><ManagementPage /></ProtectedRoute>} />
+            <Route path="/usuarios" element={<ProtectedRoute permission="fatores"><UserManagementPage /></ProtectedRoute>} />
+            <Route path="/processos" element={<ProtectedRoute permission="financeiro"><InternalTasksPage /></ProtectedRoute>} />
+            <Route path="/produtos" element={<ProtectedRoute permission="produtos"><ProductsPage /></ProtectedRoute>} />
+            <Route path="/clientes" element={<ProtectedRoute permission="cadastros"><ClientList /></ProtectedRoute>} />
+            <Route path="/fornecedores" element={<ProtectedRoute permission="cadastros"><SupplierList /></ProtectedRoute>} />
+            <Route path="/cadastros/novo" element={<ProtectedRoute permission="cadastros"><RegistrationForm /></ProtectedRoute>} />
+            <Route path="/cadastros/editar/:id" element={<ProtectedRoute permission="cadastros"><RegistrationForm /></ProtectedRoute>} />
+            <Route path="/cadastros" element={<Navigate to="/clientes" replace />} />
+            <Route path="/comissoes" element={<ProtectedRoute permission="comissoes"><CommissionPage /></ProtectedRoute>} />
+            <Route path="/relatorios" element={<Navigate to="/crm" replace />} />
+            <Route path="/painel-financeiro" element={<ProtectedRoute permission="financeiro.receber"><FinancialDashboardPage /></ProtectedRoute>} />
+            <Route path="/pedidos-recebiveis" element={<ProtectedRoute permission="financeiro.receber"><OrdersReceivablesPage /></ProtectedRoute>} />
+            <Route path="/saldo-pedidos" element={<Navigate to="/pedidos-recebiveis" replace />} />
+            <Route path="/receivables" element={<Navigate to="/pedidos-recebiveis" replace />} />
+            <Route path="/payables" element={<ProtectedRoute permission="financeiro.pagar"><PayablesPage /></ProtectedRoute>} />
+            <Route path="/configuracoes" element={<ProtectedRoute permission="fatores"><CalculationFactors /></ProtectedRoute>} />
+            <Route path="/configuracoes/fatores/novo" element={<ProtectedRoute permission="fatores"><CalculationFactorForm /></ProtectedRoute>} />
+            <Route path="/configuracoes/fatores/editar/:id" element={<ProtectedRoute permission="fatores"><CalculationFactorForm /></ProtectedRoute>} />
+            <Route path="/login" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<Navigate to={getLandingPage()} replace />} />
+          </Routes>
+        </Suspense>
       </main>
     </div>
   );
 };
 
+// ─── Root App ────────────────────────────────────────────────────────────────
 const App: React.FC = () => {
+  // QueryClient inside component so cache can be cleared on logout and between sessions
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        refetchOnWindowFocus: false,
+        retry: 1,
+      },
+    },
+  }));
+
   return (
     <QueryClientProvider client={queryClient}>
       <HashRouter>

@@ -114,28 +114,6 @@ const CatalogPreviewPage: React.FC = () => {
               alt="Capa"
               className="absolute inset-0 w-full h-full object-cover"
             />
-            <div
-              className="absolute inset-0"
-              style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%)' }}
-            />
-            {catalog.logo_url && (
-              <div className="absolute top-12 left-12">
-                <img src={catalog.logo_url} alt="Logo" className="h-14 w-auto object-contain" style={{ filter: 'brightness(0) invert(1)' }} />
-              </div>
-            )}
-            <div className="absolute bottom-12 left-12 right-12">
-              <h1
-                className="text-5xl font-black text-white leading-tight"
-                style={{ fontFamily: catalog.font_family }}
-              >
-                {catalog.title}
-              </h1>
-              {catalog.subtitle && (
-                <p className="text-xl text-white/80 mt-3" style={{ fontFamily: catalog.font_family }}>
-                  {catalog.subtitle}
-                </p>
-              )}
-            </div>
           </div>
         )}
 
@@ -157,6 +135,73 @@ const CatalogPreviewPage: React.FC = () => {
             />
           </div>
         ))}
+
+        {/* Back Cover page */}
+        {(catalog.back_cover_logo_url || catalog.back_cover_message || catalog.back_cover_website || catalog.back_cover_instagram || catalog.back_cover_phone) && (
+          <div
+            className="pdf-page relative overflow-hidden shadow-2xl flex flex-col items-center justify-center p-16 text-center"
+            style={{
+              width: A4_WIDTH,
+              minHeight: A4_HEIGHT,
+              background: catalog.bg_type === 'solid' ? catalog.bg_value : '#ffffff', // Simplified background
+              borderRadius: 4,
+              fontFamily: catalog.font_family,
+            }}
+          >
+            <div className="flex flex-col items-center w-full max-w-2xl space-y-16">
+              {catalog.back_cover_logo_url && (
+                <img src={catalog.back_cover_logo_url} alt="Logo Final" className="max-h-48 object-contain" />
+              )}
+              
+              {catalog.back_cover_message && (
+                <p className="text-3xl font-semibold leading-relaxed" style={{ color: catalog.primary_color }}>
+                  {catalog.back_cover_message}
+                </p>
+              )}
+
+              <div className="flex flex-col items-center space-y-6 pt-12 border-t w-full" style={{ borderColor: 'rgba(0,0,0,0.1)' }}>
+                {catalog.back_cover_website && (
+                  <a 
+                    href={catalog.back_cover_website.startsWith('http') ? catalog.back_cover_website : `https://${catalog.back_cover_website}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-4 text-2xl hover:opacity-80 transition-opacity"
+                    style={{ color: catalog.secondary_color, textDecoration: 'none' }}
+                  >
+                    <span className="material-icons-outlined text-4xl">language</span>
+                    {catalog.back_cover_website}
+                  </a>
+                )}
+                
+                {catalog.back_cover_instagram && (
+                  <a 
+                    href={`https://instagram.com/${catalog.back_cover_instagram.replace('@', '')}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="flex items-center gap-4 text-2xl hover:opacity-80 transition-opacity"
+                    style={{ color: catalog.secondary_color, textDecoration: 'none' }}
+                  >
+                    <span className="material-icons-outlined text-4xl">photo_camera</span>
+                    {catalog.back_cover_instagram}
+                  </a>
+                )}
+                
+                {catalog.back_cover_phone && (
+                  <a 
+                    href={`https://wa.me/55${catalog.back_cover_phone.replace(/\D/g, '')}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="flex items-center gap-4 text-2xl hover:opacity-80 transition-opacity"
+                    style={{ color: catalog.secondary_color, textDecoration: 'none' }}
+                  >
+                    <span className="material-icons-outlined text-4xl">message</span>
+                    WhatsApp: {catalog.back_cover_phone}
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

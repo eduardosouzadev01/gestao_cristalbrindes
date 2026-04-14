@@ -18,6 +18,9 @@ export interface UserPermissions {
   comissoes: boolean;
   relatorios: boolean;
   fatores: boolean;
+  canViewMargins: boolean;
+  canEditCatalog: boolean;
+  canDeleteCRM: boolean;
 }
 
 export interface AppUser {
@@ -38,6 +41,11 @@ const fetchUserProfile = async (userId: string): Promise<AppUser | null> => {
 
     if (error || !data) {
       console.error('Error fetching profile:', error);
+      return null;
+    }
+
+    if (data.active === false) {
+      console.warn('User is inactive:', data.email);
       return null;
     }
 
@@ -79,6 +87,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     const initAuth = async () => {
+      // Remove legacy user data stored in localStorage by older app versions
+      localStorage.removeItem('app_user');
+
       // Check existing session
       const { data: { session } } = await supabase.auth.getSession();
 
@@ -93,8 +104,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setAppUser(null);
         }
       } else {
-        // Fallback or cleanup local storage if no session
-        localStorage.removeItem('app_user');
         setAppUser(null);
       }
       setIsLoading(false);
@@ -129,15 +138,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return { success: false, error: 'Perfil de usuário não encontrado no sistema. Contate o administrador.' };
     }
 
+    // Profile lives only in React state — never persisted to localStorage
     setAppUser(profile);
-    localStorage.setItem('app_user', JSON.stringify(profile));
     return { success: true };
   };
 
   const logout = async () => {
     await supabase.auth.signOut();
     setAppUser(null);
-    localStorage.removeItem('app_user');
+    // Clean up only the last-visited route, not user credentials
+    localStorage.removeItem('lastPath');
   };
 
   const hasPermission = (permission: string): boolean => {
@@ -171,6 +181,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return appUser.permissions.relatorios;
       case 'fatores':
         return appUser.permissions.fatores;
+      case 'margins':
+        return appUser.permissions.canViewMargins;
+      case 'catalog.edit':
+        return appUser.permissions.canEditCatalog;
+      case 'crm.delete':
+        return appUser.permissions.canDeleteCRM;
       default:
         return false;
     }

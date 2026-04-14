@@ -17,6 +17,11 @@ export interface Catalog {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  back_cover_logo_url: string | null;
+  back_cover_website: string | null;
+  back_cover_instagram: string | null;
+  back_cover_phone: string | null;
+  back_cover_message: string | null;
 }
 
 export interface CatalogPage {
@@ -93,6 +98,11 @@ export const DEFAULT_CATALOG: CreateCatalogInput = {
   bg_type: 'solid',
   bg_value: '#ffffff',
   created_by: null,
+  back_cover_logo_url: null,
+  back_cover_website: null,
+  back_cover_instagram: null,
+  back_cover_phone: null,
+  back_cover_message: null,
 };
 
 // Slot layout config: positions 0,1 = vertical; 2,3 = horizontal

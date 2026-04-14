@@ -7,11 +7,12 @@ interface EditorSidebarProps {
   onChange: (updates: UpdateCatalogInput) => void;
   onLogoUpload: (file: File) => Promise<string | null>;
   onCoverEdit: () => void;
+  onBackCoverEdit: () => void;
 }
 
 type Tab = 'geral' | 'fontes' | 'cores' | 'fundo' | 'logo';
 
-const EditorSidebar: React.FC<EditorSidebarProps> = ({ catalog, onChange, onLogoUpload, onCoverEdit }) => {
+const EditorSidebar: React.FC<EditorSidebarProps> = ({ catalog, onChange, onLogoUpload, onCoverEdit, onBackCoverEdit }) => {
   const [activeTab, setActiveTab] = useState<Tab>('geral');
   const [logoUploading, setLogoUploading] = useState(false);
   const logoInputRef = React.useRef<HTMLInputElement>(null);
@@ -84,24 +85,23 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({ catalog, onChange, onLogo
               />
             </div>
             <div>
-              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Subtítulo</label>
-              <input
-                type="text"
-                value={catalog.subtitle || ''}
-                onChange={e => onChange({ subtitle: e.target.value || null })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all"
-                placeholder="Opcional..."
-              />
-            </div>
-            <div>
-              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Capa do Catálogo</label>
-              <button
-                onClick={onCoverEdit}
-                className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-gray-300 rounded-lg text-[10px] font-bold text-gray-500 hover:bg-gray-50 hover:border-gray-400 transition-all"
-              >
-                <span className="material-icons-outlined text-sm">photo_camera</span>
-                Editar Capa
-              </button>
+              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Páginas de Capa e Contracapa</label>
+              <div className="space-y-2">
+                <button
+                  onClick={onCoverEdit}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-gray-300 rounded-lg text-[10px] font-bold text-gray-500 hover:bg-gray-50 hover:border-gray-400 transition-all"
+                >
+                  <span className="material-icons-outlined text-sm">photo_camera</span>
+                  Editar Capa
+                </button>
+                <button
+                  onClick={onBackCoverEdit}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-gray-300 rounded-lg text-[10px] font-bold text-gray-500 hover:bg-gray-50 hover:border-gray-400 transition-all"
+                >
+                  <span className="material-icons-outlined text-sm">contact_page</span>
+                  Editar Contracapa
+                </button>
+              </div>
             </div>
           </>
         )}

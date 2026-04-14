@@ -15,8 +15,8 @@ interface UserProfile {
 }
 
 const ROLE_TEMPLATES: Record<string, { label: string; color: string; icon: string; permissions: UserPermissions }> = {
-    admin: {
-        label: 'Administrador',
+    GESTAO: {
+        label: 'Gestão',
         color: '#0F6CBD',
         icon: 'admin_panel_settings',
         permissions: {
@@ -32,9 +32,12 @@ const ROLE_TEMPLATES: Record<string, { label: string; color: string; icon: strin
             comissoes: true,
             relatorios: true,
             fatores: true,
+            canViewMargins: true,
+            canEditCatalog: true,
+            canDeleteCRM: true,
         },
     },
-    financeiro: {
+    FINANCEIRO: {
         label: 'Financeiro',
         color: '#0E700E',
         icon: 'account_balance',
@@ -51,10 +54,13 @@ const ROLE_TEMPLATES: Record<string, { label: string; color: string; icon: strin
             comissoes: true,
             relatorios: true,
             fatores: false,
+            canViewMargins: false,
+            canEditCatalog: false,
+            canDeleteCRM: false,
         },
     },
-    vendas: {
-        label: 'Vendas',
+    VENDEDOR: {
+        label: 'Vendedor',
         color: '#8A6116',
         icon: 'storefront',
         permissions: {
@@ -70,6 +76,31 @@ const ROLE_TEMPLATES: Record<string, { label: string; color: string; icon: strin
             comissoes: false,
             relatorios: false,
             fatores: false,
+            canViewMargins: false,
+            canEditCatalog: false,
+            canDeleteCRM: false,
+        },
+    },
+    SUPERVISOR: {
+        label: 'Supervisor',
+        color: '#6200EE',
+        icon: 'supervised_user_circle',
+        permissions: {
+            fullAccess: false,
+            viewAllOrders: true,
+            viewOwnOrdersOnly: false,
+            cadastros: true,
+            produtos: true,
+            canDelete: true,
+            crmPerformance: true,
+            crmFinanceiro: false,
+            financeiro: { contasReceber: false, contasPagar: false },
+            comissoes: false,
+            relatorios: true,
+            fatores: false,
+            canViewMargins: true,
+            canEditCatalog: true,
+            canDeleteCRM: true,
         },
     },
 };
@@ -90,9 +121,10 @@ const UserManagementPage: React.FC = () => {
     const [form, setForm] = useState({
         name: '',
         email: '',
-        role: 'vendas',
+        role: 'VENDEDOR',
         salesperson_id: '',
         active: true,
+        customPermissions: null as UserPermissions | null,
     });
 
     useEffect(() => {
@@ -117,14 +149,14 @@ const UserManagementPage: React.FC = () => {
     };
 
     const detectRole = (permissions: UserPermissions): string => {
-        if (permissions.fullAccess) return 'admin';
-        if (permissions.financeiro?.contasReceber || permissions.financeiro?.contasPagar) return 'financeiro';
-        return 'vendas';
+        if (permissions.fullAccess) return 'GESTAO';
+        if (permissions.financeiro?.contasReceber || permissions.financeiro?.contasPagar) return 'FINANCEIRO';
+        return 'VENDEDOR';
     };
 
     const openCreateModal = () => {
         setEditingUser(null);
-        setForm({ name: '', email: '', role: 'vendas', salesperson_id: '', active: true });
+        setForm({ name: '', email: '', role: 'VENDEDOR', salesperson_id: '', active: true, customPermissions: null });
         setIsModalOpen(true);
     };
 
@@ -136,6 +168,7 @@ const UserManagementPage: React.FC = () => {
             role: user.role || detectRole(user.permissions),
             salesperson_id: user.salesperson_id || '',
             active: user.active !== false,
+            customPermissions: user.permissions,
         });
         setIsModalOpen(true);
     };
@@ -160,8 +193,8 @@ const UserManagementPage: React.FC = () => {
             name: form.name.trim(),
             email: form.email.toLowerCase().trim(),
             role: form.role,
-            salesperson_id: form.role === 'vendas' ? form.salesperson_id : null,
-            permissions: roleTemplate.permissions,
+            salesperson_id: form.role === 'VENDEDOR' ? form.salesperson_id : null,
+            permissions: form.customPermissions || roleTemplate.permissions,
             active: form.active,
         };
 
@@ -174,11 +207,18 @@ const UserManagementPage: React.FC = () => {
                 if (error) throw error;
                 toast.success('Usuário atualizado com sucesso!');
             } else {
-                const { error } = await supabase
-                    .from('user_profiles')
-                    .insert([payload]);
+                const { data, error } = await supabase.rpc('create_new_user', {
+                    new_email: payload.email,
+                    new_name: payload.name,
+                    new_role: payload.role,
+                    new_salesperson_id: payload.salesperson_id,
+                    new_permissions: payload.permissions
+                });
                 if (error) throw error;
-                toast.success('Perfil de usuário criado! Lembre-se de criar o login no painel Supabase Auth.');
+                if (data && data.success === false) {
+                    throw new Error(data.error || 'Erro desconhecido ao criar usuário.');
+                }
+                toast.success('Perfil de usuário criado com sucesso! Senha padrão: Mudar@123');
             }
             setIsModalOpen(false);
             fetchUsers();
@@ -230,7 +270,7 @@ const UserManagementPage: React.FC = () => {
 
     const getRoleBadge = (user: UserProfile) => {
         const role = user.role || detectRole(user.permissions);
-        const template = ROLE_TEMPLATES[role] || ROLE_TEMPLATES.vendas;
+        const template = ROLE_TEMPLATES[role] || ROLE_TEMPLATES.VENDEDOR;
         return (
             <span
                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-medium"
@@ -407,15 +447,15 @@ const UserManagementPage: React.FC = () => {
             </div>
 
             {/* Info Banner */}
-            <div className="mt-6 p-4 rounded-xl border border-blue-200" style={{ backgroundColor: '#EBF3FC' }}>
+            <div className="mt-6 p-4 rounded-xl border border-green-200" style={{ backgroundColor: '#F0FDF4' }}>
                 <div className="flex items-start gap-3">
-                    <span className="material-icons-outlined text-lg mt-0.5" style={{ color: '#0F6CBD' }}>info</span>
+                    <span className="material-icons-outlined text-lg mt-0.5" style={{ color: '#166534' }}>info</span>
                     <div>
-                        <p className="text-sm font-medium" style={{ color: '#0F548C' }}>
-                            Para criar o login de acesso (e-mail + senha), acesse o <strong>Painel Supabase → Authentication → Users → Add User</strong>.
+                        <p className="text-sm font-medium" style={{ color: '#166534' }}>
+                            A criação de novos usuários agora é totalmente automática.
                         </p>
-                        <p className="text-xs mt-1" style={{ color: '#0F548C', opacity: 0.8 }}>
-                            O perfil aqui define apenas nome, permissões e vendedor vinculado. O login (credenciais) é gerenciado pelo Supabase Auth.
+                        <p className="text-xs mt-1" style={{ color: '#166534', opacity: 0.8 }}>
+                            Ao criar um perfil aqui, o usuário já terá acesso ao sistema com a senha padrão <strong>Mudar@123</strong>.
                         </p>
                     </div>
                 </div>
@@ -481,7 +521,7 @@ const UserManagementPage: React.FC = () => {
                                     <label className="block text-xs font-medium mb-2" style={{ color: '#424242' }}>
                                         Perfil de Acesso *
                                     </label>
-                                    <div className="grid grid-cols-3 gap-2">
+                                    <div className="grid grid-cols-2 gap-2">
                                         {Object.entries(ROLE_TEMPLATES).map(([key, tmpl]) => (
                                             <button
                                                 key={key}
@@ -506,34 +546,42 @@ const UserManagementPage: React.FC = () => {
                                     </div>
 
                                     {/* Permission Description */}
-                                    <div className="mt-3 p-3 rounded-lg bg-gray-50 border border-gray-100">
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Permissões do perfil:</p>
-                                        <div className="text-xs text-gray-600 space-y-0.5">
-                                            {form.role === 'admin' && (
-                                                <p>✅ Acesso total ao sistema — Todas as funcionalidades</p>
-                                            )}
-                                            {form.role === 'financeiro' && (
-                                                <>
-                                                    <p>✅ Contas a Receber e a Pagar</p>
-                                                    <p>✅ Comissões e Relatórios</p>
-                                                    <p>✅ Visualizar todos os pedidos</p>
-                                                    <p>❌ CRM Performance, Fatores, Excluir registros</p>
-                                                </>
-                                            )}
-                                            {form.role === 'vendas' && (
-                                                <>
-                                                    <p>✅ Ver e criar seus próprios pedidos</p>
-                                                    <p>✅ Cadastros de clientes (vinculados)</p>
-                                                    <p>✅ Catálogo de produtos</p>
-                                                    <p>❌ Financeiro, Relatórios, Excluir registros</p>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
+                                    {(() => {
+                                        const activeTemplate = ROLE_TEMPLATES[form.role] || ROLE_TEMPLATES.VENDEDOR;
+                                        return (
+                                            <div className="mt-3 p-3 rounded-lg bg-gray-50 border border-gray-100">
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Ajustes Finos de Permissão:</p>
+                                                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                                    {[
+                                                        { label: 'Ver Margens', key: 'canViewMargins' },
+                                                        { label: 'Editar Catálogo', key: 'canEditCatalog' },
+                                                        { label: 'Excluir CRM', key: 'canDeleteCRM' },
+                                                        { label: 'Ver Tudo', key: 'viewAllOrders' },
+                                                    ].map(p => (
+                                                        <label key={p.key} className="flex items-center gap-2 cursor-pointer group">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                                                                checked={!!(form.customPermissions || activeTemplate.permissions)[p.key as keyof UserPermissions]}
+                                                                onChange={e => {
+                                                                    const current = form.customPermissions || { ...activeTemplate.permissions };
+                                                                    setForm({
+                                                                        ...form,
+                                                                        customPermissions: { ...current, [p.key]: e.target.checked }
+                                                                    });
+                                                                }}
+                                                            />
+                                                            <span className="text-[11px] font-medium text-gray-600 group-hover:text-blue-600 transition-colors uppercase tracking-tight">{p.label}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
 
                                 {/* Vendedor (only for sales) */}
-                                {form.role === 'vendas' && (
+                                {form.role === 'VENDEDOR' && (
                                     <div>
                                         <label className="block text-xs font-medium mb-1.5" style={{ color: '#424242' }}>
                                             Vendedor Vinculado *

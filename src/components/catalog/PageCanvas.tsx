@@ -33,34 +33,34 @@ const PageCanvas: React.FC<PageCanvasProps> = ({
     return { backgroundColor: bgValue || '#ffffff' };
   };
 
-  // Sort slots by position
   const slots = [...(page.slots || [])].sort((a, b) => a.slot_position - b.slot_position);
-  const verticalSlots = slots.filter(s => s.orientation === 'vertical');
-  const horizontalSlots = slots.filter(s => s.orientation === 'horizontal');
 
-  // Fill missing slots with placeholder objects
-  const fillSlots = (arr: CatalogSlot[], count: number, orientation: 'vertical' | 'horizontal'): CatalogSlot[] => {
+  // Fill missing slots up to 4
+  const fillSlots = (arr: CatalogSlot[], count: number): CatalogSlot[] => {
     const filled = [...arr];
-    while (filled.length < count) {
-      filled.push({
-        id: `placeholder-${orientation}-${filled.length}`,
-        page_id: page.id,
-        slot_position: filled.length,
-        orientation,
-        product_id: null,
-        custom_image: null,
-        custom_title: null,
-        custom_desc: null,
-        show_price: false,
-        show_code: true,
-        created_at: '',
-      });
+    for (let i = 0; i < count; i++) {
+        if (!filled.find(s => s.slot_position === i)) {
+            filled.push({
+                id: `placeholder-vertical-${i}`,
+                page_id: page.id,
+                slot_position: i,
+                orientation: 'vertical',
+                product_id: null,
+                custom_image: null,
+                custom_title: null,
+                custom_desc: null,
+                show_price: false,
+                show_code: true,
+                created_at: '',
+            });
+        }
     }
-    return filled;
+    return filled.sort((a, b) => a.slot_position - b.slot_position).slice(0, count);
   };
 
-  const vSlots = fillSlots(verticalSlots, 2, 'vertical');
-  const hSlots = fillSlots(horizontalSlots, 2, 'horizontal');
+  // We want 4 vertical slots per page
+  // Ignore the saved orientation and force them to 'vertical' for rendering
+  const allSlots = fillSlots(slots, 4).map(s => ({ ...s, orientation: 'vertical' as const }));
 
   return (
     <div
@@ -82,39 +82,22 @@ const PageCanvas: React.FC<PageCanvasProps> = ({
           position: 'absolute',
           inset: 24 * scale,
           display: 'grid',
-          gridTemplateRows: `1fr ${0.7 * A4_HEIGHT * scale * 0.42}px`,
+          gridTemplateRows: '1fr 1fr',
+          gridTemplateColumns: '1fr 1fr',
           gap: 12 * scale,
         }}
       >
-        {/* Top row: 2 vertical slots */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 * scale }}>
-          {vSlots.map(slot => (
-            <ProductSlot
-              key={slot.id}
-              slot={slot}
-              catalog={catalog}
-              onAddProduct={onAddProduct}
-              onEditSlot={onEditSlot}
-              onClearSlot={onClearSlot}
-              isPreview={isPreview || slot.id.startsWith('placeholder')}
-            />
-          ))}
-        </div>
-
-        {/* Bottom row: 2 horizontal slots */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 * scale }}>
-          {hSlots.map(slot => (
-            <ProductSlot
-              key={slot.id}
-              slot={slot}
-              catalog={catalog}
-              onAddProduct={onAddProduct}
-              onEditSlot={onEditSlot}
-              onClearSlot={onClearSlot}
-              isPreview={isPreview || slot.id.startsWith('placeholder')}
-            />
-          ))}
-        </div>
+        {allSlots.map(slot => (
+          <ProductSlot
+            key={slot.id}
+            slot={slot}
+            catalog={catalog}
+            onAddProduct={onAddProduct}
+            onEditSlot={onEditSlot}
+            onClearSlot={onClearSlot}
+            isPreview={isPreview || slot.id.startsWith('placeholder')}
+          />
+        ))}
       </div>
 
       {/* Page number badge */}

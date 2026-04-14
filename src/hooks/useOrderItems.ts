@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { calculateItemTotal, calculateItemRealTotal } from '../utils/formulas';
 
-export const useOrderItems = (initialItems: any[] = []) => {
+export const useOrderItems = (initialItems: any[] = [], referenceNumber?: string) => {
     const [items, setItems] = useState<any[]>(initialItems.length > 0 ? initialItems : [{
         id: Date.now(),
         productName: '',
@@ -14,7 +14,10 @@ export const useOrderItems = (initialItems: any[] = []) => {
         transpCliente: 0,
         despesaExtra: 0,
         layoutCost: 0,
-        fator: 1.34,
+        fator: 1.29,
+        mockMargin: 15,
+        mockNF: 14,
+        mockPayment: 0,
         bvPct: 0,
         extraPct: 0,
         factorId: '',
@@ -46,6 +49,10 @@ export const useOrderItems = (initialItems: any[] = []) => {
         productCode: ''
     }]);
 
+    const isModern = !referenceNumber || referenceNumber === 'AUTO' || (!isNaN(parseInt(referenceNumber)) && parseInt(referenceNumber) >= 3526);
+
+    const itemsWithContext = items.map(it => ({ ...it, useModernRounding: isModern }));
+
     const addItem = () => {
         setItems(prev => [...prev, {
             id: Date.now(),
@@ -58,7 +65,10 @@ export const useOrderItems = (initialItems: any[] = []) => {
             transpCliente: 0,
             despesaExtra: 0,
             layoutCost: 0,
-            fator: 1.34,
+            fator: 1.29,
+            mockMargin: 15,
+            mockNF: 14,
+            mockPayment: 0,
             bvPct: 0,
             extraPct: 0,
             factorId: '',
@@ -103,11 +113,11 @@ export const useOrderItems = (initialItems: any[] = []) => {
         setItems(prev => [...prev, { ...item, id: Date.now(), isApproved: false }]);
     };
 
-    const totalRevenue = items.reduce((acc, item) => acc + calculateItemTotal(item), 0);
-    const totalCostsReal = items.reduce((acc, item) => acc + calculateItemRealTotal(item), 0);
+    const totalRevenue = itemsWithContext.reduce((acc, item) => acc + calculateItemTotal(item), 0);
+    const totalCostsReal = itemsWithContext.reduce((acc, item) => acc + calculateItemRealTotal(item), 0);
 
     return {
-        items,
+        items: itemsWithContext,
         setItems,
         addItem,
         updateItem,

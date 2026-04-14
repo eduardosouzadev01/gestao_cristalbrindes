@@ -94,12 +94,12 @@ const ProductSlot: React.FC<ProductSlotProps> = ({
     >
       <div className={containerClass}>
         {/* Image area */}
-        <div className={imageClass} style={{ background: '#f3f4f6' }}>
+        <div className={imageClass} style={{ background: '#fff' }}>
           {displayImage ? (
             <img
               src={displayImage}
               alt={displayTitle || 'produto'}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain p-2"
               style={{ display: 'block' }}
             />
           ) : (

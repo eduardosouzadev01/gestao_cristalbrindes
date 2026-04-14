@@ -72,12 +72,20 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: {
+            // Core framework — cached aggressively
             vendor: ['react', 'react-dom', 'react-router-dom'],
+            // Supabase SDK — changes independently
             supabase: ['@supabase/supabase-js'],
+            // State management
+            query: ['@tanstack/react-query'],
+            // Form handling — heavy, rarely changes
+            forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
+            // Used only in specific pages (pdf, drag-drop)
+            utils: ['html2pdf.js', '@hello-pangea/dnd', 'papaparse'],
           }
         }
       },
-      chunkSizeWarningLimit: 1000
+      chunkSizeWarningLimit: 800
     }
   };
 });

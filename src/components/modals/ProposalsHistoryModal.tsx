@@ -39,6 +39,7 @@ export const ProposalsHistoryModal: React.FC<ProposalsHistoryModalProps> = ({ is
                                 <tr className="border-b border-gray-100 bg-gray-50/30">
                                     <th className="px-6 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Nº Proposta</th>
                                     <th className="px-6 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Data Gerada</th>
+                                    <th className="px-6 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Enviada por E-mail</th>
                                     <th className="px-6 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Valor Total</th>
                                     <th className="px-6 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Ações</th>
                                 </tr>
@@ -52,18 +53,59 @@ export const ProposalsHistoryModal: React.FC<ProposalsHistoryModalProps> = ({ is
                                         <td className="px-6 py-4 text-xs font-bold text-gray-500">
                                             {new Date(prop.created_at).toLocaleDateString('pt-BR')} <span className="text-gray-300 font-normal">às</span> {new Date(prop.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                         </td>
+                                        <td className="px-6 py-4 text-center">
+                                            {prop.last_sent_at ? (
+                                                <div className="flex flex-col items-center">
+                                                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-tighter flex items-center gap-1">
+                                                        <span className="material-icons-outlined text-xs">check_circle</span> SIM
+                                                    </span>
+                                                    <span className="text-[9px] text-gray-400">
+                                                        {new Date(prop.last_sent_at).toLocaleDateString('pt-BR')} {new Date(prop.last_sent_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-[10px] font-black text-gray-300 uppercase tracking-tighter">NÃO ENVIADA</span>
+                                            )}
+                                        </td>
                                         <td className="px-6 py-4 text-xs font-black text-gray-700 text-right">{formatCurrency(prop.total_amount)}</td>
                                         <td className="px-6 py-4 text-center">
-                                            <button 
-                                                onClick={() => {
-                                                    onClose();
-                                                    navigate(`/proposta/${prop.id}`);
-                                                }}
-                                                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0F6CBD] text-white hover:bg-[#0c5aa5] transition-all text-[10px] font-bold uppercase shadow-sm shadow-blue-100 active:scale-95"
-                                            >
-                                                <span className="material-icons-outlined text-white text-base">visibility</span>
-                                                Visualizar
-                                            </button>
+                                            <div className="flex justify-center items-center gap-2">
+                                                <button 
+                                                    onClick={() => {
+                                                        onClose();
+                                                        navigate(`/proposta/${prop.id}`);
+                                                    }}
+                                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-white text-blue-600 border border-blue-200 hover:bg-blue-50 transition-all text-[10px] font-black uppercase shadow-sm active:scale-95"
+                                                    title="Visualizar Proposta"
+                                                >
+                                                    <span className="material-icons-outlined text-base">visibility</span>
+                                                    VER
+                                                </button>
+                                                <button 
+                                                    onClick={async () => {
+                                                        if (!window.confirm('Tem certeza que deseja excluir esta proposta?')) return;
+                                                        try {
+                                                            const { supabase } = await import('../../../lib/supabase');
+                                                            const { toast } = await import('sonner');
+                                                            const { error } = await supabase.from('proposals').delete().eq('id', prop.id);
+                                                            if (error) throw error;
+                                                            toast.success('Proposta excluída');
+                                                            if ((window as any).fetchProposalsHistory) {
+                                                                (window as any).fetchProposalsHistory();
+                                                            } else {
+                                                                window.location.reload();
+                                                            }
+                                                        } catch (e: any) {
+                                                            alert('Erro ao excluir: ' + e.message);
+                                                        }
+                                                    }}
+                                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-white text-red-600 border border-red-200 hover:bg-red-50 transition-all text-[10px] font-black uppercase shadow-sm active:scale-95"
+                                                    title="Excluir Proposta"
+                                                >
+                                                    <span className="material-icons-outlined text-base">delete</span>
+                                                    EXCLUIR
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

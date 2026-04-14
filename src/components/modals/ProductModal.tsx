@@ -424,14 +424,42 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                         </div>
                     </div>
                 </div>
-                <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 rounded-b-2xl border-t border-gray-100 flex-shrink-0">
-                    <button onClick={onClose} className="px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 font-medium text-sm transition-colors cursor-pointer">
-                        Cancelar
-                    </button>
-                    <button onClick={handleSave} disabled={loading || uploading} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm transition-colors disabled:opacity-50 cursor-pointer flex items-center gap-2">
-                        {loading && <span className="material-icons-outlined animate-spin text-sm">sync</span>}
-                        {loading ? 'Salvando...' : 'Salvar Produto'}
-                    </button>
+                <div className="px-6 py-4 bg-gray-50 flex justify-between items-center rounded-b-2xl border-t border-gray-100 flex-shrink-0">
+                    <div>
+                        {formData.id && (
+                            <button 
+                                onClick={async () => {
+                                    if (!window.confirm('Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita.')) return;
+                                    try {
+                                        setLoading(true);
+                                        const { error } = await supabase.from('products').delete().eq('id', formData.id);
+                                        if (error) throw error;
+                                        toast.success('Produto excluído com sucesso!');
+                                        onSaveSuccess();
+                                        onClose();
+                                    } catch (err: any) {
+                                        toast.error('Erro ao excluir: ' + err.message);
+                                    } finally {
+                                        setLoading(false);
+                                    }
+                                }} 
+                                disabled={loading || uploading} 
+                                className="px-4 py-2 bg-red-50 border border-red-100 text-red-600 rounded-lg hover:bg-red-100 font-medium text-sm transition-colors cursor-pointer flex items-center gap-2"
+                            >
+                                <span className="material-icons-outlined text-sm">delete</span>
+                                Excluir
+                            </button>
+                        )}
+                    </div>
+                    <div className="flex gap-3">
+                        <button onClick={onClose} className="px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 font-medium text-sm transition-colors cursor-pointer">
+                            Cancelar
+                        </button>
+                        <button onClick={handleSave} disabled={loading || uploading} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm transition-colors disabled:opacity-50 cursor-pointer flex items-center gap-2">
+                            {loading && <span className="material-icons-outlined animate-spin text-sm">sync</span>}
+                            {loading ? 'Salvando...' : 'Salvar Produto'}
+                        </button>
+                    </div>
                 </div>
             </div>
 

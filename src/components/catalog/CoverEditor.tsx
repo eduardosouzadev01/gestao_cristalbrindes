@@ -75,26 +75,6 @@ const CoverEditor: React.FC<CoverEditorProps> = ({ catalog, onChange, onClose })
               </div>
             )}
 
-            {/* Overlay with title */}
-            <div
-              className="absolute inset-0 flex flex-col justify-end p-6"
-              style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 60%)' }}
-            >
-              {catalog.logo_url && (
-                <img src={catalog.logo_url} alt="Logo" className="h-10 w-auto object-contain mb-4 self-start" style={{ filter: 'brightness(0) invert(1)' }} />
-              )}
-              <h1
-                className="text-2xl font-black text-white leading-tight"
-                style={{ fontFamily: catalog.font_family, textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}
-              >
-                {catalog.title || 'Título do Catálogo'}
-              </h1>
-              {catalog.subtitle && (
-                <p className="text-sm text-white/80 mt-1" style={{ fontFamily: catalog.font_family }}>
-                  {catalog.subtitle}
-                </p>
-              )}
-            </div>
           </div>
 
           {/* Controls */}
@@ -120,26 +100,6 @@ const CoverEditor: React.FC<CoverEditorProps> = ({ catalog, onChange, onClose })
               )}
             </div>
 
-            <div>
-              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Título</label>
-              <input
-                type="text"
-                value={catalog.title}
-                onChange={e => onChange({ title: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Subtítulo</label>
-              <input
-                type="text"
-                value={catalog.subtitle || ''}
-                onChange={e => onChange({ subtitle: e.target.value || null })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all"
-                placeholder="Opcional..."
-              />
-            </div>
 
             <button
               onClick={onClose}

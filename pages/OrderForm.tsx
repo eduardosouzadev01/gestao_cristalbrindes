@@ -156,7 +156,7 @@ const OrderForm: React.FC = () => {
     removeItem,
     totalRevenue: totalPedidoCalculado,
     totalCostsReal: totalRealCustosCalculado
-  } = useOrderItems();
+  } = useOrderItems([], orderNumber);
 
   // Derived Values
   const totalRecebido = (entradaConfirmed ? parseCurrencyToNumber(recebimentoEntrada) : 0) + (restanteConfirmed ? parseCurrencyToNumber(recebimentoRestante) : 0);

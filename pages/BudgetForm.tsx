@@ -2,6 +2,24 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
+
+// BUDGET STATUS CONFIG (Independent for budgets)
+const BUDGET_STATUS_CONFIG: Record<string, { label: string; colorClass: string }> = {
+    'EM ABERTO': { label: 'Em Aberto', colorClass: 'bg-slate-50 text-slate-600 border-slate-200' },
+    'ATENDIMENTO': { label: 'Em Andamento', colorClass: 'bg-sky-50 text-sky-700 border-sky-200' },
+    'ACOMPANHAMENTO_01': { label: 'Acompanhamento 01', colorClass: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+    'ACOMPANHAMENTO_02': { label: 'Acompanhamento 02', colorClass: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+    'PROPOSTA_ENVIADA': { label: 'Proposta Enviada', colorClass: 'bg-amber-50 text-amber-700 border-amber-200' },
+    'ENVIO_CATALOGO': { label: 'Envio de Catálogo', colorClass: 'bg-orange-50 text-orange-700 border-orange-200' },
+    'PEDIDO_ABERTO': { label: 'Pedido Aberto', colorClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    'PROPOSTA ACEITA': { label: 'Proposta Aceita', colorClass: 'bg-teal-50 text-teal-700 border-teal-200' },
+    'NAO_ATENDE_PRAZO': { label: 'Não atende Prazo', colorClass: 'bg-rose-50 text-rose-700 border-rose-200' },
+    'NAO_APROVADO': { label: 'Não Aprovado', colorClass: 'bg-slate-50 text-slate-700 border-slate-200' }
+};
+
+const getBudgetStatusStyle = (status: string) => {
+    return BUDGET_STATUS_CONFIG[status] || { label: status, colorClass: 'bg-gray-50 text-gray-600 border-gray-200' };
+};
 import { formatCurrency, parseCurrencyToNumber } from '../src/utils/formatCurrency';
 import { calculateItemTotal } from '../src/utils/formulas';
 import { useOrderItems } from '../src/hooks/useOrderItems';
@@ -25,7 +43,7 @@ const BudgetForm: React.FC = () => {
     const location = useLocation();
     const [loading, setLoading] = useState(false);
     const isSavingRef = useRef(false);
-    const { appUser } = useAuth();
+    const { appUser, hasPermission } = useAuth();
     const userSalesperson = appUser?.salesperson || '';
     const isSeller = !!appUser?.salesperson;
     const targetId = id === 'novo' ? null : id;
@@ -39,18 +57,18 @@ const BudgetForm: React.FC = () => {
     const [budgetNumber, setBudgetNumber] = useState('');
     const [vendedor, setVendedor] = useState(userSalesperson);
     const [status, setStatus] = useState('EM ABERTO');
-    const [dataOrcamento, setDataOrcamento] = useState(getTodayISO());
+    const [lastSentAt, setLastSentAt] = useState<string | null>(null);
+    const [dataOrcamento, setDataOrcamento] = useState(new Date().toISOString().split('T')[0]);
     const [dataPedido, setDataPedido] = useState(getTodayISO()); // Prediction
     const [issuer, setIssuer] = useState('CRISTAL');
     const [clientData, setClientData] = useState({ id: '', name: '', doc: '', phone: '', email: '', emailFin: '' });
 
     // Commercial data (Proposal terms)
     const [validity, setValidity] = useState('15 dias');
-    const [shipping, setShipping] = useState('1 Frete incluso para Grande Vitória, exceto Guarapari.');
+    const [shipping, setShipping] = useState('Frete incluso para Grande Vitória, exceto Guarapari.');
     const [deliveryDeadline, setDeliveryDeadline] = useState('15 / 20 dias úteis');
-    const [paymentMethod, setPaymentMethod] = useState('À vista ou parcelado');
+    const [paymentMethod, setPaymentMethod] = useState('50% na entrada + 50% no pedido pronto.');
     const [observation, setObservation] = useState('');
-    const [natureza, setNatureza] = useState('Venda');
 
     // Lists
     const [clientsList, setClientsList] = useState<any[]>([]);
@@ -106,7 +124,7 @@ const BudgetForm: React.FC = () => {
         updateItem,
         removeItem,
         duplicateItem
-    } = useOrderItems([]);
+    } = useOrderItems([], budgetNumber);
 
     // Drag and drop reorder
     const onDragEnd = (result: DropResult) => {
@@ -152,14 +170,31 @@ const BudgetForm: React.FC = () => {
             // New Budget from CRM
             const { clientData: cData, vendedor: vend } = location.state;
 
-            // Try to find partner ID if missing
-            if (!cData.id) {
-                findPartnerId(cData).then(foundId => {
-                    setClientData({ ...cData, id: foundId || '' });
-                });
-            } else {
-                setClientData(cData);
-            }
+            // Try to find partner record if missing
+            const fetchFullPartner = async (cData: any) => {
+                let pid = cData.id;
+                if (!pid) pid = await findPartnerId(cData);
+                
+                if (pid) {
+                    const { data: partner } = await supabase.from('partners').select('*').eq('id', pid).single();
+                    if (partner) {
+                        setClientData({
+                            id: partner.id,
+                            name: partner.name,
+                            doc: partner.doc || '',
+                            phone: partner.phone || '',
+                            email: partner.email || '',
+                            emailFin: partner.financial_email || partner.email || ''
+                        });
+                    } else {
+                        setClientData({ ...cData, emailFin: cData.email || '' });
+                    }
+                } else {
+                    setClientData({ ...cData, emailFin: cData.email || '' });
+                }
+            };
+
+            fetchFullPartner(cData);
 
             // For sellers, always use their own vendedor
             if (isSeller && userSalesperson) {
@@ -173,6 +208,12 @@ const BudgetForm: React.FC = () => {
             setBudgetNumber('AUTO');
             setActiveId(undefined);
         } else if (!id || id === 'novo') {
+            // Task: Restriction for sellers - only allow via CRM
+            if (isSeller && !hasPermission('adm') && !hasPermission('gestao')) {
+                toast.error('Vendedores só podem criar orçamentos através do CRM (Atendimentos).');
+                navigate('/crm');
+                return;
+            }
             setBudgetNumber('AUTO');
             setActiveId(undefined);
         }
@@ -336,6 +377,22 @@ const BudgetForm: React.FC = () => {
             setStatus(data.status);
             setDataOrcamento(data.created_at.split('T')[0]);
             setIssuer(data.issuer);
+
+            // Fetch the last sent proposal for this budget
+            const { data: lastProp } = await supabase
+                .from('proposals')
+                .select('last_sent_at')
+                .eq('budget_id', targetId)
+                .not('last_sent_at', 'is', null)
+                .order('last_sent_at', { ascending: false })
+                .limit(1)
+                .single();
+            
+            if (lastProp) {
+                setLastSentAt(lastProp.last_sent_at);
+            } else {
+                setLastSentAt(null);
+            }
             // Load client directly from DB to avoid race condition with clientsList
             if (data.client_id) {
                 const { data: clientRecord } = await supabase.from('partners').select('*').eq('id', data.client_id).single();
@@ -355,7 +412,7 @@ const BudgetForm: React.FC = () => {
             setValidity(data.validity || '15 dias');
             setShipping(data.shipping || 'Cliente retira');
             setDeliveryDeadline(data.delivery_deadline || '15 / 20 dias úteis');
-            setPaymentMethod(data.payment_method || 'À vista ou parcelado');
+            setPaymentMethod(data.payment_method || '50% na entrada + 50% no pedido pronto.');
             setObservation(data.observation || '');
 
             // Map items and fetch variations for each
@@ -366,17 +423,32 @@ const BudgetForm: React.FC = () => {
                     .eq('name', it.product_name)
                     .limit(10); // Find a few to aggregate variations if needed
 
+                const allImgs = new Set<string>();
+                const addVal = (ux: any) => { if (typeof ux === 'string' && ux.trim()) allImgs.add(ux); };
+
+                if (it.product_image_url) addVal(it.product_image_url);
+
                 let aggregatedVars: any[] = [];
                 if (pData) {
                     pData.forEach(p => {
+                        addVal(p.image_url);
+                        if (p.images && Array.isArray(p.images)) p.images.forEach(addVal);
+
                         const vars = p.variations || [];
                         vars.forEach((v: any) => {
+                            if (v.image) addVal(v.image);
                             if (!aggregatedVars.some(av => av.color === v.color)) aggregatedVars.push(v);
                         });
                         if (p.color && !aggregatedVars.some(av => av.color === p.color)) {
-                            aggregatedVars.push({ color: p.color, stock: p.stock });
+                            aggregatedVars.push({ color: p.color, stock: p.stock, image: p.image_url || (p.images && p.images[0]) });
                         }
                     });
+                }
+                
+                // Final productImage check - if saved is null, try to find one
+                let finalProdImg = it.product_image_url;
+                if (!finalProdImg || !finalProdImg.trim()) {
+                    finalProdImg = Array.from(allImgs)[0] || '';
                 }
 
                 const fator = it.calculation_factor || 1.35;
@@ -454,9 +526,12 @@ const BudgetForm: React.FC = () => {
                     productDescription: it.product_description || '',
                     productColor: it.product_color || '',
                     productCode: it.product_code || (pData?.find(p => p.color === it.product_color)?.code) || (pData && pData[0]?.code) || '',
-                    productImage: it.product_image_url || (pData?.find(p => p.color === it.product_color)?.image_url) || (pData?.find(p => p.color === it.product_color)?.images?.[0]) || (pData && (pData[0]?.image_url || pData[0]?.images?.[0])) || '',
+                    productImage: finalProdImg,
+                    coverImage: finalProdImg,
+                    availableImages: Array.from(allImgs),
                     variations: aggregatedVars
                 };
+
             }));
             setItems(mappedItems);
         }
@@ -972,9 +1047,39 @@ const BudgetForm: React.FC = () => {
                             #{budgetNumber || 'NOVO'}
                         </span>
                     </div>
-                    <span className="bg-[var(--color-info-budget)] text-[var(--color-info-text-budget)] px-2.5 py-1 rounded-[var(--radius-sm-budget)] text-[11px] font-[500] uppercase tracking-wider">
-                        {status}
-                    </span>
+                    <div className="flex flex-col gap-0.5">
+                        <div className="relative group">
+                            <select
+                                value={status}
+                                onChange={async (e) => {
+                                    const newStatus = e.target.value;
+                                    setStatus(newStatus);
+                                    if (activeId) {
+                                        await supabase.from('budgets').update({ status: newStatus }).eq('id', activeId);
+                                        toast.success('Status atualizado!');
+                                    }
+                                }}
+                                className={`
+                                    appearance-none px-3 py-1 rounded-md text-[11px] font-black uppercase tracking-wider
+                                    border cursor-pointer transition-all pr-8
+                                    ${getBudgetStatusStyle(status).colorClass}
+                                `}
+                            >
+                                {Object.entries(BUDGET_STATUS_CONFIG).map(([key, config]) => (
+                                    <option key={key} value={key} className="bg-white text-slate-900">
+                                        {config.label}
+                                    </option>
+                                ))}
+                            </select>
+                            <span className="material-icons-outlined absolute right-2 top-1/2 -translate-y-1/2 text-[10px] pointer-events-none opacity-40">expand_more</span>
+                        </div>
+                        {lastSentAt && (
+                            <span className="text-[9px] font-black text-emerald-600 flex items-center gap-1 uppercase tracking-tighter">
+                                <span className="material-icons-outlined text-[10px]">mark_email_read</span>
+                                Enviado: {new Date(lastSentAt).toLocaleDateString('pt-BR')} {new Date(lastSentAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                        )}
+                    </div>
                 </div>
                 
                 <div className="flex items-center gap-3">
@@ -1075,10 +1180,18 @@ const BudgetForm: React.FC = () => {
                             <div className="relative group">
                                 <CustomSelect
                                     options={clientsList}
-                                    onSelect={(c: any) => setClientData({ id: c.id, name: c.name, doc: c.doc, phone: c.phone, email: c.email, emailFin: c.financial_email || c.emailFin })}
+                                    onSelect={(c: any) => setClientData({ 
+                                        id: c.id, 
+                                        name: c.name, 
+                                        doc: c.doc || '', 
+                                        phone: c.phone || '', 
+                                        email: c.email || '', 
+                                        emailFin: c.financial_email || c.email || '' 
+                                    })}
                                     placeholder="Comece a digitar o nome do cliente..."
                                     value={clientData.name}
                                     onAdd={() => navigate('/cadastros/novo')}
+                                    disabled={isClientLocked}
                                 />
                                 {clientData.id && (
                                     <div className="mt-4 p-3 bg-slate-50 border border-slate-100 rounded-xl flex flex-wrap gap-4">
@@ -1119,10 +1232,9 @@ const BudgetForm: React.FC = () => {
                 </div>
 
                 <div className="bg-white border border-[#D0D3D6] rounded-2xl shadow-sm overflow-hidden divide-y divide-[#D0D3D6]">
-                    <div className="grid grid-cols-1 md:grid-cols-5 divide-x divide-[#D0D3D6]">
+                    <div className="grid grid-cols-1 md:grid-cols-4 divide-x divide-[#D0D3D6]">
                         {[
-                            { label: 'Validade da Proposta', value: validity, setter: setValidity, icon: 'timer' },
-                            { label: 'Natureza da Operação', value: natureza, setter: setNatureza, icon: 'swap_horiz' },
+                            { label: 'Validade da Proposta', value: validity, setter: setValidity, icon: 'timer', list: 'validity-options' },
                             { label: 'Logística / Frete', value: shipping, setter: setShipping, icon: 'local_shipping', list: 'shipping-options' },
                             { label: 'Prazo de Entrega', value: deliveryDeadline, setter: setDeliveryDeadline, icon: 'event_available', list: 'delivery-options' },
                             { label: 'Forma de Pagamento', value: paymentMethod, setter: setPaymentMethod, icon: 'payments', list: 'payment-options' }
@@ -1139,6 +1251,16 @@ const BudgetForm: React.FC = () => {
                                     disabled={status === 'PROPOSTA ACEITA'}
                                     list={cond.list}
                                 />
+                                 {cond.list === 'validity-options' && (
+                                    <datalist id="validity-options">
+                                        <option value="5 dias" />
+                                        <option value="7 dias" />
+                                        <option value="10 dias" />
+                                        <option value="15 dias" />
+                                        <option value="20 dias" />
+                                        <option value="30 dias" />
+                                    </datalist>
+                                )}
                                 {cond.list === 'shipping-options' && (
                                     <datalist id="shipping-options">
                                         <option value="Frete incluso para Grande Vitória, exceto Guarapari." />
@@ -1173,13 +1295,13 @@ const BudgetForm: React.FC = () => {
                             </div>
                         ))}
                     </div>
-                    <div className="p-4 bg-[#F8F8F8]/50">
+                    <div className="p-4 bg-[#F8F8F8]/50 rounded-2xl border border-transparent hover:border-slate-200 transition-all">
                         <div className="flex items-center gap-2 mb-2">
                             <span className="material-icons-outlined text-[14px] text-slate-400">rate_review</span>
                             <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-widest">Observações Gerais (Aparecerão na Proposta)</label>
                         </div>
                         <textarea 
-                            className="w-full bg-transparent border-none p-0 text-[13px] font-medium text-slate-600 focus:ring-0 min-h-[40px] resize-none"
+                            className="w-full bg-transparent border-none p-0 text-[13px] font-medium text-slate-600 focus:ring-0 min-h-[60px] resize-none"
                             value={observation}
                             onChange={e => setObservation(e.target.value)}
                             placeholder="Adicione observações importantes para esta proposta..."

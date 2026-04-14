@@ -12,13 +12,8 @@ const OrderList: React.FC = () => {
   const { appUser } = useAuth();
 
   // States
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(location.state?.clientName || '');
 
-  useEffect(() => {
-    if (location.state?.clientName) {
-      setSearchTerm(location.state.clientName);
-    }
-  }, [location.state]);
   const [vendedorFilter, setVendedorFilter] = useState('Todos os Vendedores');
   const [statusFilter, setStatusFilter] = useState('Todos');
   const [limitDateFilter, setLimitDateFilter] = useState('');
@@ -243,13 +238,13 @@ const OrderList: React.FC = () => {
           <div className="flex-1 min-w-[250px]">
             <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">BUSCAR PEDIDO</label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <span className="material-icons-outlined text-gray-400 text-sm">search</span>
               </span>
               <input
                 type="text"
                 placeholder="ID, Cliente, CNPJ ou Valor..."
-                className="form-input block w-full pl-8 rounded border-gray-300 shadow-sm focus:ring-0 focus:border-blue-500 text-xs h-8 font-bold"
+                className="form-input block w-full pl-11 rounded border-gray-300 shadow-sm focus:ring-0 focus:border-blue-500 text-xs h-8 font-bold"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />

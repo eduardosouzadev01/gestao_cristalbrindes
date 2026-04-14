@@ -55,6 +55,16 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
     const totalVenda = calculateItemTotal(it);
     const unitVenda = totalVenda / (it.quantity || 1);
 
+    const getValidImages = (imgs: any[]) => imgs.filter(img => typeof img === 'string' && img.trim().length > 0);
+
+    const variationsImages = (it.variations || []).map((v: any) => v.image);
+    const derivedImages = Array.from(new Set(getValidImages([
+        it.coverImage,
+        ...(it.availableImages || []),
+        ...variationsImages,
+        it.productImage
+    ])));
+
     const paymentOptions = [
         { val: 0, label: '50% + 50% ( - sem acréscimo )' },
         { val: 0, label: 'À Vista ( - Sem acréscimo )' },
@@ -99,10 +109,32 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                                 <CustomSelect
                                     options={productsList}
                                     onSelect={async (p: any) => {
+                                        const getFirstValid = (p: any) => {
+                                            if (p.image_url && p.image_url.trim()) return p.image_url;
+                                            if (p.images && Array.isArray(p.images)) {
+                                                const valid = p.images.find((img: any) => typeof img === 'string' && img.trim());
+                                                if (valid) return valid;
+                                            }
+                                            if (p.image && typeof p.image === 'string' && p.image.trim()) return p.image;
+                                            return null;
+                                        };
+
+                                        const mainImage = getFirstValid(p);
+                                        const allImages = new Set<string>();
+                                        const addIfValid = (img: any) => {
+                                            if (typeof img === 'string' && img.trim()) allImages.add(img);
+                                        };
+
+                                        addIfValid(mainImage);
+                                        addIfValid(p.image_url);
+                                        if (p.images && Array.isArray(p.images)) p.images.forEach(addIfValid);
+
                                         updateItem(it.id, 'product_id', p.id);
                                         updateItem(it.id, 'productName', p.name);
                                         updateItem(it.id, 'productCode', p.code);
-                                        updateItem(it.id, 'productImage', p.image_url || (p.images && p.images[0]) || p.image);
+                                        updateItem(it.id, 'productImage', mainImage);
+                                        updateItem(it.id, 'coverImage', mainImage);
+                                        // availableImages will be updated after sibling check if needed
                                         updateItem(it.id, 'productDescription', p.description);
                                         updateItem(it.id, 'productColor', p.color || '');
                                         
@@ -115,27 +147,41 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                                             }
                                         }
 
-                                        // ASIA/Flat Products Fix: Fetch variations if not present as JSON
-                                        if (!p.variations || p.variations.length === 0) {
-                                            const baseName = p.name.split(' - ')[0];
-                                            const { data: vData } = await supabase.from('products')
-                                                .select('color, stock, image_url, code, images')
-                                                .eq('name', baseName)
-                                                .limit(30);
+                                        // ASIA/XBZ Sibling check
+                                        const baseName = p.name.split(' - ')[0].split(' (')[0].trim();
+                                        const { data: vData } = await supabase.from('products')
+                                            .select('color, stock, image_url, code, images')
+                                            .ilike('name', `%${baseName}%`)
+                                            .limit(50);
+                                        
+                                        if (vData && vData.length > 0) {
+                                            // Update allImages with all sibling images
+                                            vData.forEach(v => {
+                                                addIfValid(v.image_url);
+                                                if (v.images && Array.isArray(v.images)) v.images.forEach(addIfValid);
+                                            });
+
+                                            const vars = vData.map((v: any) => ({
+                                                color: v.color,
+                                                stock: v.stock,
+                                                image: getFirstValid(v),
+                                                code: v.code
+                                            }));
+
+                                            updateItem(it.id, 'variations', vars);
+                                            updateItem(it.id, 'availableImages', Array.from(allImages));
                                             
-                                            if (vData && vData.length > 1) {
-                                                const vars = vData.map((v: any) => ({
-                                                    color: v.color,
-                                                    stock: v.stock,
-                                                    image: v.image_url || (v.images && v.images[0]) || v.image,
-                                                    code: v.code
-                                                }));
-                                                updateItem(it.id, 'variations', vars);
-                                            } else {
-                                                updateItem(it.id, 'variations', []);
+                                            // Handle case where selected product has no image but siblings do
+                                            if (!mainImage) {
+                                                const firstSiblingImg = vars.find(v => v.image)?.image;
+                                                if (firstSiblingImg) {
+                                                    updateItem(it.id, 'productImage', firstSiblingImg);
+                                                    updateItem(it.id, 'coverImage', firstSiblingImg);
+                                                }
                                             }
                                         } else {
-                                            updateItem(it.id, 'variations', p.variations);
+                                            updateItem(it.id, 'variations', p.variations || []);
+                                            updateItem(it.id, 'availableImages', Array.from(allImages));
                                         }
                                     }}
                                     placeholder="Buscar produto no catálogo..."
@@ -199,6 +245,28 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                                         </div>
                                     )}
                                 </div>
+
+                                {/* THUMBNAILS (GALERIA) */}
+                                {derivedImages.length > 1 && (
+                                    <div className="flex gap-2 overflow-x-auto py-1 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent pb-2">
+                                        {derivedImages.map((img, i) => (
+                                            <button
+                                                key={i}
+                                                type="button"
+                                                onClick={() => {
+                                                    if (!isLocked) {
+                                                        updateItem(it.id, 'productImage', img as string);
+                                                    }
+                                                }}
+                                                disabled={isLocked}
+                                                className={`flex-shrink-0 w-12 h-12 rounded-lg border-2 overflow-hidden transition-all ${it.productImage === img ? 'border-[var(--color-accent-budget)] ring-2 ring-[var(--color-accent-budget)]/20 shadow-sm' : 'border-slate-200 opacity-60 hover:opacity-100 hover:border-slate-400 focus:outline-none'}`}
+                                            >
+                                                <img src={img as string} alt="Thumbnail" className="w-full h-full object-contain bg-white p-0.5" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
                                 <div className="bg-[var(--bg-muted-budget)]/40 rounded-[var(--radius-md-budget)] p-3 border border-[#D0D3D6] shadow-inner">
                                     <label className="block text-[10px] uppercase font-[700] text-slate-400 mb-1 italic">REF</label>
                                     <input
@@ -256,9 +324,14 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                                                     const selectedVar = it.variations.find((v: any) => v.color === e.target.value);
                                                     updateItem(it.id, 'productColor', e.target.value);
                                                     if (selectedVar) {
-                                                        if (selectedVar.image) updateItem(it.id, 'productImage', selectedVar.image);
+                                                        const varImg = selectedVar.image && typeof selectedVar.image === 'string' && selectedVar.image.trim() ? selectedVar.image : null;
+                                                        if (varImg) {
+                                                            updateItem(it.id, 'productImage', varImg);
+                                                        } else if (it.coverImage) {
+                                                            // If variation has no photo, keep/revert to cover photo
+                                                            updateItem(it.id, 'productImage', it.coverImage);
+                                                        }
                                                         if (selectedVar.price) updateItem(it.id, 'priceUnit', selectedVar.price);
-                                                        // Update stock info if needed (maybe in productDescription or another field)
                                                     }
                                                 }}
                                                 disabled={isLocked}

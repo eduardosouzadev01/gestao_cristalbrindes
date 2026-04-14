@@ -4,22 +4,55 @@ import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-import { formatDate } from '../src/utils/dateUtils';
-import { maskPhone, maskCpfCnpj } from '../src/utils/maskUtils';
-import { PerformanceTab } from '../src/components/crm/PerformanceTab';
-import { FinanceiroTab } from '../src/components/crm/FinanceiroTab';
 import { Lead } from '../src/hooks/useCRM';
 import { fixClientName } from '../src/utils/textUtils';
+import { formatDate } from '../src/utils/dateUtils';
+import { maskPhone, maskCpfCnpj } from '../src/utils/maskUtils';
 
-// --- SHARED STATUS CONFIGURATION ---
-export const CRM_STATUS_CONFIG: Record<string, { label: string, colorClass: string, icon: string }> = {
-    'ATENDIMENTO': { label: 'Em Atendimento', colorClass: 'bg-transparent text-slate-600', icon: 'chat' },
-    'ORCAMENTO': { label: 'Em Orçamento', colorClass: 'bg-transparent text-amber-700', icon: 'receipt_long' },
-    'PROPOSTA_ENVIADA': { label: 'Proposta Enviada', icon: 'send', colorClass: 'bg-transparent text-emerald-700' },
-    'PEDIDO_ABERTO': { label: 'Pedido Aberto', colorClass: 'bg-transparent text-sky-700', icon: 'shopping_bag' },
-    'FINALIZADO': { label: 'Finalizado (Venda)', colorClass: 'bg-transparent text-emerald-700', icon: 'verified' },
-    'NAO_APROVADO': { label: 'Não Aprovado', colorClass: 'bg-transparent text-rose-700', icon: 'cancel' }
+const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+// CRM STATUS CONFIG (Independent for leads)
+export const CRM_STATUS_CONFIG: Record<string, { label: string; colorClass: string; icon: string }> = {
+    'ATENDIMENTO': { 
+        label: 'Em Andamento', 
+        colorClass: '!bg-sky-50 !text-sky-700 !border-sky-100', 
+        icon: 'pending_actions' 
+    },
+    'ACOMPANHAMENTO_01': { 
+        label: 'Acompanhamento 01', 
+        colorClass: '!bg-cyan-50 !text-cyan-700 !border-cyan-100', 
+        icon: 'assignment_turned_in' 
+    },
+    'ACOMPANHAMENTO_02': { 
+        label: 'Acompanhamento 02', 
+        colorClass: '!bg-indigo-50 !text-indigo-700 !border-indigo-100', 
+        icon: 'task_alt' 
+    },
+    'PROPOSTA_ENVIADA': { 
+        label: 'Proposta Enviada', 
+        colorClass: '!bg-amber-50 !text-amber-700 !border-amber-100', 
+        icon: 'send' 
+    },
+    'ENVIO_CATALOGO': { 
+        label: 'Envio de Catálogo', 
+        colorClass: '!bg-orange-50 !text-orange-700 !border-orange-100', 
+        icon: 'auto_stories' 
+    },
+    'PEDIDO_ABERTO': { 
+        label: 'Pedido Aberto', 
+        colorClass: '!bg-emerald-50 !text-emerald-700 !border-emerald-100', 
+        icon: 'verified' 
+    },
+    'NAO_ATENDE_PRAZO': { 
+        label: 'Não atende Prazo', 
+        colorClass: '!bg-rose-50 !text-rose-700 !border-rose-100', 
+        icon: 'event_busy' 
+    },
+    'NAO_APROVADO': { 
+        label: 'Não Aprovado', 
+        colorClass: '!bg-slate-50 !text-slate-700 !border-slate-100', 
+        icon: 'cancel' 
+    }
 };
 
 export const getStatusStyle = (status: string) => {
@@ -63,63 +96,107 @@ const ManagementPage: React.FC = () => {
         client_name: '', client_contact_name: '', client_phone: '', client_email: '', client_doc: ''
     };
 
-    const tabParam = searchParams.get('tab') as 'LEADS' | 'PERFORMANCE' | 'FINANCEIRO' | 'TRANSFERENCIAS' | 'RECORDS' | 'ANALYTICS' | null;
-    const [activeTab, setActiveTab] = useState<'LEADS' | 'PERFORMANCE' | 'FINANCEIRO' | 'TRANSFERENCIAS' | 'RECORDS' | 'ANALYTICS'>(tabParam || 'LEADS');
+    const [openStatusMenuId, setOpenStatusMenuId] = useState<string | null>(null);
+
+    // Close menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (openStatusMenuId && !(event.target as Element).closest('.status-dropdown-container')) {
+                setOpenStatusMenuId(null);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [openStatusMenuId]);
+
+    const tabParam = searchParams.get('tab') as 'RECORDS' | 'TRANSFERENCIAS' | null;
+    const [activeTab, setActiveTab] = useState<'RECORDS' | 'TRANSFERENCIAS'>(tabParam || 'RECORDS');
+    
+    // Core Data States
+    const [leads, setLeads] = useState<Lead[]>([]);
+    const [loading, setLoading] = useState(true);
     const [transferRequests, setTransferRequests] = useState<TransferRequest[]>([]);
     const [pendingTransferCount, setPendingTransferCount] = useState(0);
     const [loadingTransfers, setLoadingTransfers] = useState(false);
+
+    // Filters & Search States
+    const [searchTerm, setSearchTerm] = useState('');
+    const [globalSearchTerm, setGlobalSearchTerm] = useState('');
+    const [kanbanSellerFilter, setKanbanSellerFilter] = useState('Todos');
+    const [kanbanPeriodFilter, setKanbanPeriodFilter] = useState('Todos');
+    const [kanbanStatusCategoryFilter, setKanbanStatusCategoryFilter] = useState('Todos');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const searchInputRef = React.useRef<HTMLInputElement>(null);
+
+    // Lead Management States
+    const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
+    const [editingLead, setEditingLead] = useState<Lead | null>(null);
+    const [newLead, setNewLead] = useState<Partial<Lead>>(initialLeadState);
+    const [checklistItems, setChecklistItems] = useState<{ id: string; text: string; completed: boolean }[]>([]);
+    const [newItemText, setNewItemText] = useState('');
+    const [isSavingPartner, setIsSavingPartner] = useState(false);
+    const [partnerSaved, setPartnerSaved] = useState(false);
+    const [showClientForm, setShowClientForm] = useState(false);
+
+    // Finalization & Lost States
+    const [isFinalizeModalOpen, setIsFinalizeModalOpen] = useState(false);
+    const [finalizeForm, setFinalizeForm] = useState({ success: true, value: 0, notes: '', category: 'VENDA' });
+    const [isLostReasonModalOpen, setIsLostReasonModalOpen] = useState(false);
+    const [lostForm, setLostForm] = useState({ category: 'PREÇO', reason: '' });
+    const [pendingStatusLead, setPendingStatusLead] = useState<Lead | null>(null);
+
+    // Transfer Modal States
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
     const [selectedClientToTransfer, setSelectedClientToTransfer] = useState<any>(null);
     const [transferReason, setTransferReason] = useState('');
-    const [loading, setLoading] = useState(true);
 
-    // Filter Stats
-    const [month, setMonth] = useState(new Date().getMonth() + 1);
-    const [year, setYear] = useState(new Date().getFullYear());
-    const [selectedSalesperson, setSelectedSalesperson] = useState('Todos');
-
-    // Leads State
-    const [leads, setLeads] = useState<Lead[]>([]);
-    const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
-    const [isLostReasonModalOpen, setIsLostReasonModalOpen] = useState(false);
-    const [pendingStatusLead, setPendingStatusLead] = useState<Lead | null>(null);
-    const [lostForm, setLostForm] = useState({ category: 'PREÇO', reason: '' });
-
-    const [editingLead, setEditingLead] = useState<Lead | null>(null);
-    const [newLead, setNewLead] = useState<Partial<Lead>>({
-        status: 'ATENDIMENTO',
-        salesperson: userSalesperson || 'VENDAS 01',
-        priority: 'NORMAL'
-    });
+    // Check Client Modal (initial check)
+    const [isCheckClientModalOpen, setIsCheckClientModalOpen] = useState(false);
+    const [checkClientInput, setCheckClientInput] = useState('');
 
     // Client Search State
     const [clientSearchTerm, setClientSearchTerm] = useState('');
     const [clientSearchResults, setClientSearchResults] = useState<any[]>([]);
     const [showClientResults, setShowClientResults] = useState(false);
 
-    // Filters
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
+    // Client Search logic for Modal
+    useEffect(() => {
+        const timer = setTimeout(async () => {
+            if (clientSearchTerm.length < 2) {
+                setClientSearchResults([]);
+                return;
+            }
 
-    // Performance State
-    const [stats, setStats] = useState<any[]>([]);
-    const [totalBudgets, setTotalBudgets] = useState(0);
-    const [totalApproved, setTotalApproved] = useState(0);
-    const [totalValue, setTotalValue] = useState(0);
-    const [recentBudgets, setRecentBudgets] = useState<any[]>([]);
+            try {
+                const { data, error } = await supabase
+                    .from('partners')
+                    .select('*')
+                    .eq('type', 'CLIENTE')
+                    .or(`name.ilike.%${clientSearchTerm}%,contact_name.ilike.%${clientSearchTerm}%,phone.ilike.%${clientSearchTerm}%`)
+                    .limit(5);
 
+                if (error) throw error;
+                setClientSearchResults(data || []);
+            } catch (err) {
+                console.error('Error searching clients:', err);
+            }
+        }, 300);
 
-    const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
-    const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [kanbanSellerFilter, setKanbanSellerFilter] = useState('Todos');
-    const [kanbanPeriodFilter, setKanbanPeriodFilter] = useState('Todos');
-    const [kanbanStatusCategoryFilter, setKanbanStatusCategoryFilter] = useState('Todos');
-    const [collapsedCols, setCollapsedCols] = useState<Record<string, boolean>>({});
-    const [globalSearchTerm, setGlobalSearchTerm] = useState('');
+        return () => clearTimeout(timer);
+    }, [clientSearchTerm]);
 
-    const searchInputRef = React.useRef<HTMLInputElement>(null);
+    // UI State
+    const [compactMode, setCompactMode] = useState(true);
+    const [isFullscreen, setIsFullscreen] = useState(false);
 
+    // Scroll Click & Drag State
+    const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+    const [isDraggingScroll, setIsDraggingScroll] = useState(false);
+    const [startX, setStartX] = useState(0);
+    const [scrollLeft, setScrollLeft] = useState(0);
+
+    // Effects
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
@@ -131,44 +208,11 @@ const ManagementPage: React.FC = () => {
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, []);
 
-    // Scroll Click & Drag State
-    const scrollContainerRef = React.useRef<HTMLDivElement>(null);
-    const [isDraggingScroll, setIsDraggingScroll] = useState(false);
-    const [startX, setStartX] = useState(0);
-    const [scrollLeft, setScrollLeft] = useState(0);
-
-    // Finalize Modal State
-    const [isFinalizeModalOpen, setIsFinalizeModalOpen] = useState(false);
-    const [finalizeForm, setFinalizeForm] = useState({ success: true, value: 0, notes: '', category: '' });
-    const [showClientForm, setShowClientForm] = useState(false);
-    const [isSavingPartner, setIsSavingPartner] = useState(false);
-    const [partnerSaved, setPartnerSaved] = useState(false);
-
-    // Check Client Modal State
-    const [isCheckClientModalOpen, setIsCheckClientModalOpen] = useState(false);
-    const [checkClientInput, setCheckClientInput] = useState('');
-
-    // Financial Stats (From ReportsPage)
-    const [finStats, setFinStats] = useState({
-        totalSales: 0,
-        totalNet: 0,
-        totalCommissions: 0,
-        totalFixedExpenses: 0,
-        orderCount: 0,
-        ticketMedio: 0,
-        totalExtra: 0,
-        topProducts: [] as any[],
-        salesByStatus: [] as any[]
-    });
-
     useEffect(() => {
-        if (activeTab === 'LEADS') fetchLeads();
-        else if (activeTab === 'PERFORMANCE') fetchPerformanceData();
-        else if (activeTab === 'FINANCEIRO') fetchFinancialData();
+        if (activeTab === 'RECORDS') fetchLeads();
         else if (activeTab === 'TRANSFERENCIAS') fetchTransferRequests();
-    }, [activeTab, startDate, endDate, month, year, selectedSalesperson]);
+    }, [activeTab, startDate, endDate]);
 
-    // Sync checklist and template when lead changes
     useEffect(() => {
         if (isLeadModalOpen && newLead) {
             const metadata = newLead.closing_metadata || {};
@@ -195,27 +239,22 @@ const ManagementPage: React.FC = () => {
         setChecklistItems(checklistItems.filter(item => item.id !== id));
     };
 
-    // --- Leads Logic ---
+    // --- Data Fetching Functions ---
     const fetchLeads = async () => {
         setLoading(true);
-        let query = supabase.from('crm_leads').select('*').order('created_at', { ascending: false });
+        try {
+            let query = supabase.from('crm_leads').select('*').order('created_at', { ascending: false });
 
-        if (startDate) query = query.gte('created_at', startDate);
-        if (endDate) query = query.lte('created_at', endDate + 'T23:59:59');
+            if (startDate) query = query.gte('created_at', startDate);
+            if (endDate) query = query.lte('created_at', endDate + 'T23:59:59');
 
-        // Sellers can only see their own leads
-        if (isSeller && userSalesperson) {
-            query = query.eq('salesperson', userSalesperson);
-        }
-
-        const { data, error } = await query;
-        if (error) {
-            if (error.code === '42P01') {
-                toast.error('ERRO CRÍTICO: Tabela CRM não encontrada. Contacte o suporte para rodar a migração.');
-            } else {
-                toast.error('Erro ao carregar leads: ' + error.message);
+            if (isSeller && userSalesperson) {
+                query = query.eq('salesperson', userSalesperson);
             }
-        } else {
+
+            const { data, error } = await query;
+            if (error) throw error;
+
             const priorityWeight = { 'ALTA': 3, 'NORMAL': 2, 'BAIXA': 1 };
             const sorted = (data || []).sort((a, b) => {
                 const pA = priorityWeight[a.priority as keyof typeof priorityWeight] || 0;
@@ -224,8 +263,176 @@ const ManagementPage: React.FC = () => {
                 return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
             });
             setLeads(sorted);
+        } catch (error: any) {
+            toast.error('Erro ao carregar leads: ' + error.message);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
+    };
+
+    const fetchTransferRequests = async () => {
+        try {
+            setLoadingTransfers(true);
+            let clientQuery = supabase.from('client_transfer_requests').select('*, client:partners(name)');
+            if (isSeller && userSalesperson) {
+                clientQuery = clientQuery.or(`requesting_salesperson.eq.${userSalesperson},current_salesperson.eq.${userSalesperson}`);
+            }
+            const { data: clients, error: clientError } = await clientQuery.order('created_at', { ascending: false });
+            if (clientError) throw clientError;
+
+            let orderQuery = supabase.from('seller_transfer_requests').select('*');
+            if (isSeller && userSalesperson) {
+                orderQuery = orderQuery.or(`requested_salesperson.eq.${userSalesperson},current_salesperson.eq.${userSalesperson}`);
+            }
+            const { data: orders, error: orderError } = await orderQuery.order('created_at', { ascending: false });
+            if (orderError) throw orderError;
+
+            const unified: TransferRequest[] = [
+                ...(clients || []).map(c => ({ ...c, type: 'CLIENT' as const })),
+                ...(orders || []).map(o => ({ 
+                    ...o, 
+                    type: 'ORDER' as const,
+                    requesting_salesperson: o.current_salesperson,
+                    requested_salesperson: o.requested_salesperson,
+                    status: o.status === 'PENDENTE' ? 'PENDING' : o.status === 'APROVADO' ? 'APPROVED' : 'REJECTED'
+                }))
+            ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+            setTransferRequests(unified);
+            setPendingTransferCount(unified.filter(r => r.status === 'PENDING').length);
+        } catch (error: any) {
+            console.error('Erro ao buscar solicitações:', error);
+            toast.error('Erro ao carregar transferências');
+        } finally {
+            setLoadingTransfers(false);
+        }
+    };
+
+    const handleRequestTransfer = async () => {
+        if (!selectedClientToTransfer) return;
+        try {
+            const { error } = await supabase
+                .from('client_transfer_requests')
+                .insert({
+                    client_id: selectedClientToTransfer.id,
+                    requesting_salesperson: appUser?.salesperson || 'ADMIN',
+                    current_salesperson: selectedClientToTransfer.salesperson,
+                    reason: 'SOLICITAÇÃO DE TROCA VIA CRM',
+                    status: 'PENDING',
+                    requested_by_email: appUser?.email
+                });
+
+            if (error) throw error;
+
+            // Notify Management
+            await supabase.from('notifications').insert({
+                user_email: 'cristalbrindes@cristalbrindes.com.br',
+                title: `🔄 Troca de Carteira - ${selectedClientToTransfer.name}`,
+                message: `${appUser?.salesperson || 'ADMIN'} solicita o cliente do vendedor ${selectedClientToTransfer.salesperson}.`,
+                type: 'info',
+                read: false,
+                link: `/crm?tab=TRANSFERENCIAS`
+            });
+
+            toast.success('Solicitação enviada com sucesso!');
+            setIsTransferModalOpen(false);
+            setTransferReason('');
+            setSelectedClientToTransfer(null);
+            fetchTransferRequests();
+        } catch (error: any) {
+            toast.error('Erro ao enviar solicitação.');
+            console.error(error);
+        }
+    };
+
+    const handleApproveTransfer = async (request: TransferRequest) => {
+        try {
+            if (request.type === 'CLIENT') {
+                const { error: clientError } = await supabase
+                    .from('partners')
+                    .update({ salesperson: request.requesting_salesperson })
+                    .eq('id', request.client_id);
+                if (clientError) throw clientError;
+
+                const { error: requestError } = await supabase
+                    .from('client_transfer_requests')
+                    .update({ status: 'APPROVED' })
+                    .eq('id', request.id);
+                if (requestError) throw requestError;
+            } else {
+                const { error: orderError } = await supabase
+                    .from('orders')
+                    .update({ salesperson: request.requested_salesperson })
+                    .eq('id', request.order_id);
+                if (orderError) throw orderError;
+
+                await supabase.from('order_change_logs').insert({
+                    order_id: request.order_id,
+                    user_email: appUser?.email || 'SISTEMA',
+                    field_name: 'vendedor',
+                    old_value: request.current_salesperson,
+                    new_value: request.requested_salesperson,
+                    description: `Troca de vendedor aprovada pela gerência. Motivo: ${request.reason}`
+                });
+
+                const { error: requestError } = await supabase
+                    .from('seller_transfer_requests')
+                    .update({ status: 'APROVADO' })
+                    .eq('id', request.id);
+                if (requestError) throw requestError;
+            }
+
+            toast.success('Transferência aprovada com sucesso!');
+
+            if (request.requested_by_email) {
+                await supabase.from('notifications').insert({
+                    user_email: request.requested_by_email,
+                    title: `✅ Troca Aprovada`,
+                    message: `Sua solicitação de troca para ${request.type === 'CLIENT' ? request.client?.name : 'Pedido #' + request.order_number} foi aprovada.`,
+                    type: 'success',
+                    read: false,
+                    link: request.type === 'CLIENT' ? '/clientes' : `/pedido/${request.order_id}`
+                });
+            }
+            fetchTransferRequests();
+        } catch (error: any) {
+            toast.error('Erro ao aprovar transferência.');
+            console.error(error);
+        }
+    };
+
+    const handleRejectTransfer = async (request: TransferRequest) => {
+        try {
+            if (request.type === 'CLIENT') {
+                const { error } = await supabase
+                    .from('client_transfer_requests')
+                    .update({ status: 'REJECTED' })
+                    .eq('id', request.id);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase
+                    .from('seller_transfer_requests')
+                    .update({ status: 'REJEITADO' })
+                    .eq('id', request.id);
+                if (error) throw error;
+            }
+
+            toast.success('Solicitação rejeitada.');
+
+            if (request.requested_by_email) {
+                await supabase.from('notifications').insert({
+                    user_email: request.requested_by_email,
+                    title: `❌ Troca Rejeitada`,
+                    message: `Sua solicitação de troca para ${request.type === 'CLIENT' ? request.client?.name : 'Pedido #' + request.order_number} foi rejeitada pela gerência.`,
+                    type: 'danger',
+                    read: false
+                });
+            }
+            fetchTransferRequests();
+        } catch (error: any) {
+            toast.error('Erro ao rejeitar solicitação.');
+            console.error(error);
+        }
     };
 
     const handleAttendLead = async (e: React.MouseEvent, leadId: string) => {
@@ -320,21 +527,21 @@ const ManagementPage: React.FC = () => {
     };
 
     const selectClient = (client: any) => {
-        // Ownership Check
         if (client.salesperson && newLead.salesperson && client.salesperson !== newLead.salesperson) {
-            // Prevent selection if belongs to another salesperson
-            alert(`ATENÇÃO: Este cliente pertence ao vendedor ${client.salesperson}.\n\nNão é permitido adicionar ao seu atendimento.`);
+            // Trigger Transfer Request instead of just alert
+            setSelectedClientToTransfer(client);
+            setIsTransferModalOpen(true);
             return;
         }
 
-        setNewLead({
-            ...newLead,
-            client_name: client.name,
-            client_contact_name: client.contact_name || '',
+        setNewLead(prev => ({
+            ...prev,
+            client_name: fixClientName(client.name),
             client_phone: client.phone,
-            client_email: client.email || '',
-            client_doc: client.doc || ''
-        });
+            client_email: client.email,
+            client_doc: client.doc,
+            client_contact_name: client.contact_name
+        }));
         setClientSearchTerm('');
         setShowClientResults(false);
         setPartnerSaved(true); // Treat existing clients as already saved
@@ -388,7 +595,7 @@ const ManagementPage: React.FC = () => {
         }
 
         if (newLead.client_email) {
-            const openStatuses = ['ATENDIMENTO', 'ORCAMENTO', 'PROPOSTA_ENVIADA', 'PEDIDO_ABERTO'];
+            const openStatuses = ['ATENDIMENTO', 'PROPOSTA_ENVIADA', 'ENVIO_CATALOGO'];
             let checkQuery = supabase
                 .from('crm_leads')
                 .select('id, salesperson, closing_metadata')
@@ -402,15 +609,14 @@ const ManagementPage: React.FC = () => {
             const { data: existingLeads } = await checkQuery as { data: any[] };
 
             if (existingLeads && existingLeads.length > 0) {
-                // If it's the same item, block. If it's a different item, allow.
                 const hasSameItem = existingLeads.some(l => l.closing_metadata?.quoted_item === newLead.closing_metadata?.quoted_item);
-                if (hasSameItem) {
-                    alert(`Este e-mail e item já estão em uso em um atendimento em aberto relacionado ao vendedor ${existingLeads[0].salesperson}.`);
+                const seller = existingLeads[0].salesperson;
+                const msg = hasSameItem 
+                    ? `Este cliente já tem um atendimento em aberto para este MESMO ITEM com o vendedor ${seller}. Deseja criar outro atendimento duplicado mesmo assim?`
+                    : `Este cliente já tem um atendimento em aberto para outro item com o vendedor ${seller}. Criar um novo atendimento paralelo para "${newLead.closing_metadata?.quoted_item || 'Novo Item'}"?`;
+                
+                if (!window.confirm(msg)) {
                     return;
-                } else {
-                    if (!window.confirm(`Este cliente já tem um atendimento em aberto para outro item. Criar um novo atendimento paralelo para "${newLead.closing_metadata?.quoted_item || 'Novo Item'}"?`)) {
-                        return;
-                    }
                 }
             }
         }
@@ -481,7 +687,6 @@ const ManagementPage: React.FC = () => {
             fetchLeads();
         }
     };
-
     const updateLeadStatus = async (lead: Lead, newStatus: string) => {
         if (newStatus === 'NAO_APROVADO') {
             setPendingStatusLead(lead);
@@ -490,12 +695,15 @@ const ManagementPage: React.FC = () => {
             return;
         }
 
-        if (newStatus === 'FINALIZADO') {
+        if (newStatus === 'PEDIDO_ABERTO') {
             setPendingStatusLead(lead);
-            setFinalizeForm({ success: true, value: lead.estimated_value || 0, notes: '' });
+            setFinalizeForm({ success: true, value: lead.estimated_value || 0, notes: '', category: 'VENDA' });
             setIsFinalizeModalOpen(true);
             return;
         }
+
+        // Optimistic update for immediate feedback in summary cards
+        setLeads(prevLeads => prevLeads.map(l => l.id === lead.id ? { ...l, status: newStatus } : l));
 
         const { error } = await supabase.from('crm_leads').update({
             status: newStatus
@@ -504,21 +712,44 @@ const ManagementPage: React.FC = () => {
         if (!error) {
             toast.success(`Status atualizado para ${newStatus}`);
             fetchLeads();
+        } else {
+            fetchLeads();
+            toast.error('Erro ao atualizar status');
         }
     };
 
-    const toggleFollowUp = async (lead: Lead) => {
+    const updateLeadAtendimentoStatus = async (lead: Lead, newStatus: string) => {
+        // Optimistic update
+        setLeads(prevLeads => prevLeads.map(l => l.id === lead.id ? { ...l, atendimento_status: newStatus } : l));
+
+        const { error } = await supabase.from('crm_leads').update({
+            atendimento_status: newStatus
+        }).eq('id', lead.id);
+
+        if (!error) {
+            toast.success(`Atendimento atualizado para ${CRM_STATUS_CONFIG[newStatus]?.label || newStatus}`);
+            fetchLeads();
+        } else {
+            fetchLeads();
+            toast.error('Erro ao atualizar status de atendimento');
+        }
+    };
+
+    const togglePriority = async (lead: Lead) => {
         try {
-            const nextDone = !lead.follow_up_done;
+            const priorities = ['NORMAL', 'ALTA', 'VIP', 'URGENTE'];
+            const currentIndex = priorities.indexOf(lead.priority || 'NORMAL');
+            const nextPriority = priorities[(currentIndex + 1) % priorities.length];
+
             const { error } = await supabase.from('crm_leads').update({
-                follow_up_done: nextDone,
-                follow_up_at: nextDone ? new Date().toISOString() : null
+                priority: nextPriority
             }).eq('id', lead.id);
+
             if (error) throw error;
-            toast.success(nextDone ? 'Acompanhamento marcado!' : 'Acompanhamento removido');
+            toast.success(`Prioridade alterada para ${nextPriority}`);
             fetchLeads();
         } catch (error: any) {
-            toast.error('Erro ao atualizar acompanhamento');
+            toast.error('Erro ao alterar prioridade');
         }
     };
 
@@ -538,14 +769,14 @@ const ManagementPage: React.FC = () => {
         };
 
         const { error } = await supabase.from('crm_leads').update({
-            status: 'FINALIZADO',
+            status: 'PEDIDO_ABERTO',
             closing_metadata: metadata,
             estimated_value: finalizeForm.value,
             finish_reason_category: finalizeForm.category
         }).eq('id', pendingStatusLead.id);
 
         if (!error) {
-            toast.success('Atendimento finalizado com sucesso!');
+            toast.success('Atendimento finalizado com sucesso! (Pedido Aberto)');
             setIsFinalizeModalOpen(false);
             setPendingStatusLead(null);
             fetchLeads();
@@ -568,6 +799,8 @@ const ManagementPage: React.FC = () => {
         }).eq('id', pendingStatusLead.id);
 
         if (!error) {
+            // Optimistic update
+            setLeads(prevLeads => prevLeads.map(l => l.id === pendingStatusLead.id ? { ...l, status: 'NAO_APROVADO' } : l));
             toast.success('Atendimento marcado como não aprovado.');
             setIsLostReasonModalOpen(false);
             setPendingStatusLead(null);
@@ -613,400 +846,13 @@ const ManagementPage: React.FC = () => {
         });
     };
 
-    // --- Drag and Drop Handlers ---
-    const handleDragStart = (e: React.DragEvent, lead: Lead) => {
-        setDraggedLead(lead);
-        e.dataTransfer.effectAllowed = 'move';
-        const el = e.target as HTMLElement;
-        const clone = el.cloneNode(true) as HTMLElement;
-        clone.style.position = 'absolute';
-        clone.style.top = '-9999px';
-        clone.style.left = '-9999px';
-        clone.style.width = el.offsetWidth + 'px';
-        clone.style.opacity = '1';
-        clone.style.backgroundColor = '#ffffff';
-        clone.style.borderRadius = '8px';
-        clone.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-        document.body.appendChild(clone);
-        e.dataTransfer.setDragImage(clone, el.offsetWidth / 2, 20);
-        setTimeout(() => { if (clone.parentNode) clone.parentNode.removeChild(clone); }, 0);
-        el.style.opacity = '0.4';
-    };
 
-    const handleDragEnd = (e: React.DragEvent) => {
-        if (e.target instanceof HTMLElement) {
-            e.target.style.opacity = '1';
-        }
-        setDraggedLead(null);
-        setDragOverColumn(null);
-    };
-
-    const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-    };
-
-    const handleDragEnter = (e: React.DragEvent, colId: string) => {
-        e.preventDefault();
-        setDragOverColumn(colId);
-    };
-
-    const handleDragLeave = (e: React.DragEvent) => {
-        e.preventDefault();
-        // Only clear if we are not moving into a child
-        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-        if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
-            setDragOverColumn(null);
-        }
-    };
-
-    const handleDrop = (e: React.DragEvent, status: any) => {
-        e.preventDefault();
-        setDragOverColumn(null);
-        if (draggedLead && draggedLead.status !== status) {
-            updateLeadStatus(draggedLead, status);
-        }
-    };
-
-    // --- Performance Logic ---
-    const fetchPerformanceData = async () => {
-        try {
-            setLoading(true);
-
-            // Fetch Budgets for conversion stats
-            const { data: budgetsData, error: budgetError } = await supabase
-                .from('budgets')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (budgetError) throw budgetError;
-
-            // Fetch CRM Leads for Kanban stats
-            const { data: leadsData, error: leadError } = await supabase
-                .from('crm_leads')
-                .select('id, status, salesperson, estimated_value');
-
-            if (leadError) throw leadError;
-
-            const allBudgets = budgetsData || [];
-            const allLeads = leadsData || [];
-
-            // Global Stats (from budgets)
-            setTotalBudgets(allBudgets.length);
-            setTotalApproved(allBudgets.filter((b: any) => b.status === 'PROPOSTA ACEITA').length);
-            setTotalValue(allBudgets.reduce((sum: number, b: any) => sum + (b.total_amount || 0), 0));
-            setRecentBudgets(allBudgets.slice(0, 5));
-
-            // Group by salesperson
-            const sellers = Array.from(new Set([
-                ...allBudgets.map(b => b.salesperson || 'N/A'),
-                ...allLeads.map(l => l.salesperson || 'N/A')
-            ]));
-
-            const grouped = sellers.reduce((acc: any, sp: string) => {
-                const spBudgets = allBudgets.filter(b => b.salesperson === sp);
-                const spLeads = allLeads.filter(l => l.salesperson === sp);
-
-                acc[sp] = {
-                    name: sp,
-                    total: spBudgets.length,
-                    approved: spBudgets.filter((b: any) => b.status === 'PROPOSTA ACEITA').length,
-                    pending: spBudgets.filter((b: any) => b.status !== 'PROPOSTA ACEITA' && b.status !== 'PROPOSTA RECUSADA' && b.status !== 'CANCELADO').length,
-                    refused: spBudgets.filter((b: any) => b.status === 'PROPOSTA RECUSADA' || b.status === 'CANCELADO').length,
-                    value: spBudgets.reduce((sum: number, b: any) => sum + (b.total_amount || 0), 0),
-                    // New fields from CRM Leads
-                    atendimento: spLeads.filter(l => l.status === 'ATENDIMENTO').length,
-                    orcamento: spLeads.filter(l => l.status === 'ORCAMENTO').length,
-                    proposta: spLeads.filter(l => l.status === 'PROPOSTA_ENVIADA').length,
-                    aberto: spLeads.filter(l => l.status === 'PEDIDO_ABERTO').length,
-                    entregue: spLeads.filter(l => l.status === 'PEDIDO_ENTREGUE').length
-                };
-
-                return acc;
-            }, {});
-
-            setStats(Object.values(grouped));
-        } catch (error: any) {
-            console.error(error);
-            toast.error('Erro ao carregar dados do CRM.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const fetchTransferRequests = async () => {
-        try {
-            setLoadingTransfers(true);
-            
-            // Fetch Client Transfers
-            let clientQuery = supabase.from('client_transfer_requests').select('*, client:partners(name)');
-            
-            // If seller, filter by their participation
-            if (isSeller && userSalesperson) {
-                clientQuery = clientQuery.or(`requesting_salesperson.eq.${userSalesperson},current_salesperson.eq.${userSalesperson}`);
-            }
-
-            const { data: clients, error: clientError } = await clientQuery.order('created_at', { ascending: false });
-
-            if (clientError) throw clientError;
-
-            // Fetch Order Transfers
-            let orderQuery = supabase.from('seller_transfer_requests').select('*');
-
-            if (isSeller && userSalesperson) {
-                orderQuery = orderQuery.or(`requested_salesperson.eq.${userSalesperson},current_salesperson.eq.${userSalesperson}`);
-            }
-
-            const { data: orders, error: orderError } = await orderQuery.order('created_at', { ascending: false });
-
-            if (orderError) throw orderError;
-
-            const unified: TransferRequest[] = [
-                ...(clients || []).map(c => ({ ...c, type: 'CLIENT' as const })),
-                ...(orders || []).map(o => ({ 
-                    ...o, 
-                    type: 'ORDER' as const,
-                    requesting_salesperson: o.current_salesperson, // In order transfer, the requester is the current seller
-                    requested_salesperson: o.requested_salesperson,
-                    status: o.status === 'PENDENTE' ? 'PENDING' : o.status === 'APROVADO' ? 'APPROVED' : 'REJECTED'
-                }))
-            ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-            setTransferRequests(unified);
-            setPendingTransferCount(unified.filter(r => r.status === 'PENDING').length);
-        } catch (error: any) {
-            console.error('Erro ao buscar solicitações:', error);
-            toast.error('Erro ao carregar transferências');
-        } finally {
-            setLoadingTransfers(false);
-        }
-    };
-
-    const handleRequestTransfer = async () => {
-        if (!selectedClientToTransfer) return;
-        try {
-            const { error } = await supabase
-                .from('client_transfer_requests')
-                .insert({
-                    client_id: selectedClientToTransfer.id,
-                    requesting_salesperson: appUser?.salesperson || 'ADMIN',
-                    current_salesperson: selectedClientToTransfer.salesperson,
-                    reason: transferReason,
-                    status: 'PENDING',
-                    requested_by_email: appUser?.email
-                });
-
-            if (error) throw error;
-
-            // Notify Management
-            await supabase.from('notifications').insert({
-                user_email: 'cristalbrindes@cristalbrindes.com.br',
-                title: `🔄 Troca de Carteira - ${selectedClientToTransfer.name}`,
-                message: `${appUser?.salesperson || 'ADMIN'} solicita o cliente do vendedor ${selectedClientToTransfer.salesperson}. Motivo: ${transferReason}`,
-                type: 'info',
-                read: false,
-                link: `/crm?tab=TRANSFERENCIAS`
-            });
-
-            toast.success('Solicitação enviada com sucesso!');
-            setIsTransferModalOpen(false);
-            setTransferReason('');
-            setSelectedClientToTransfer(null);
-            fetchTransferRequests();
-        } catch (error: any) {
-            toast.error('Erro ao enviar solicitação.');
-            console.error(error);
-        }
-    };
-
-    const handleApproveTransfer = async (request: TransferRequest) => {
-        try {
-            if (request.type === 'CLIENT') {
-                // 1. Update Client (Partner)
-                const { error: clientError } = await supabase
-                    .from('partners')
-                    .update({ salesperson: request.requesting_salesperson })
-                    .eq('id', request.client_id);
-
-                if (clientError) throw clientError;
-
-                // 2. Update Request Status
-                const { error: requestError } = await supabase
-                    .from('client_transfer_requests')
-                    .update({ status: 'APPROVED' })
-                    .eq('id', request.id);
-
-                if (requestError) throw requestError;
-            } else {
-                // 1. Update Order
-                const { error: orderError } = await supabase
-                    .from('orders')
-                    .update({ salesperson: request.requested_salesperson })
-                    .eq('id', request.order_id);
-
-                if (orderError) throw orderError;
-
-                // 2. Log in Order Change Logs
-                await supabase.from('order_change_logs').insert({
-                    order_id: request.order_id,
-                    user_email: appUser?.email || 'SISTEMA',
-                    field_name: 'vendedor',
-                    old_value: request.current_salesperson,
-                    new_value: request.requested_salesperson,
-                    description: `Troca de vendedor aprovada pela gerência. Motivo: ${request.reason}`
-                });
-
-                // 3. Update Request Status
-                const { error: requestError } = await supabase
-                    .from('seller_transfer_requests')
-                    .update({ status: 'APROVADO' })
-                    .eq('id', request.id);
-
-                if (requestError) throw requestError;
-            }
-
-            toast.success('Transferência aprovada com sucesso!');
-
-            // Notify Requester
-            if (request.requested_by_email) {
-                await supabase.from('notifications').insert({
-                    user_email: request.requested_by_email,
-                    title: `✅ Troca Aprovada`,
-                    message: `Sua solicitação de troca para ${request.type === 'CLIENT' ? request.client?.name : 'Pedido #' + request.order_number} foi aprovada.`,
-                    type: 'success',
-                    read: false,
-                    link: request.type === 'CLIENT' ? '/clientes' : `/pedido/${request.order_id}`
-                });
-            }
-
-            fetchTransferRequests();
-        } catch (error: any) {
-            toast.error('Erro ao aprovar transferência.');
-            console.error(error);
-        }
-    };
-
-    const handleRejectTransfer = async (request: TransferRequest) => {
-        try {
-            if (request.type === 'CLIENT') {
-                const { error } = await supabase
-                    .from('client_transfer_requests')
-                    .update({ status: 'REJECTED' })
-                    .eq('id', request.id);
-                if (error) throw error;
-            } else {
-                const { error } = await supabase
-                    .from('seller_transfer_requests')
-                    .update({ status: 'REJEITADO' })
-                    .eq('id', request.id);
-                if (error) throw error;
-            }
-
-            toast.success('Solicitação rejeitada.');
-
-            // Notify Requester
-            if (request.requested_by_email) {
-                await supabase.from('notifications').insert({
-                    user_email: request.requested_by_email,
-                    title: `❌ Troca Rejeitada`,
-                    message: `Sua solicitação de troca para ${request.type === 'CLIENT' ? request.client?.name : 'Pedido #' + request.order_number} foi rejeitada pela gerência.`,
-                    type: 'danger',
-                    read: false
-                });
-            }
-
-            fetchTransferRequests();
-        } catch (error: any) {
-            toast.error('Erro ao rejeitar solicitação.');
-            console.error(error);
-        }
-    };
-
-    const fetchFinancialData = async () => {
-        try {
-            setLoading(true);
-            const startStr = new Date(year, month - 1, 1).toISOString();
-            const endStr = new Date(year, month, 0).toISOString();
-
-            let orderQuery = supabase
-                .from('orders')
-                .select(`
-                    id, status, total_amount, salesperson,
-                    order_items ( product_name, quantity, unit_price, total_item_value, extra_pct, customization_cost, supplier_transport_cost, client_transport_cost, extra_expense )
-                `)
-                .gte('order_date', startStr)
-                .lte('order_date', endStr);
-
-            if (selectedSalesperson !== 'Todos') {
-                orderQuery = orderQuery.eq('salesperson', selectedSalesperson);
-            }
-
-            const { data: orders } = await orderQuery;
-
-            // Fetch Fixed Expenses
-            let expensesTotal = 0;
-            if (selectedSalesperson === 'Todos') {
-                const { data: expenses } = await supabase
-                    .from('company_expenses')
-                    .select('amount')
-                    .gte('due_date', startStr)
-                    .lte('due_date', endStr);
-                if (expenses) expensesTotal = expenses.reduce((acc, curr) => acc + (curr.amount || 0), 0);
-            }
-
-            // Fetch Commissions
-            let commQuery = supabase.from('commissions').select('amount').gte('created_at', startStr).lte('created_at', endStr);
-            if (selectedSalesperson !== 'Todos') commQuery = commQuery.eq('salesperson', selectedSalesperson);
-            const { data: comms } = await commQuery;
-            const totalCommissions = (comms || []).reduce((acc, curr) => acc + (curr.amount || 0), 0);
-
-            // Logic for Stats
-            let totalSales = 0;
-            let totalCostEst = 0;
-            let totalExtra = 0;
-            const productMap: any = {};
-            const statusMap: any = {};
-
-            (orders || []).forEach(o => {
-                totalSales += o.total_amount || 0;
-                statusMap[o.status] = (statusMap[o.status] || 0) + (o.total_amount || 0);
-
-                o.order_items?.forEach((item: any) => {
-                    const estItemCost = (item.quantity * (item.unit_price || 0)) + (item.customization_cost || 0) + (item.supplier_transport_cost || 0) + (item.client_transport_cost || 0) + (item.extra_expense || 0);
-                    totalCostEst += estItemCost;
-                    totalExtra += (item.total_item_value || 0) * ((item.extra_pct || 0) / 100);
-                    productMap[item.product_name || 'N/A'] = (productMap[item.product_name || 'N/A'] || 0) + (item.quantity * (item.unit_price || 0));
-                });
-            });
-
-            setFinStats({
-                totalSales,
-                totalNet: totalSales - totalCostEst - totalCommissions - expensesTotal,
-                totalCommissions,
-                totalFixedExpenses: expensesTotal,
-                totalExtra,
-                orderCount: orders?.length || 0,
-                ticketMedio: totalSales / (orders?.length || 1),
-                topProducts: Object.entries(productMap).map(([name, total]) => ({ name, total })).sort((a: any, b: any) => b.total - a.total).slice(0, 5),
-                salesByStatus: Object.entries(statusMap).map(([status, total]) => ({ status, total })).sort((a: any, b: any) => b.total - a.total)
-            });
-        } catch (e: any) {
-            toast.error('Erro ao carregar dados financeiros');
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const leadColumns = Object.entries(CRM_STATUS_CONFIG)
-        .filter(([id]) => !['FINALIZADO', 'NAO_APROVADO'].includes(id)) // Keep only active columns in Kanban
+        .filter(([id]) => !['PEDIDO_ABERTO', 'NAO_APROVADO'].includes(id)) // Keep only 'in progress' columns
         .map(([id, cfg]) => ({
             id,
             title: cfg.label,
-            color: cfg.colorClass.includes('slate') ? '#475569' : 
-                   cfg.colorClass.includes('amber') ? '#b45309' :
-                   cfg.colorClass.includes('sky') ? '#0369a1' :
-                   cfg.colorClass.includes('emerald') ? '#047857' :
-                   cfg.colorClass.includes('rose') ? '#be123c' : '#6b7280',
             icon: cfg.icon
         }));
 
@@ -1017,13 +863,6 @@ const ManagementPage: React.FC = () => {
         if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
         return name.substring(0, 2).toUpperCase();
     };
-
-    const [compactMode, setCompactMode] = useState(true);
-    const [isFullscreen, setIsFullscreen] = useState(false);
-
-    // Checklist State
-    const [checklistItems, setChecklistItems] = useState<{ id: string; text: string; completed: boolean }[]>([]);
-    const [newItemText, setNewItemText] = useState('');
 
     return (
         <div className="max-w-[1920px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -1076,597 +915,97 @@ const ManagementPage: React.FC = () => {
                             ) : null}
                         </div>
                     )}
-                    {/* Exibe o seletor de abas apenas se o usuário tiver acesso a mais do que "LEADS" */}
-                    <div className="flex items-center gap-1 bg-transparent">
-                            <button
-                                onClick={() => setActiveTab('LEADS')}
-                                className={`px-4 py-2 rounded-lg text-[11px] font-black uppercase transition-all flex items-center gap-2 ${activeTab === 'LEADS' ? 'bg-[#1565C0] text-white' : 'bg-transparent text-gray-500 hover:text-[#1565C0] hover:underline decoration-2 underline-offset-4'}`}
-                            >
-                                <span className="material-icons-outlined text-sm">view_kanban</span>
-                                Atendimentos
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('RECORDS')}
-                                className={`px-4 py-2 rounded-lg text-[11px] font-black uppercase transition-all flex items-center gap-2 ${activeTab === 'RECORDS' ? 'bg-[#1565C0] text-white' : 'bg-transparent text-gray-500 hover:text-[#1565C0] hover:underline decoration-2 underline-offset-4'}`}
-                            >
-                                <span className="material-icons-outlined text-sm">table_view</span>
-                                Planilha
-                            </button>
-                            {hasPermission('crm.performance') && (
-                                <button
-                                    onClick={() => setActiveTab('PERFORMANCE')}
-                                    className={`px-4 py-2 rounded-lg text-[11px] font-black uppercase transition-all flex items-center gap-2 ${activeTab === 'PERFORMANCE' ? 'bg-[#1565C0] text-white' : 'bg-transparent text-gray-500 hover:text-[#1565C0] hover:underline decoration-2 underline-offset-4'}`}
-                                >
-                                    <span className="material-icons-outlined text-sm">insert_chart</span>
-                                    Performance
-                                </button>
+                <div className="flex items-center gap-1 bg-transparent">
+                    <button
+                        onClick={() => {
+                            setEditingLead(null);
+                            setNewLead({ ...initialLeadState, salesperson: isSeller ? appUser?.salesperson : 'VENDAS 01' });
+                            setIsLeadModalOpen(true);
+                        }}
+                        className="px-4 py-2 bg-[#1565C0] text-white rounded-lg text-[11px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-blue-700 hover:shadow-blue-500/40 transition-all flex items-center gap-2"
+                    >
+                        <span className="material-icons-outlined text-sm">add_circle</span>
+                        Novo Atendimento
+                    </button>
+                    {(!isSeller || hasPermission('crm.performance')) && (
+                        <button
+                            onClick={() => setActiveTab('TRANSFERENCIAS')}
+                            className={`px-4 py-2 rounded-lg text-[11px] font-black uppercase transition-all flex items-center gap-2 ${activeTab === 'TRANSFERENCIAS' ? 'bg-[#1565C0] text-white' : 'bg-transparent text-gray-500 hover:text-[#1565C0] hover:underline decoration-2 underline-offset-4'}`}
+                        >
+                            <span className="material-icons-outlined text-sm">swap_horiz</span>
+                            Trocas
+                            {pendingTransferCount > 0 && (
+                                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-pulse">
+                                    {pendingTransferCount}
+                                </span>
                             )}
-                            {hasPermission('crm.financeiro') && (
-                                <button
-                                    onClick={() => setActiveTab('FINANCEIRO')}
-                                    className={`px-4 py-2 rounded-lg text-[11px] font-black uppercase transition-all flex items-center gap-2 ${activeTab === 'FINANCEIRO' ? 'bg-[#1565C0] text-white' : 'bg-transparent text-gray-500 hover:text-[#1565C0] hover:underline decoration-2 underline-offset-4'}`}
-                                >
-                                    <span className="material-icons-outlined text-sm">payments</span>
-                                    Financeiro
-                                </button>
-                            )}
-                            {hasPermission('crm.performance') && (
-                                <button
-                                    onClick={() => setActiveTab('ANALYTICS')}
-                                    className={`px-4 py-2 rounded-lg text-[11px] font-black uppercase transition-all flex items-center gap-2 ${activeTab === 'ANALYTICS' ? 'bg-[#1565C0] text-white' : 'bg-transparent text-gray-500 hover:text-[#1565C0] hover:underline decoration-2 underline-offset-4'}`}
-                                 >
-                                    <span className="material-icons-outlined text-sm">insights</span>
-                                    Análise
-                                </button>
-                            )}
-                            <button
-                                onClick={() => setActiveTab('TRANSFERENCIAS')}
-                                className={`px-4 py-2 rounded-lg text-[11px] font-black uppercase transition-all flex items-center gap-2 ${activeTab === 'TRANSFERENCIAS' ? 'bg-[#1565C0] text-white' : 'bg-transparent text-gray-500 hover:text-[#1565C0] hover:underline decoration-2 underline-offset-4'}`}
-                            >
-                                <span className="material-icons-outlined text-sm">swap_horiz</span>
-                                Trocas
-                                {pendingTransferCount > 0 && (
-                                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-pulse">
-                                        {pendingTransferCount}
-                                    </span>
-                                )}
-                            </button>
-                        </div>
+                        </button>
+                    )}
+                    <button
+                        onClick={() => setActiveTab('RECORDS')}
+                        className={`px-4 py-2 rounded-lg text-[11px] font-black uppercase transition-all flex items-center gap-2 ${activeTab === 'RECORDS' ? 'bg-[#1565C0] text-white' : 'bg-transparent text-gray-400 hover:text-[#1565C0] hover:underline decoration-2 underline-offset-4'}`}
+                    >
+                        <span className="material-icons-outlined text-sm">table_view</span>
+                        Planilha
+                    </button>
                 </div>
             </div>
-
-            {activeTab === 'LEADS' && (
-                <>
-                    {/* Board Summary */}
-                    <div className="flex flex-wrap items-center justify-between mb-4 bg-gray-50/80 p-3 rounded-lg border border-gray-200 shadow-sm gap-4">
-                        {(() => {
-                            const proposalsWaiting = leads.filter(l => l.status === 'PROPOSTA_ENVIADA').length;
-                            const openOrders = leads.filter(l => l.status === 'PEDIDO_ABERTO').length;
-                            const delayedLeads = leads.filter(l => {
-                                if (['FINALIZADO', 'NAO_APROVADO'].includes(l.status)) return false;
-                                const diff = new Date().getTime() - new Date(l.updated_at || l.created_at).getTime();
-                                return Math.floor(diff / 86400000) > 15;
-                            }).length;
-                            return (
-                                <>
-                                    <div className="flex gap-4 divide-x divide-gray-300 w-full md:w-auto">
-                                        <div className="px-3">
-                                            <span className="text-[10px] uppercase font-bold text-gray-500 block">Propostas aguardando</span>
-                                            <span className="text-lg font-black text-gray-800">{proposalsWaiting}</span>
-                                        </div>
-                                        <div className="px-3">
-                                            <span className="text-[10px] uppercase font-bold text-gray-500 block">Pedidos abertos</span>
-                                            <span className="text-lg font-black text-blue-600">{openOrders}</span>
-                                        </div>
-                                        <div className="px-3 cursor-pointer group" onClick={() => {/* Filtro futuros */}}>
-                                            <span className="text-[10px] uppercase font-bold text-gray-500 block">Atrasados</span>
-                                            <span className={`text-lg font-black flex items-center gap-1 ${delayedLeads > 0 ? 'text-red-500' : 'text-gray-800'}`}>
-                                                {delayedLeads > 0 ? `${delayedLeads} 🔴` : '0'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </>
-                            );
-                        })()}
-                    </div>
-
-                    {/* Action and Filter Bar */}
-                    <div className="flex flex-wrap items-center gap-3 mb-6 bg-white p-2 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100">
-                        <div className="relative flex-1 min-w-[320px]">
-                            <span className="material-icons-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">search</span>
-                            <input 
-                                ref={searchInputRef}
-                                type="text"
-                                placeholder="Buscar cliente, empresa ou responsável... (Ctrl+K)"
-                                className="w-full pl-10 pr-4 py-2 bg-gray-50/50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all placeholder:text-gray-400 font-medium"
-                                value={searchTerm}
-                                onChange={e => setSearchTerm(e.target.value)}
-                            />
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <select 
-                                className="bg-gray-50/50 border border-gray-200 text-sm font-medium text-gray-600 py-2 px-3 rounded-lg outline-none cursor-pointer focus:ring-2 focus:ring-blue-500 hover:bg-gray-50"
-                                value={kanbanSellerFilter}
-                                onChange={e => setKanbanSellerFilter(e.target.value)}
-                            >
-                                <option value="Todos">Vendedor: Todos</option>
-                                {Array.from(new Set(leads.map(l => l.salesperson || 'N/A'))).sort().map(s => (
-                                    <option key={s} value={s}>{s}</option>
-                                ))}
-                            </select>
-                            
-                            <select
-                                className="bg-gray-50/50 border border-gray-200 text-sm font-medium text-gray-600 py-2 px-3 rounded-lg outline-none cursor-pointer focus:ring-2 focus:ring-blue-500 hover:bg-gray-50"
-                                value={kanbanPeriodFilter}
-                                onChange={e => setKanbanPeriodFilter(e.target.value)}
-                            >
-                                <option value="Todos">Período: Todos</option>
-                                <option value="Hoje">Hoje</option>
-                                <option value="7d">Últimos 7 dias</option>
-                                <option value="30d">Últimos 30 dias</option>
-                            </select>
-                        </div>
-                        <div className="ml-auto w-px h-8 bg-gray-200 mx-2 hidden md:block"></div>
-                        <div className="ml-auto md:ml-0 flex gap-2">
-                            <button onClick={() => setIsFullscreen(!isFullscreen)} className="px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg font-bold uppercase text-[10px] hover:bg-gray-50 flex items-center gap-2 transition-all">
-                                <span className="material-icons-outlined text-sm">{isFullscreen ? 'fullscreen_exit' : 'open_in_full'}</span>
-                                <span className="hidden md:inline">{isFullscreen ? 'Sair Ampliado' : 'Ampliar CRM'}</span>
-                            </button>
-                            <button onClick={() => {
-                                setNewLead({ ...initialLeadState, salesperson: isSeller ? appUser?.salesperson : 'VENDAS 01' });
-                                setEditingLead(null);
-                                setShowClientForm(false);
-                                setPartnerSaved(false);
-                                setIsLeadModalOpen(true);
-                            }} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold uppercase text-[10px] hover:bg-blue-700 shadow flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-95">
-                                <span className="material-icons-outlined text-sm">add</span> Novo Atendimento
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className={isFullscreen ? "fixed inset-0 z-50 bg-gray-100 overflow-hidden flex flex-col" : ""}>
-                        {isFullscreen && (
-                            <div className="flex items-center justify-between p-4 bg-white border-b border-gray-200 shadow-sm">
-                                <div className="flex items-center gap-2">
-                                    <span className="material-icons-outlined text-blue-600 text-2xl">view_kanban</span>
-                                    <h2 className="text-lg font-black text-gray-900 uppercase tracking-tighter">CRM & Vendas — Modo Ampliado</h2>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button onClick={() => {
-                                        setNewLead({ ...initialLeadState, salesperson: isSeller ? appUser?.salesperson : 'VENDAS 01' });
-                                        setEditingLead(null);
-                                        setShowClientForm(false);
-                                        setPartnerSaved(false);
-                                        setIsLeadModalOpen(true);
-                                    }} className="px-4 py-2 bg-blue-600 text-white rounded font-bold uppercase text-[10px] hover:bg-blue-700 shadow-sm flex items-center gap-2 transition-all">
-                                        <span className="material-icons-outlined text-sm">add</span> Novo Atendimento
-                                    </button>
-                                    <button onClick={() => setIsFullscreen(false)} className="px-3 py-2 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition-all ml-2" title="Sair da Tela Cheia">
-                                        <span className="material-icons-outlined text-sm">close</span>
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    <div
-                        ref={scrollContainerRef}
-                        className={`flex gap-4 cursor-grab active:cursor-grabbing select-none [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[::-webkit-scrollbar-thumb]:bg-gray-400 ${isFullscreen ? 'p-6 flex-1 overflow-x-auto overflow-y-hidden items-stretch' : 'overflow-x-auto pb-4 items-start'}`}
-                        onMouseDown={(e) => {
-                            if (!scrollContainerRef.current) return;
-                            setIsDraggingScroll(true);
-                            setStartX(e.pageX - scrollContainerRef.current.offsetLeft);
-                            setScrollLeft(scrollContainerRef.current.scrollLeft);
-                        }}
-                        onMouseLeave={() => {
-                            setIsDraggingScroll(false);
-                        }}
-                        onMouseUp={() => {
-                            setIsDraggingScroll(false);
-                        }}
-                        onMouseMove={(e) => {
-                            if (!isDraggingScroll || !scrollContainerRef.current) return;
-                            e.preventDefault();
-                            const x = e.pageX - scrollContainerRef.current.offsetLeft;
-                            const walk = (x - startX) * 2; // Scroll-fast
-                            scrollContainerRef.current.scrollLeft = scrollLeft - walk;
-                        }}
-                    >
-                        {leadColumns.map(col => {
-                            const colLeads = leads.filter(l => l.status === col.id)
-                                .filter(l => kanbanSellerFilter === 'Todos' || l.salesperson === kanbanSellerFilter)
-                                .filter(l => {
-                                    if (kanbanPeriodFilter === 'Todos') return true;
-                                    const diff = new Date().getTime() - new Date(l.created_at).getTime();
-                                    const days = Math.floor(diff / 86400000);
-                                    if (kanbanPeriodFilter === 'Hoje') return days === 0;
-                                    if (kanbanPeriodFilter === '7d') return days <= 7;
-                                    if (kanbanPeriodFilter === '30d') return days <= 30;
-                                    return true;
-                                })
-                                .filter(l => {
-                                    if (!searchTerm) return true;
-                                    const term = searchTerm.toLowerCase();
-                                    return l.client_name.toLowerCase().includes(term) || (l.client_contact_name && l.client_contact_name.toLowerCase().includes(term)) || (l.client_phone && l.client_phone.includes(term)) || (l.salesperson && l.salesperson.toLowerCase().includes(term));
-                                });
-
-                            const totalVal = colLeads.reduce((s, l) => s + (l.estimated_value || 0), 0);
-                            const isCollapsed = collapsedCols[col.id];
-
-                            return (
-                                <div
-                                    key={col.id}
-                                    className={`flex-shrink-0 flex flex-col transition-all rounded-lg border border-slate-200 border-t-2 bg-slate-50/30 ${dragOverColumn === col.id ? 'ring-2 ring-slate-400' : ''} ${isFullscreen ? 'h-full max-h-none overflow-hidden' : 'h-max'} ${isCollapsed ? 'min-w-[60px] w-[60px]' : 'min-w-[280px] md:min-w-[320px] w-[320px]'}`}
-                                    style={{ borderTopColor: col.color }}
-                                    onDragOver={handleDragOver}
-                                    onDragEnter={(e) => handleDragEnter(e, col.id)}
-                                    onDragLeave={handleDragLeave}
-                                    onDrop={(e) => handleDrop(e, col.id)}
-                                >
-                                    <div 
-                                        className={`p-3 flex justify-between items-start cursor-pointer hover:bg-slate-100 transition-colors rounded-t-md border-b border-slate-200 bg-white ${isCollapsed ? 'flex-col items-center py-6 h-full' : ''}`}
-                                        onClick={() => setCollapsedCols(prev => ({ ...prev, [col.id]: !prev[col.id] }))}
-                                    >
-                                        {isCollapsed ? (
-                                            <>
-                                                <span className="material-icons-outlined mb-2" style={{ color: col.color }}>{col.icon}</span>
-                                                <span className="text-[10px] font-bold px-2 py-1 rounded-full text-white" style={{ backgroundColor: col.color }}>{colLeads.length}</span>
-                                                <div className="rotate-180 text-[10px] font-black tracking-widest uppercase mt-4" style={{ color: col.color, writingMode: 'vertical-rl' }}>{col.title}</div>
-                                            </>
-                                        ) : (
-                                            <div className="w-full">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="material-icons-outlined text-sm" style={{ color: col.color }}>{col.icon}</span>
-                                                        <span className="text-xs font-bold uppercase tracking-tight text-slate-700">{col.title}</span>
-                                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded text-white shadow-sm" style={{ backgroundColor: col.color }}>
-                                                            {colLeads.length}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                {totalVal > 0 && (
-                                                    <p className="text-[11px] font-bold text-gray-500 mt-1">{formatCurrency(totalVal)} em aberto</p>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {!isCollapsed && (
-                                    <div className={`px-3 flex-1 space-y-3 py-3 ${isFullscreen ? 'overflow-y-auto' : ''}`}>
-                                        {colLeads.map(lead => {
-                                            const diffToNow = new Date().getTime() - new Date(lead.updated_at || lead.created_at).getTime();
-                                            const stoppedDays = Math.floor(diffToNow / 86400000);
-                                            
-                                            // Indicador de tempo parado
-                                            let timeColor = 'text-green-600';
-                                            let timeBg = 'bg-green-50';
-                                            let timeDot = 'bg-green-500';
-                                            if (stoppedDays >= 15) { timeColor = 'text-red-600'; timeBg = 'bg-red-50'; timeDot = 'bg-red-500'; }
-                                            else if (stoppedDays >= 7) { timeColor = 'text-yellow-600'; timeBg = 'bg-yellow-50'; timeDot = 'bg-yellow-500'; }
-
-                                            return (
-                                                <div
-                                                    key={lead.id}
-                                                    draggable
-                                                    onDragStart={(e) => handleDragStart(e, lead)}
-                                                    onDragEnd={handleDragEnd}
-                                                    className={`bg-white rounded border-l-[3px] border-r border-t border-b border-slate-200 hover:border-r-slate-300 hover:border-t-slate-300 hover:border-b-slate-300 hover:shadow-md hover:-translate-y-[1px] transition-all group relative cursor-grab active:cursor-grabbing p-3 flex flex-col min-h-[90px] ${searchTerm && lead.id === globalSearchTerm ? 'ring-2 ring-slate-400' : ''}`}
-                                                    style={{ borderLeftColor: col.color }}
-                                                    onClick={() => {
-                                                        setEditingLead(lead);
-                                                        setNewLead(lead);
-                                                        setPartnerSaved(true);
-                                                        setIsLeadModalOpen(true);
-                                                    }}
-                                                >
-                                                    <div className="flex justify-between items-center mb-1.5">
-                                                        <span className={`px-1.5 py-[2px] rounded text-[9px] font-bold uppercase tracking-wider ${lead.priority === 'ALTA' || lead.priority === 'URGENTE' ? 'bg-red-50 text-red-600' : lead.priority === 'VIP' ? 'bg-amber-50 text-amber-600' : 'bg-slate-50 text-slate-500'}`}>
-                                                            {lead.priority || 'NORMAL'}
-                                                        </span>
-                                                        <div className="flex items-center text-gray-400 text-[9px] font-bold">
-                                                            <span className="material-icons-outlined text-[10px] mr-1">calendar_today</span>
-                                                            {formatDate(lead.created_at)}
-                                                        </div>
-                                                    </div>
-
-                                                    <h4 className="font-bold text-gray-900 text-[14px] leading-tight line-clamp-2 mt-1" title={fixClientName(lead.client_name)}>{fixClientName(lead.client_name)}</h4>
-                                                    {lead.closing_metadata?.quoted_item && (
-                                                        <div className="flex items-center gap-1 mt-1">
-                                                            <span className="material-icons-outlined text-[12px] text-blue-500">inventory_2</span>
-                                                            <span className="text-[11px] font-bold text-blue-700 uppercase tracking-tighter truncate">{lead.closing_metadata.quoted_item}</span>
-                                                        </div>
-                                                    )}
-                                                    <p className="text-[12px] text-gray-500 font-medium line-clamp-1 mt-0.5">{lead.client_contact_name || lead.client_phone}</p>
-
-                                                    {lead.estimated_value ? (
-                                                        <p className="text-[11px] font-black text-green-700 mt-1">{formatCurrency(lead.estimated_value)}</p>
-                                                    ) : null}
-
-                                                    <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-50">
-                                                        <div className="flex items-center gap-2">
-                                                            {lead.salesperson && (
-                                                                <div className="flex items-center justify-center px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-black text-[9px] border border-gray-200" title={lead.salesperson}>
-                                                                    {getSalespersonInitials(lead.salesperson)}
-                                                                </div>
-                                                            )}
-                                                            <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${timeBg} ${timeColor} text-[9px] font-bold`}>
-                                                                 <span className="material-icons-outlined text-[10px]">schedule</span>
-                                                                 {stoppedDays}d parado
-                                                                 {stoppedDays >= 15 && <span className={`w-1 h-1 rounded-full ${timeDot} animate-pulse ml-0.5`}></span>}
-                                                             </div>
-                                                             {lead.follow_up_done && (
-                                                                 <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 text-[9px] font-black uppercase ring-1 ring-blue-100">
-                                                                     <span className="material-icons-outlined text-[10px]">done_all</span>
-                                                                     Acompanhamento OK
-                                                                 </div>
-                                                             )}
-                                                         </div>
-                                                         <div className="flex items-center gap-1">
-                                                             <button
-                                                                 onClick={(e) => { e.stopPropagation(); toggleFollowUp(lead); }}
-                                                                 className={`h-6 w-6 flex items-center justify-center rounded-full transition-all shadow-sm border ${lead.follow_up_done ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-blue-500 hover:text-white hover:border-blue-500 opacity-60 group-hover:opacity-100'}`}
-                                                                 title={lead.follow_up_done ? "Desmarcar acompanhamento" : "Marcar acompanhamento feito"}
-                                                             >
-                                                                 <span className="material-icons-outlined text-[12px]">{lead.follow_up_done ? 'check' : 'notifications_active'}</span>
-                                                             </button>
-                                                             <button
-                                                                 onClick={(e) => handleAttendLead(e, lead.id)}
-                                                                 className="h-6 w-6 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:bg-blue-500 hover:text-white transition-all shadow-sm border border-gray-200 hover:border-blue-500 opacity-60 group-hover:opacity-100"
-                                                                 title="Marcar como atualizado"
-                                                             >
-                                                                 <span className="material-icons-outlined text-[12px]">refresh</span>
-                                                             </button>
-                                                         </div>
-                                                     </div>
-                                                    
-                                                    {/* Hover Quick Actions */}
-                                                    <div className="absolute inset-x-0 bottom-0 h-[46px] opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-around bg-white/95 backdrop-blur shadow-[0_-10px_20px_rgba(0,0,0,0.05)] border-t border-gray-100 rounded-b-xl z-20">
-                                                        <button onClick={(e) => { e.stopPropagation(); navigate('/pedidos', { state: { clientName: lead.client_name } }); }} className="p-1 hover:bg-blue-50 rounded text-blue-600 transition-all"><span className="material-icons-outlined text-lg">shopping_bag</span></button>
-                                                        <button 
-                                                            onClick={async (e) => { 
-                                                                e.stopPropagation();  
-                                                                let clientId = ''; 
-                                                                const conditions = []; 
-                                                                if (lead.client_doc) conditions.push(`doc.eq."${lead.client_doc.replace(/"/g, '""')}"`); 
-                                                                if (lead.client_email) conditions.push(`email.eq."${lead.client_email.replace(/"/g, '""')}"`); 
-                                                                if (lead.client_phone) {
-                                                                    const cleanPhone = lead.client_phone.replace(/\D/g, '');
-                                                                    if (cleanPhone) conditions.push(`phone.ilike."%${cleanPhone}%"`);
-                                                                }
-                                                                const safeClientName = lead.client_name?.trim().replace(/"/g, '""'); 
-                                                                if (safeClientName) conditions.push(`name.ilike."%${safeClientName}%"`); 
-                                                                
-                                                                if (conditions.length > 0) {
-                                                                    const { data } = await supabase.from('partners').select('id').or(conditions.join(',')).eq('type', 'CLIENTE').limit(1); 
-                                                                    if (data && data.length > 0) clientId = data[0].id; 
-                                                                }
-                                                                navigate('/orcamentos', { state: { clientName: lead.client_name, clientId: clientId } }); 
-                                                            }} 
-                                                            className="p-1 hover:bg-emerald-50 rounded text-emerald-600 transition-all"
-                                                        >
-                                                            <span className="material-icons-outlined text-lg">request_quote</span>
-                                                        </button>
-                                                        <button onClick={(e) => { e.stopPropagation(); convertToBudget(lead); }} className="p-1 hover:bg-purple-50 rounded text-purple-600 transition-all"><span className="material-icons-outlined text-lg">add_circle</span></button>
-                                                        <button onClick={(e) => { e.stopPropagation(); setPendingStatusLead(lead); setIsFinalizeModalOpen(true); }} className="p-1 hover:bg-green-50 rounded text-green-600 transition-all"><span className="material-icons-outlined text-lg">check_circle</span></button>
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                    )}
-                                </div>
-                            )
-                        })}
-                    </div>
-                    </div>
-                </>
-            )}
-
-            {
-                 activeTab === 'PERFORMANCE' && (
-                     <PerformanceTab
-                         totalBudgets={totalBudgets}
-                         totalApproved={totalApproved}
-                         totalValue={totalValue}
-                         stats={stats}
-                         recentBudgets={recentBudgets}
-                         formatCurrency={formatCurrency}
-                         leads={leads}
-                     />
-                 )
-             }
- 
-             {
-                 activeTab === 'ANALYTICS' && (
-                     <div className="space-y-6 animate-in fade-in duration-500">
-                         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 overflow-hidden">
-                             <div className="mb-0 flex items-center justify-between">
-                                 <div>
-                                     <h2 className="text-xl font-black text-gray-900 uppercase tracking-tighter flex items-center gap-2">
-                                         <span className="material-icons-outlined text-blue-600">insights</span>
-                                         Análise de Atendimentos Finalizados
-                                     </h2>
-                                     <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Metrificação de motivos de fechamento e perda</p>
-                                 </div>
-                                 <div className="flex items-center gap-2">
-                                     <button onClick={() => fetchLeads()} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Recarregar dados">
-                                         <span className={`material-icons-outlined ${loading ? 'animate-spin' : ''}`}>sync</span>
-                                     </button>
-                                 </div>
-                             </div>
- 
-                             <div className="h-px bg-gray-100 w-full my-6"></div>
- 
-                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                                 <div className="bg-green-50 rounded-2xl p-6 border border-green-100 shadow-sm transition-all hover:shadow-md hover:scale-[1.01]">
-                                     <div className="flex items-center gap-3 mb-2">
-                                         <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center shadow-sm">
-                                             <span className="material-icons-outlined">verified</span>
-                                         </div>
-                                         <span className="text-[10px] font-black text-green-700 uppercase tracking-widest">Sucesso (Vendas)</span>
-                                     </div>
-                                     <p className="text-3xl font-black text-green-800">
-                                         {leads.filter(l => l.status === 'FINALIZADO' && ['QUALIDADE', 'PREÇO', 'ATENDIMENTO', 'PRAZO', 'FIDELIDADE'].includes(l.finish_reason_category || '')).length}
-                                     </p>
-                                     <p className="text-[10px] text-green-600 font-bold uppercase mt-1">Total de pedidos fechados</p>
-                                 </div>
- 
-                                 <div className="bg-red-50 rounded-2xl p-6 border border-red-100 shadow-sm transition-all hover:shadow-md hover:scale-[1.01]">
-                                     <div className="flex items-center gap-3 mb-2">
-                                         <div className="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center shadow-sm">
-                                             <span className="material-icons-outlined">cancel</span>
-                                         </div>
-                                         <span className="text-[10px] font-black text-red-700 uppercase tracking-widest">Perdas (Leads)</span>
-                                     </div>
-                                     <p className="text-3xl font-black text-red-800">
-                                         {leads.filter(l => (l.status === 'NAO_APROVADO' || (l.status === 'FINALIZADO' && !['QUALIDADE', 'PREÇO', 'ATENDIMENTO', 'PRAZO', 'FIDELIDADE'].includes(l.finish_reason_category || '')))).length}
-                                     </p>
-                                     <p className="text-[10px] text-red-600 font-bold uppercase mt-1">Total de leads não convertidos</p>
-                                 </div>
- 
-                                 <div className="bg-blue-50 rounded-2xl p-6 border border-blue-100 shadow-sm transition-all hover:shadow-md hover:scale-[1.01]">
-                                     <div className="flex items-center gap-3 mb-2">
-                                         <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shadow-sm">
-                                             <span className="material-icons-outlined">show_chart</span>
-                                         </div>
-                                         <span className="text-[10px] font-black text-blue-700 uppercase tracking-widest">Conversão Global</span>
-                                     </div>
-                                     <p className="text-3xl font-black text-blue-800">
-                                         {(() => {
-                                             const success = leads.filter(l => l.status === 'FINALIZADO' && ['QUALIDADE', 'PREÇO', 'ATENDIMENTO', 'PRAZO', 'FIDELIDADE'].includes(l.finish_reason_category || '')).length;
-                                             const total = leads.filter(l => l.status === 'FINALIZADO' || l.status === 'NAO_APROVADO').length;
-                                             return total > 0 ? ((success / total) * 100).toFixed(1) + '%' : '0%';
-                                         })()}
-                                     </p>
-                                     <p className="text-[10px] text-blue-600 font-bold uppercase mt-1">Taxa de fechamento geral</p>
-                                 </div>
-                             </div>
- 
-                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                                 <div className="space-y-6">
-                                     <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 pb-2 border-b border-gray-50">
-                                         <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)] animate-pulse"></span>
-                                         Fatores de Conversão (Por que ganhamos?)
-                                     </h3>
-                                     <div className="space-y-4">
-                                         {['QUALIDADE', 'PREÇO', 'ATENDIMENTO', 'PRAZO', 'FIDELIDADE', 'OUTRO'].map(reason => {
-                                             const count = leads.filter(l => l.status === 'FINALIZADO' && l.finish_reason_category === reason).length;
-                                             const allPossible = leads.filter(l => l.status === 'FINALIZADO' && ['QUALIDADE', 'PREÇO', 'ATENDIMENTO', 'PRAZO', 'FIDELIDADE', 'OUTRO'].includes(l.finish_reason_category || ''));
-                                             const max = Math.max(...['QUALIDADE', 'PREÇO', 'ATENDIMENTO', 'PRAZO', 'FIDELIDADE', 'OUTRO'].map(r => leads.filter(l => l.status === 'FINALIZADO' && l.finish_reason_category === r).length), 1);
-                                             return (
-                                                 <div key={reason} className="group">
-                                                     <div className="flex justify-between items-center mb-1.5 px-1">
-                                                         <span className="text-xs font-black text-gray-700 uppercase tracking-tight">{reason}</span>
-                                                         <span className="text-[10px] font-black text-green-600 bg-green-50/50 px-2.5 py-1 rounded-full border border-green-200">{count} Atendimentos</span>
-                                                     </div>
-                                                     <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden p-0.5 border border-gray-200 shadow-inner">
-                                                         <div 
-                                                             className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full transition-all duration-1000 group-hover:scale-y-110 shadow-[0_0_12px_rgba(34,197,94,0.3)]"
-                                                             style={{ width: `${(count / max) * 100}%` }}
-                                                         ></div>
-                                                     </div>
-                                                 </div>
-                                             );
-                                         })}
-                                     </div>
-                                 </div>
- 
-                                 <div className="space-y-6">
-                                     <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 pb-2 border-b border-gray-50">
-                                         <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)] animate-pulse"></span>
-                                         Principais Motivos de Perda
-                                     </h3>
-                                     <div className="space-y-4">
-                                         {['PREÇO ALTO', 'PRAZO LONGO', 'CONCORRÊNCIA', 'DESISTIU', 'FALTA ESTOQUE', 'OUTRO'].map(reason => {
-                                             const count = leads.filter(l => (l.status === 'NAO_APROVADO' || l.status === 'FINALIZADO') && l.finish_reason_category === reason).length;
-                                             const max = Math.max(...['PREÇO ALTO', 'PRAZO LONGO', 'CONCORRÊNCIA', 'DESISTIU', 'FALTA ESTOQUE', 'OUTRO'].map(r => leads.filter(l => (l.status === 'NAO_APROVADO' || l.status === 'FINALIZADO') && l.finish_reason_category === r).length), 1);
-                                             return (
-                                                 <div key={reason} className="group">
-                                                     <div className="flex justify-between items-center mb-1.5 px-1">
-                                                         <span className="text-xs font-black text-gray-700 uppercase tracking-tight">{reason}</span>
-                                                         <span className="text-[10px] font-black text-red-600 bg-red-100/50 px-2.5 py-1 rounded-full border border-red-200">{count} Atendimentos</span>
-                                                     </div>
-                                                     <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden p-0.5 border border-gray-200 shadow-inner">
-                                                         <div 
-                                                             className="h-full bg-gradient-to-r from-red-400 to-red-600 rounded-full transition-all duration-1000 group-hover:scale-y-110 shadow-[0_0_12px_rgba(239,68,68,0.3)]"
-                                                             style={{ width: `${(count / max) * 100}%` }}
-                                                         ></div>
-                                                     </div>
-                                                 </div>
-                                             );
-                                         })}
-                                     </div>
-                                 </div>
-                             </div>
- 
-                             <div className="mt-12 pt-8 border-t border-gray-100">
-                                 <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-6">Desempenho de Conversão por Vendedor</h3>
-                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                     {Array.from(new Set(leads.map(l => l.salesperson))).filter(Boolean).map(seller => {
-                                         const sellerLeads = leads.filter(l => l.salesperson === seller);
-                                         const total = sellerLeads.filter(l => l.status === 'FINALIZADO' || l.status === 'NAO_APROVADO').length;
-                                         const success = sellerLeads.filter(l => l.status === 'FINALIZADO' && ['QUALIDADE', 'PREÇO', 'ATENDIMENTO', 'PRAZO', 'FIDELIDADE'].includes(l.finish_reason_category || '')).length;
-                                         return (
-                                             <div key={seller} className="bg-white rounded-2xl p-4 border border-gray-100 hover:shadow-xl transition-all group overflow-hidden relative">
-                                                 <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
-                                                     <span className="material-icons-outlined text-4xl">person</span>
-                                                 </div>
-                                                 <p className="text-[10px] font-black text-gray-400 uppercase mb-2 tracking-tighter">{seller}</p>
-                                                 <div className="flex justify-between items-end">
-                                                     <div>
-                                                         <p className="text-2xl font-black text-gray-900">{total > 0 ? ((success / total) * 100).toFixed(0) + '%' : '0%'}</p>
-                                                         <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Conversão</p>
-                                                     </div>
-                                                     <div className="text-right">
-                                                         <div className="flex items-center gap-1 justify-end">
-                                                             <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                                                             <p className="text-[10px] font-black text-green-700">{success} Ganhos</p>
-                                                         </div>
-                                                         <div className="flex items-center gap-1 justify-end">
-                                                             <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>
-                                                             <p className="text-[10px] font-black text-red-500">{total - success} Perdas</p>
-                                                         </div>
-                                                     </div>
-                                                 </div>
-                                             </div>
-                                         );
-                                     })}
-                                 </div>
-                             </div>
-                         </div>
-                     </div>
-                 )
-             }
-
-            {
-                activeTab === 'FINANCEIRO' && (
-                    <FinanceiroTab
-                        finStats={finStats}
-                        month={month}
-                        year={year}
-                        selectedSalesperson={selectedSalesperson}
-                        setMonth={setMonth}
-                        setYear={setYear}
-                        setSelectedSalesperson={setSelectedSalesperson}
-                        formatCurrency={formatCurrency}
-                    />
-                )
-            }
+        </div>
 
             {/* Records (Planilha) Tab Content */}
-            {
-                activeTab === 'RECORDS' && (
-                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-in fade-in duration-300">
+            {activeTab === 'RECORDS' && (
+                <div className="animate-in fade-in slide-in-from-top-4 duration-500">
+                    {/* Summary Counters */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-4 mb-6">
+                        {((hasPermission('adm') || hasPermission('gestao'))
+                            ? ['VENDAS 01', 'VENDAS 02', 'VENDAS 03', 'VENDAS 04']
+                            : [userSalesperson].filter(Boolean)
+                        ).map((seller) => {
+                            const count = leads.filter(l => l.salesperson === seller && (l.atendimento_status || l.status) === 'ATENDIMENTO').length;
+                            const isActive = kanbanSellerFilter === seller;
+                            return (
+                                <div 
+                                    key={seller} 
+                                    onClick={() => setKanbanSellerFilter(isActive ? 'Todos' : seller)}
+                                    className={`flex-1 min-w-[200px] p-5 rounded-2xl border flex items-center gap-4 transition-all group cursor-pointer ${
+                                        isActive 
+                                        ? 'bg-blue-600 border-blue-700 shadow-lg shadow-blue-200 ring-4 ring-blue-500/10' 
+                                        : 'bg-white border-gray-100 shadow-sm hover:shadow-md hover:border-blue-100'
+                                    }`}
+                                >
+                                    <div className={`h-10 w-10 rounded-full flex items-center justify-center transition-transform group-hover:scale-110 ${
+                                        isActive ? 'bg-white/20 text-white' : 'bg-[#E3F2FD] text-[#0D47A1]'
+                                    }`}>
+                                        <span className="material-icons-outlined text-xl">{isActive ? 'filter_alt' : 'person'}</span>
+                                    </div>
+                                    <div>
+                                        <p className={`text-[10px] uppercase font-black tracking-widest ${isActive ? 'text-blue-100' : 'text-gray-400'}`}>{seller}</p>
+                                        <div className="flex items-baseline gap-1">
+                                            <p className={`text-xl font-black ${isActive ? 'text-white' : 'text-[#0D47A1]'}`}>{count}</p>
+                                            <p className={`text-[11px] font-bold uppercase ${isActive ? 'text-blue-200' : 'text-gray-400'}`}>Em Andamento</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+
                         <div className="p-6 border-b border-gray-100 flex flex-wrap justify-between items-center bg-gray-50/50 gap-4">
-                            <div>
-                                <h2 className="text-lg font-black text-gray-900 uppercase">Planilha de Atendimentos</h2>
-                                <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Histórico completo de atendimentos (Ativos e Finalizados)</p>
+                            <div className="flex items-center gap-4">
+                                <div>
+                                    <h2 className="text-lg font-black text-gray-900 uppercase">Planilha de Atendimentos</h2>
+                                    <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Histórico completo de atendimentos (Ativos e Finalizados)</p>
+                                </div>
                             </div>
                             <div className="flex flex-wrap items-center gap-3">
                                 <div className="relative min-w-[200px]">
-                                    <span className="material-icons-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">search</span>
+                                    <span className="material-icons-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">search</span>
                                     <input 
                                         type="text"
                                         placeholder="Buscar na planilha..."
-                                        className="w-full pl-9 pr-4 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                        className="w-full pl-12 pr-4 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-black text-gray-600 uppercase tracking-tighter outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer hover:border-gray-300 transition-all"
                                         value={searchTerm}
                                         onChange={e => setSearchTerm(e.target.value)}
                                     />
@@ -1695,30 +1034,19 @@ const ManagementPage: React.FC = () => {
                         </div>
 
                         <div className="flex flex-wrap items-center justify-between gap-4 py-4 px-6 bg-slate-50/50 border-b border-gray-100">
-                            <div className="flex flex-wrap items-center gap-4">
-                                <div className="relative">
+                                                    <div className="relative">
                                     <span className="material-icons-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">filter_list</span>
                                     <select 
-                                        className="pl-9 pr-6 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 uppercase tracking-tighter outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer hover:border-gray-300 transition-all"
+                                        className="pl-9 pr-6 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-black text-gray-600 uppercase tracking-tighter outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer hover:border-gray-300 transition-all"
                                         value={kanbanStatusCategoryFilter}
                                         onChange={e => setKanbanStatusCategoryFilter(e.target.value)}
                                     >
                                         <option value="Todos">Status: Todos</option>
-                                        <option value="Ativos">Status: Ativos</option>
-                                        <option value="Finalizados">Status: Finalizados</option>
-                                        <option value="Perdidos">Status: Perdidos</option>
-                                        <optgroup label="Específicos">
-                                            {Object.entries(CRM_STATUS_CONFIG).map(([id, cfg]) => (
-                                                <option key={id} value={id}>{cfg.label}</option>
-                                            ))}
-                                        </optgroup>
+                                        {Object.entries(CRM_STATUS_CONFIG).map(([id, cfg]) => (
+                                            <option key={id} value={id}>{cfg.label}</option>
+                                        ))}
                                     </select>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[10px] uppercase font-black text-gray-400">Total:</span>
-                                    <span className="text-xs font-black text-blue-600">{leads.length} Atendimentos</span>
-                                </div>
-                            </div>
                             <div className="flex items-center gap-2">
                                 <button onClick={() => fetchLeads()} className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="Atualizar dados">
                                     <span className="material-icons-outlined text-sm">refresh</span>
@@ -1730,19 +1058,18 @@ const ManagementPage: React.FC = () => {
                             <table className="min-w-full divide-y divide-gray-200 text-[13px]">
                                 <thead>
                                     <tr className="bg-gray-50/50">
-                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Status / Funil</th>
+                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Atendimento</th>
                                         <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Prioridade</th>
                                         <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Data</th>
                                         <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Cliente / Empresa</th>
                                         <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Item / Projeto</th>
                                         <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Vendedor</th>
-                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Parado</th>
                                         <th className="px-6 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Ações Rápidas</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-100">
                                     {loading ? (
-                                        <tr><td colSpan={9} className="px-6 py-10 text-center text-gray-400 font-bold uppercase text-xs animate-pulse tracking-widest">Carregando dados da nuvem...</td></tr>
+                                        <tr><td colSpan={8} className="px-6 py-10 text-center text-gray-400 font-bold uppercase text-xs animate-pulse tracking-widest">Carregando dados da nuvem...</td></tr>
                                     ) : (leads || [])
                                         .filter(l => kanbanSellerFilter === 'Todos' || l.salesperson === kanbanSellerFilter)
                                         .filter(l => {
@@ -1756,9 +1083,6 @@ const ManagementPage: React.FC = () => {
                                         })
                                         .filter(l => {
                                             if (kanbanStatusCategoryFilter === 'Todos') return true;
-                                            if (kanbanStatusCategoryFilter === 'Ativos') return !['FINALIZADO', 'NAO_APROVADO'].includes(l.status);
-                                            if (kanbanStatusCategoryFilter === 'Finalizados') return l.status === 'FINALIZADO';
-                                            if (kanbanStatusCategoryFilter === 'Perdidos') return l.status === 'NAO_APROVADO';
                                             return l.status === kanbanStatusCategoryFilter;
                                         })
                                         .filter(l => {
@@ -1767,37 +1091,66 @@ const ManagementPage: React.FC = () => {
                                             return l.client_name.toLowerCase().includes(term) || (l.client_contact_name && l.client_contact_name.toLowerCase().includes(term)) || (l.client_phone && l.client_phone.includes(term)) || (l.salesperson && l.salesperson.toLowerCase().includes(term)) || (l.closing_metadata?.quoted_item && l.closing_metadata.quoted_item.toLowerCase().includes(term));
                                         })
                                         .map(l => {
-                                            const diffToNow = new Date().getTime() - new Date(l.updated_at || l.created_at).getTime();
-                                            const stoppedDays = Math.floor(diffToNow / 86400000);
-                                            
-                                            let timeColor = 'text-green-600';
-                                            let timeBg = 'bg-green-50';
-                                            if (stoppedDays >= 15) { timeColor = 'text-red-600'; timeBg = 'bg-red-50'; }
-                                            else if (stoppedDays >= 7) { timeColor = 'text-yellow-600'; timeBg = 'bg-yellow-50'; }
 
                                             return (
                                                 <tr key={l.id} className="hover:bg-blue-50/30 transition-colors group">
                                                     <td className="px-6 py-4">
-                                                        <select
-                                                            className={`text-[10px] font-black uppercase tracking-tighter rounded border border-gray-100 py-1 px-2 outline-none focus:ring-1 focus:ring-blue-500 max-w-[140px] transition-colors ${
-                                                                getStatusStyle(l.status).colorClass
-                                                            }`}
-                                                            value={l.status}
-                                                            onChange={(e) => updateLeadStatus(l, e.target.value)}
-                                                        >
-                                                            {leadColumns.map(col => <option key={col.id} value={col.id}>{col.title}</option>)}
-                                                            <option value="FINALIZADO">FINALIZADO (Sucesso)</option>
-                                                            <option value="NAO_APROVADO">NÃO APROVADO (Perda)</option>
-                                                        </select>
+                                                        <div className="relative status-dropdown-container">
+                                                            <button 
+                                                                onClick={() => setOpenStatusMenuId(openStatusMenuId === `${l.id}-atend` ? null : `${l.id}-atend`)}
+                                                                className={`flex items-center justify-between w-full min-w-[140px] text-[10px] font-black uppercase tracking-tighter rounded py-1.5 px-3 outline-none transition-all shadow-sm ${
+                                                                    getStatusStyle(l.atendimento_status || 'ATENDIMENTO').colorClass
+                                                                }`}
+                                                            >
+                                                                <div className="flex items-center gap-1.5 truncate">
+                                                                    <span className="material-icons-outlined text-[14px] opacity-70">{getStatusStyle(l.atendimento_status || 'ATENDIMENTO').icon}</span>
+                                                                    <span className="truncate">{getStatusStyle(l.atendimento_status || 'ATENDIMENTO').label}</span>
+                                                                </div>
+                                                                <span className="material-icons-outlined text-[14px] opacity-50 ml-1">expand_more</span>
+                                                            </button>
+
+                                                            {openStatusMenuId === `${l.id}-atend` && (
+                                                                <div className="absolute z-[100] mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 left-0">
+                                                                    <div className="p-2 bg-gray-50 border-b border-gray-100">
+                                                                        <span className="text-[9px] font-black pointer-events-none text-gray-400 uppercase tracking-widest pl-1">Alterar Atendimento</span>
+                                                                    </div>
+                                                                    <div className="max-h-80 overflow-y-auto p-1.5 space-y-1">
+                                                                        {Object.entries(CRM_STATUS_CONFIG).map(([id, cfg]) => (
+                                                                            <button 
+                                                                                key={id} 
+                                                                                onClick={() => {
+                                                                                    updateLeadAtendimentoStatus(l, id);
+                                                                                    setOpenStatusMenuId(null);
+                                                                                }}
+                                                                                className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left rounded-lg transition-all hover:scale-[1.02] active:scale-95 ${cfg.colorClass} border border-transparent hover:border-current/20`}
+                                                                            >
+                                                                                <div className="flex items-center gap-3">
+                                                                                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-white/50 shadow-inner">
+                                                                                        <span className="material-icons-outlined text-[16px]">{cfg.icon}</span>
+                                                                                    </div>
+                                                                                    <span className="font-black text-[10px] uppercase tracking-wider">{cfg.label}</span>
+                                                                                </div>
+                                                                                {(l.atendimento_status || 'ATENDIMENTO') === id && <span className="material-icons-outlined text-sm opacity-50">check</span>}
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${
-                                                            l.priority === 'ALTA' || l.priority === 'URGENTE' ? 'bg-red-50 text-red-600 border border-red-100' :
-                                                            l.priority === 'VIP' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' :
-                                                            'bg-gray-100 text-gray-600 border border-gray-200'
-                                                        }`}>
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); togglePriority(l); }}
+                                                            className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 ${
+                                                                l.priority === 'URGENTE' ? 'bg-red-600 text-white border border-red-700 shadow-sm' :
+                                                                l.priority === 'ALTA' ? 'bg-red-50 text-red-600 border border-red-100' :
+                                                                l.priority === 'VIP' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' :
+                                                                'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+                                                            }`}
+                                                            title="Clique para alterar prioridade"
+                                                        >
                                                             {l.priority || 'NORMAL'}
-                                                        </span>
+                                                        </button>
                                                     </td>
                                                     <td className="px-6 py-4 font-medium text-gray-500 tabular-nums">
                                                         {formatDate(l.created_at)}
@@ -1822,12 +1175,6 @@ const ManagementPage: React.FC = () => {
                                                                 {getSalespersonInitials(l.salesperson)}
                                                             </div>
                                                             <span className="font-bold text-gray-600 text-[11px] truncate max-w-[80px]">{l.salesperson}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded ${timeBg} ${timeColor} text-[10px] font-black`}>
-                                                            <span className="material-icons-outlined text-[12px]">schedule</span>
-                                                            {stoppedDays}d
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
@@ -1872,33 +1219,11 @@ const ManagementPage: React.FC = () => {
                                                                 <span className="material-icons-outlined text-lg">edit</span>
                                                             </button>
                                                             <button 
-                                                                onClick={(e) => { e.stopPropagation(); toggleFollowUp(l); }}
-                                                                className={`p-1.5 rounded-lg transition-all ${l.follow_up_done ? 'text-blue-600 bg-blue-50' : 'text-gray-400 hover:text-blue-500 hover:bg-blue-50'}`}
-                                                                title={l.follow_up_done ? "Desmarcar Acompanhamento" : "Marcar Acompanhamento"}
-                                                            >
-                                                                <span className="material-icons-outlined text-lg">{l.follow_up_done ? 'notifications_off' : 'notifications_active'}</span>
-                                                            </button>
-                                                            <button 
-                                                                onClick={(e) => handleAttendLead(e, l.id)}
-                                                                className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                                                                title="Atualizar Atendimento"
-                                                            >
-                                                                <span className="material-icons-outlined text-lg">refresh</span>
-                                                            </button>
-                                                            <div className="w-px h-4 bg-gray-200 mx-0.5"></div>
-                                                            <button 
                                                                 onClick={(e) => { e.stopPropagation(); convertToBudget(l); }}
                                                                 className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
                                                                 title="Gerar Novo Orçamento"
                                                             >
                                                                 <span className="material-icons-outlined text-lg">add</span>
-                                                            </button>
-                                                            <button 
-                                                                onClick={(e) => { e.stopPropagation(); setPendingStatusLead(l); setIsFinalizeModalOpen(true); }}
-                                                                className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all"
-                                                                title="Finalizar (Venda)"
-                                                            >
-                                                                <span className="material-icons-outlined text-lg">verified</span>
                                                             </button>
                                                         </div>
                                                     </td>
@@ -1909,8 +1234,8 @@ const ManagementPage: React.FC = () => {
                             </table>
                         </div>
                     </div>
-                )
-            }
+                </div>
+            )}
 
             {
                 activeTab === 'TRANSFERENCIAS' && (
@@ -1952,7 +1277,7 @@ const ManagementPage: React.FC = () => {
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <p className="text-sm font-bold text-gray-900">{req.type === 'CLIENT' ? req.client?.name : `Pedido #${req.order_number}`}</p>
+                                                    <p className="text-sm font-bold text-gray-900">{req.type === 'CLIENT' ? fixClientName(req.client?.name || '') : `Pedido #${req.order_number}`}</p>
                                                     <p className="text-[10px] text-gray-400 font-medium italic">"{req.reason || 'Sem motivo informado'}"</p>
                                                 </td>
                                                 <td className="px-6 py-4">
@@ -1993,376 +1318,318 @@ const ManagementPage: React.FC = () => {
             {/* Modal Lead */}
             {
                 isLeadModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                        <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-                            <div className="px-2 py-2 text-sm border-b border-gray-100 flex justify-between items-center bg-blue-50">
-                                <h3 className="font-bold text-blue-800 uppercase flex items-center gap-2">
-                                    <span className="material-icons-outlined">person_add</span>
-                                    {editingLead ? 'Editar Atendimento' : 'Novo Atendimento'}
-                                </h3>
-                                <button onClick={() => setIsLeadModalOpen(false)} className="text-gray-400 hover:text-gray-600"><span className="material-icons-outlined">close</span></button>
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+                        <div className="bg-white rounded-3xl w-full max-w-6xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col border border-white/20 animate-in slide-in-from-bottom-8 duration-500">
+                            {/* Modal Header */}
+                            <div className="p-6 bg-gradient-to-r from-blue-700 to-blue-600 flex justify-between items-center shrink-0">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 shadow-inner">
+                                        <span className="material-icons-outlined text-white text-2xl">{editingLead ? 'edit' : 'person_add'}</span>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black text-white uppercase tracking-tighter leading-none">
+                                            {editingLead ? 'Editar Atendimento' : 'Novo Atendimento'}
+                                        </h3>
+                                        <p className="text-blue-100 text-[11px] font-bold uppercase tracking-widest mt-1 opacity-80">
+                                            {editingLead ? `Lead ID: ${editingLead.id.slice(0, 8)}...` : 'Preencha os dados no Pipeline'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => { setIsLeadModalOpen(false); setEditingLead(null); setNewLead(initialLeadState); }}
+                                    className="w-10 h-10 rounded-xl hover:bg-white/20 text-white transition-all flex items-center justify-center active:scale-95 border border-transparent hover:border-white/20"
+                                >
+                                    <span className="material-icons-outlined">close</span>
+                                </button>
                             </div>
-                            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
 
-                                {/* Client Search */}
-                                {!editingLead && (
-                                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-4">
-                                        <label className="block text-xs font-bold text-blue-500 uppercase mb-1">Buscar Cliente Existente</label>
-                                        <div className="relative">
-                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                <span className="material-icons-outlined text-blue-400 text-lg">search</span>
+                            <div className="flex-1 overflow-y-auto p-0 custom-scrollbar bg-slate-50/20">
+                                <div className="grid grid-cols-1 lg:grid-cols-12 min-h-full">
+                                    {/* Left Side: Client Data/Selection */}
+                                    <div className="lg:col-span-7 bg-white border-r border-slate-100 flex flex-col">
+                                        <div className="p-8 space-y-8 flex-1">
+                                            <div className="space-y-1">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 shadow-sm">
+                                                        <span className="material-icons-outlined text-xl">contact_page</span>
+                                                    </div>
+                                                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">Identificação do Cliente</h4>
+                                                </div>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest pl-12">Associe este atendimento a um cliente da base</p>
                                             </div>
-                                            <input
-                                                className="form-input w-full !pl-10 rounded-lg border-blue-200 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                                placeholder="Busque por Nome, E-mail, CPF/CNPJ ou Telefone..."
-                                                value={clientSearchTerm}
-                                                onChange={e => searchClients(e.target.value)}
-                                            />
-                                            {showClientResults && clientSearchResults.length > 0 && (
-                                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                                                    {clientSearchResults.map(client => (
-                                                        <div
-                                                            key={client.id}
-                                                            className={`px-4 py-3 border-b border-gray-50 last:border-0 transition-colors ${client.salesperson && client.salesperson !== appUser?.salesperson ? 'bg-orange-50/50' : 'hover:bg-blue-50 cursor-pointer'}`}
-                                                            onClick={() => {
-                                                                if (client.salesperson && client.salesperson !== appUser?.salesperson && appUser?.role !== 'ADMIN') {
-                                                                    setSelectedClientToTransfer(client);
-                                                                    setIsTransferModalOpen(true);
-                                                                } else {
-                                                                    selectClient(client);
-                                                                    setShowClientForm(true);
-                                                                }
-                                                            }}
-                                                        >
-                                                            <div className="flex justify-between items-start">
-                                                                <div>
-                                                                    <p className="font-bold text-gray-800 text-sm">{client.name}</p>
-                                                                    <p className="text-xs text-gray-500 font-medium">{client.email || 'Sem e-mail'} | {client.phone || 'Sem telefone'}</p>
-                                                                </div>
-                                                                {client.salesperson && (
-                                                                    <div className="flex flex-col items-end gap-1">
-                                                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded shadow-sm border uppercase tracking-widest ${client.salesperson === appUser?.salesperson ? 'bg-blue-500 text-white border-blue-600' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
-                                                                            {client.salesperson}
-                                                                        </span>
-                                                                        {client.salesperson !== appUser?.salesperson && (
-                                                                            <span className="text-[8px] font-black text-orange-600 uppercase animate-pulse">Pertence a outro vendedor</span>
-                                                                        )}
-                                                                    </div>
-                                                                )}
+                                            
+                                            {/* Search/New Choice Section */}
+                                            {!editingLead && !showClientForm && (
+                                                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 shadow-inner group focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-500/5 transition-all">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-9 h-9 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-blue-500 group-focus-within:text-blue-600">
+                                                                <span className="material-icons-outlined text-xl">search</span>
                                                             </div>
-                                                            {client.salesperson && client.salesperson !== appUser?.salesperson && (
-                                                                <div className="mt-2 flex justify-end">
-                                                                    <button
-                                                                        className="px-3 py-1 bg-orange-500 text-white text-[9px] font-black uppercase tracking-widest rounded shadow-sm hover:bg-orange-600 active:scale-95 transition-all flex items-center gap-1"
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            setSelectedClientToTransfer(client);
-                                                                            setIsTransferModalOpen(true);
+                                                            <input
+                                                                className="bg-transparent border-none focus:ring-0 text-xs font-black text-slate-900 uppercase placeholder:text-slate-300 placeholder:font-bold w-full tracking-wider"
+                                                                placeholder="LOCALIZAR CLIENTE..."
+                                                                value={clientSearchTerm}
+                                                                onChange={e => setClientSearchTerm(e.target.value)}
+                                                            />
+                                                        </div>
+                                                        
+                                                        {clientSearchResults.length > 0 && (
+                                                            <div className="mt-4 bg-white rounded-2xl shadow-2xl border border-blue-100 overflow-hidden divide-y divide-blue-50 animate-in zoom-in-95 duration-200">
+                                                                <div className="px-4 py-2.5 bg-blue-50/50 border-b border-blue-100 flex items-center justify-between">
+                                                                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Base de Partners</span>
+                                                                    <span className="text-[9px] font-bold text-blue-300 uppercase bg-white px-2 py-0.5 rounded-full border border-blue-50">{clientSearchResults.length} Resultados</span>
+                                                                </div>
+                                                                {clientSearchResults.map(l => (
+                                                                    <div 
+                                                                        key={l.id} 
+                                                                        className="px-5 py-4 hover:bg-blue-50 cursor-pointer flex items-center justify-between group transition-all"
+                                                                        onClick={() => {
+                                                                            const isManager = appUser?.role === 'ADMIN' || appUser?.role === 'GESTOR';
+                                                                            if (!isManager && l.salesperson && userSalesperson && l.salesperson !== userSalesperson) {
+                                                                                setSelectedClientToTransfer(l);
+                                                                                setIsTransferModalOpen(true);
+                                                                                return;
+                                                                            }
+
+                                                                            setNewLead({
+                                                                                ...newLead,
+                                                                                client_id: l.id,
+                                                                                client_name: l.name,
+                                                                                client_contact_name: l.contact_name,
+                                                                                client_phone: l.phone,
+                                                                                client_email: l.email,
+                                                                                client_doc: l.doc,
+                                                                                salesperson: isSeller ? userSalesperson : (l.salesperson || newLead.salesperson)
+                                                                            });
+                                                                            setClientSearchTerm('');
+                                                                            setClientSearchResults([]);
+                                                                            setShowClientForm(true);
+                                                                            setPartnerSaved(true);
                                                                         }}
                                                                     >
-                                                                        <span className="material-icons-outlined text-[12px]">swap_horiz</span>
-                                                                        Solicitar Troca de Carteira
-                                                                    </button>
-                                                                </div>
+                                                                        <div>
+                                                                            <p className="text-sm font-black text-blue-900 uppercase tracking-tight group-hover:text-blue-600 transition-colors">{fixClientName(l.name)}</p>
+                                                                            <p className="text-[11px] text-blue-400 font-bold mt-0.5">
+                                                                                {l.contact_name || 'Sem contato'} • {l.phone || 'Sem fone'} • {l.doc || 'S/ Doc'}
+                                                                            </p>
+                                                                            <div className="mt-1 flex items-center gap-1.5">
+                                                                                <span className="material-icons-outlined text-[10px] text-blue-500">person</span>
+                                                                                <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest">{l.salesperson || 'Sem Vendedor'}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-300 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
+                                                                            <span className="material-icons-outlined text-sm">add</span>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="relative py-2">
+                                                        <div className="absolute inset-x-0 top-1/2 h-px bg-slate-100 -z-10"></div>
+                                                        <div className="flex justify-center">
+                                                            <span className="bg-white px-4 text-[10px] font-black text-slate-300 uppercase tracking-[0.3em]">OU</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <button
+                                                        onClick={() => {
+                                                            setShowClientForm(true);
+                                                            setPartnerSaved(false);
+                                                            setNewLead({...initialLeadState, salesperson: isSeller ? userSalesperson : 'VENDAS 01'});
+                                                        }}
+                                                        className="w-full py-4 bg-slate-50 text-slate-600 border border-slate-200 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-100 hover:border-slate-300 transition-all flex items-center justify-center gap-3 shadow-sm active:scale-[0.98]"
+                                                    >
+                                                        <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center">
+                                                            <span className="material-icons-outlined text-lg">person_add_alt</span>
+                                                        </div>
+                                                        CADASTRAR NOVO CLIENTE DO ZERO
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {(editingLead || showClientForm) && (
+                                                <div className={`p-6 rounded-2xl border-2 transition-all duration-500 animate-in fade-in slide-in-from-bottom-2 ${partnerSaved ? 'border-green-500 bg-green-50/30' : 'border-slate-100 bg-slate-50/50'}`}>
+                                                    <div className="flex justify-between items-center mb-6">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`w-3 h-3 rounded-full ${partnerSaved ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]' : 'bg-slate-300 animate-pulse'}`}></div>
+                                                            <div>
+                                                                <h4 className={`text-[11px] font-black uppercase tracking-widest ${partnerSaved ? 'text-green-600' : 'text-slate-500'}`}>
+                                                                    {partnerSaved ? 'Cliente Vinculado' : 'Formulário de Cadastro'}
+                                                                </h4>
+                                                                {editingLead && <p className="text-[8px] text-slate-400 font-bold uppercase mt-0.5">Editando Atendimento Existente</p>}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            {partnerSaved && !editingLead && (
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        setShowClientForm(false);
+                                                                        setPartnerSaved(false);
+                                                                        setNewLead(initialLeadState);
+                                                                    }}
+                                                                    className="px-3 py-1.5 bg-white text-slate-400 hover:text-red-500 border border-slate-200 rounded-lg text-[10px] font-black uppercase transition-all shadow-sm flex items-center gap-1.5"
+                                                                >
+                                                                    <span className="material-icons-outlined text-sm">logout</span> Alterar
+                                                                </button>
+                                                            )}
+                                                            {partnerSaved && (
+                                                                <span className="bg-emerald-500 text-white text-[10px] px-3 py-1.5 rounded-lg font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-emerald-200">
+                                                                    <span className="material-icons-outlined text-sm">verified</span> OK
+                                                                </span>
                                                             )}
                                                         </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
+                                                    </div>
 
-                                        {!showClientForm && (
-                                            <div className="mt-4 flex items-center gap-2">
-                                                <span className="text-xs text-blue-400 uppercase font-bold tracking-widest flex-1 border-t border-blue-200 mt-1"></span>
-                                                <button
-                                                    onClick={() => setShowClientForm(true)}
-                                                    className="px-4 py-2 bg-white text-blue-600 border border-blue-200 rounded-lg font-bold uppercase text-xs hover:bg-blue-100 transition-colors shadow-sm flex items-center gap-2 shrink-0"
-                                                >
-                                                    <span className="material-icons-outlined text-[16px]">add_circle</span> Cadastrar Novo Cliente
-                                                </button>
-                                                <span className="text-xs text-blue-400 uppercase font-bold tracking-widest flex-1 border-t border-blue-200 mt-1"></span>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
+                                                    <div className="space-y-4">
+                                                        <div>
+                                                            <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-wider ml-1">Empresa / Razão Social *</label>
+                                                            <input
+                                                                className={`w-full rounded-xl border-slate-200 focus:ring-4 focus:ring-blue-500/10 text-xs font-bold text-slate-700 placeholder:text-slate-300 ${partnerSaved ? 'bg-white/50 border-transparent' : 'bg-white shadow-sm'}`}
+                                                                placeholder="DIGITE O NOME..."
+                                                                value={newLead.client_name || ''}
+                                                                onChange={e => { setNewLead({ ...newLead, client_name: e.target.value }); setPartnerSaved(false); }}
+                                                            />
+                                                        </div>
 
-                                {(editingLead || showClientForm) && (
-                                    <div className={`p-4 rounded-xl border-2 transition-all ${partnerSaved ? 'border-green-500 bg-green-50' : 'border-blue-100 bg-white shadow-sm'}`}>
-                                        <div className="flex justify-between items-center mb-4">
-                                            <h4 className={`text-xs font-black uppercase tracking-widest ${partnerSaved ? 'text-green-600' : 'text-blue-600'}`}>
-                                                {partnerSaved ? '✓ Cliente Identificado/Salvo' : 'Dados do Cliente'}
-                                            </h4>
-                                            {partnerSaved && (
-                                                <span className="bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase animate-pulse">Salvo</span>
-                                            )}
-                                        </div>
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div>
+                                                                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-wider ml-1">Contato</label>
+                                                                <input
+                                                                    className={`w-full rounded-xl border-slate-200 focus:ring-4 focus:ring-blue-500/10 text-xs font-bold text-slate-700 placeholder:text-slate-300 ${partnerSaved ? 'bg-white/50 border-transparent' : 'bg-white shadow-sm'}`}
+                                                                    placeholder="NOME DO CONTATO..."
+                                                                    value={newLead.client_contact_name || ''}
+                                                                    onChange={e => { setNewLead({ ...newLead, client_contact_name: e.target.value }); setPartnerSaved(false); }}
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-wider ml-1">Doc (CPF/CNPJ)</label>
+                                                                <input
+                                                                    className={`w-full rounded-xl border-slate-200 focus:ring-4 focus:ring-blue-500/10 text-xs font-bold text-slate-700 placeholder:text-slate-300 ${partnerSaved ? 'bg-white/50 border-transparent' : 'bg-white shadow-sm'}`}
+                                                                    placeholder="000.000.000-00"
+                                                                    value={newLead.client_doc || ''}
+                                                                    onChange={e => { setNewLead({ ...newLead, client_doc: maskCpfCnpj(e.target.value) }); setPartnerSaved(false); }}
+                                                                />
+                                                            </div>
+                                                        </div>
 
-                                        <div className="space-y-4">
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Nome da Empresa *</label>
-                                                    <input
-                                                        className={`form-input w-full rounded-lg border-gray-300 ${partnerSaved ? 'bg-gray-50' : ''}`}
-                                                        placeholder="Ex: Empresa XYZ"
-                                                        value={newLead.client_name || ''}
-                                                        onChange={e => { setNewLead({ ...newLead, client_name: e.target.value }); setPartnerSaved(false); }}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Nome do Contato</label>
-                                                    <input
-                                                        className={`form-input w-full rounded-lg border-gray-300 ${partnerSaved ? 'bg-gray-50' : ''}`}
-                                                        placeholder="Ex: João da Silva"
-                                                        value={newLead.client_contact_name || ''}
-                                                        onChange={e => { setNewLead({ ...newLead, client_contact_name: e.target.value }); setPartnerSaved(false); }}
-                                                    />
-                                                </div>
-                                            </div>
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div>
+                                                                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-wider ml-1">WhatsApp</label>
+                                                                <input
+                                                                    className={`w-full rounded-xl border-slate-200 focus:ring-4 focus:ring-blue-500/10 text-xs font-bold text-slate-700 placeholder:text-slate-300 ${partnerSaved ? 'bg-white/50 border-transparent' : 'bg-white shadow-sm'}`}
+                                                                    placeholder="(00) 00000-0000"
+                                                                    value={newLead.client_phone || ''}
+                                                                    onChange={e => { setNewLead({ ...newLead, client_phone: maskPhone(e.target.value) }); setPartnerSaved(false); }}
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-wider ml-1">E-mail</label>
+                                                                <input
+                                                                    type="email"
+                                                                    className={`w-full rounded-xl border-slate-200 focus:ring-4 focus:ring-blue-500/10 text-xs font-bold text-slate-700 placeholder:text-slate-300 ${partnerSaved ? 'bg-white/50 border-transparent' : 'bg-white shadow-sm'}`}
+                                                                    placeholder="CLIENTE@EMAIL.COM..."
+                                                                    value={newLead.client_email || ''}
+                                                                    onChange={e => { setNewLead({ ...newLead, client_email: e.target.value.toLowerCase() }); setPartnerSaved(false); }}
+                                                                />
+                                                            </div>
+                                                        </div>
 
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Telefone / WhatsApp</label>
-                                                    <input
-                                                        className={`form-input w-full rounded-lg border-gray-300 ${partnerSaved ? 'bg-gray-50' : ''}`}
-                                                        placeholder="(00) 00000-0000"
-                                                        value={newLead.client_phone || ''}
-                                                        onChange={e => { setNewLead({ ...newLead, client_phone: maskPhone(e.target.value) }); setPartnerSaved(false); }}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">CPF / CNPJ</label>
-                                                    <input
-                                                        className={`form-input w-full rounded-lg border-gray-300 ${partnerSaved ? 'bg-gray-50' : ''}`}
-                                                        placeholder="000.000.000-00"
-                                                        value={newLead.client_doc || ''}
-                                                        onChange={e => { setNewLead({ ...newLead, client_doc: maskCpfCnpj(e.target.value) }); setPartnerSaved(false); }}
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">E-mail</label>
-                                                <input
-                                                    type="email"
-                                                    className={`form-input w-full rounded-lg border-gray-300 ${partnerSaved ? 'bg-gray-50' : ''}`}
-                                                    placeholder="cliente@exemplo.com"
-                                                    value={newLead.client_email || ''}
-                                                    onChange={e => { setNewLead({ ...newLead, client_email: e.target.value }); setPartnerSaved(false); }}
-                                                />
-                                            </div>
-
-                                            {!partnerSaved && (
-                                                <div className="pt-2">
-                                                    <button
-                                                        onClick={handleSavePartner}
-                                                        disabled={isSavingPartner}
-                                                        className="w-full py-3 bg-blue-500 text-white rounded-xl font-bold uppercase text-xs hover:bg-blue-600 shadow-md flex items-center justify-center gap-2 transition-all active:scale-95"
-                                                    >
-                                                        {isSavingPartner ? (
-                                                            <>
-                                                                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                                                                Salvando...
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <span className="material-icons-outlined text-sm">save</span>
-                                                                Salvar Dados do Cliente
-                                                            </>
+                                                        {!partnerSaved && (
+                                                            <button
+                                                                onClick={handleSavePartner}
+                                                                disabled={isSavingPartner}
+                                                                className="w-full py-4 bg-blue-600 text-white rounded-xl font-black uppercase text-[10px] tracking-[0.2em] hover:bg-blue-700 shadow-xl shadow-blue-200 flex items-center justify-center gap-3 transition-all hover:scale-[1.01] active:scale-95 group"
+                                                            >
+                                                                {isSavingPartner ? (
+                                                                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="material-icons-outlined text-sm transition-transform group-hover:rotate-12">save_as</span>
+                                                                        Salvar Cliente
+                                                                    </>
+                                                                )}
+                                                            </button>
                                                         )}
-                                                    </button>
-                                                    <p className="text-[10px] text-gray-400 mt-2 text-center">Isso confirmará o cadastro no banco de dados antes de criar o atendimento.</p>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
                                     </div>
-                                )}
 
-                                <div>
-                                    <div className="flex justify-between items-center mb-1">
-                                        <label className="block text-xs font-bold text-gray-400 uppercase">Anotações do Atendimento</label>
-                                        <label className="flex items-center gap-2 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                checked={newLead.closing_metadata?.show_on_card || false}
-                                                onChange={e => setNewLead({
-                                                    ...newLead,
-                                                    closing_metadata: { ...newLead.closing_metadata, show_on_card: e.target.checked }
-                                                })}
-                                            />
-                                            <span className="text-[10px] font-bold text-blue-500 uppercase">Exibir no Card</span>
-                                        </label>
-                                    </div>
-                                    <textarea
-                                        className="form-textarea w-full rounded-lg border-gray-300"
-                                        rows={3}
-                                        placeholder="O que o cliente está buscando? Notas internas..."
-                                        value={newLead.description || ''}
-                                        onChange={e => setNewLead({ ...newLead, description: e.target.value })}
-                                    ></textarea>
-                                </div>
+                                    {/* Right Side: Lead Details */}
+                                    <div className="lg:col-span-5 p-8 space-y-6 bg-slate-50/50">
+                                        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+                                            <div className="flex items-center gap-3 border-b border-slate-50 pb-4">
+                                                <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center text-orange-500">
+                                                    <span className="material-icons-outlined text-lg">description</span>
+                                                </div>
+                                                <h4 className="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">Detalhes do Atendimento</h4>
+                                            </div>
 
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Item em Orçamento *</label>
-                                    <div className="relative">
-                                        <span className="material-icons-outlined absolute left-3 top-1/2 -translate-y-1/2 text-blue-400 text-sm">inventory_2</span>
-                                        <input
-                                            className="form-input w-full pl-9 rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500 font-bold text-blue-700 uppercase placeholder:normal-case"
-                                            placeholder="Ex: Copo Térmico, Caneta..."
-                                            value={newLead.closing_metadata?.quoted_item || ''}
-                                            onChange={e => setNewLead({
-                                                ...newLead,
-                                                closing_metadata: { ...(newLead.closing_metadata || {}), quoted_item: e.target.value }
-                                            })}
-                                        />
-                                    </div>
-                                    <p className="text-[9px] text-gray-400 mt-1 italic">Este item será exibido no card do Kanban para facilitar a identificação.</p>
-                                </div>
-
-                                <div className="col-span-2 space-y-4">
-                                    <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100">
-                                        <label className="block text-xs font-black text-slate-500 uppercase mb-3 tracking-widest flex items-center gap-2">
-                                            <span className="material-icons-outlined text-sm">tapestry</span>
-                                            Status do Funil
-                                        </label>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                            {Object.entries(CRM_STATUS_CONFIG).map(([id, cfg]) => {
-                                                const isSelected = newLead.status === id;
-                                                return (
-                                                    <button
-                                                        key={id}
-                                                        type="button"
-                                                        onClick={() => setNewLead({ ...newLead, status: id })}
-                                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-[10px] font-black uppercase transition-all ${
-                                                            isSelected 
-                                                            ? `${cfg.colorClass} border-current shadow-sm ring-1 ring-current`
-                                                            : 'bg-white border-slate-100 text-slate-400 hover:border-slate-300 hover:text-slate-600'
-                                                        }`}
-                                                    >
-                                                        <span className="material-icons-outlined text-sm opacity-70">{cfg.icon}</span>
-                                                        <span className="truncate">{cfg.label}</span>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">Vendedor Responsável</label>
-                                            <select
-                                                className={`w-full rounded-lg border-slate-200 text-xs font-bold text-slate-700 uppercase focus:ring-blue-500 transition-all ${isSeller ? 'bg-slate-50' : 'bg-white'}`}
-                                                value={newLead.salesperson}
-                                                onChange={e => setNewLead({ ...newLead, salesperson: e.target.value })}
-                                                disabled={isSeller}
-                                            >
-                                                <option value="VENDAS 01">VENDAS 01</option>
-                                                <option value="VENDAS 02">VENDAS 02</option>
-                                                <option value="VENDAS 03">VENDAS 03</option>
-                                                <option value="VENDAS 04">VENDAS 04</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">Prioridade</label>
-                                            <div className="flex gap-4 h-[38px] items-center">
-                                                {['BAIXA', 'NORMAL', 'ALTA'].map(p => (
-                                                    <label key={p} className="flex items-center gap-2 cursor-pointer">
+                                            <div className="grid grid-cols-12 gap-6">
+                                                <div className="col-span-7">
+                                                    <div className="flex justify-between items-center mb-1.5 px-1">
+                                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Item Buscado *</label>
+                                                    </div>
+                                                    <div className="relative group">
+                                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none text-blue-500">
+                                                            <span className="material-icons-outlined text-lg">inventory_2</span>
+                                                        </div>
                                                         <input
-                                                            type="radio"
-                                                            name="priority"
-                                                            checked={newLead.priority === p}
-                                                            onChange={() => setNewLead({ ...newLead, priority: p as any })}
-                                                            className="text-blue-600 focus:ring-blue-500"
+                                                            className="w-full pl-12 pr-4 py-3.5 rounded-2xl border-slate-100 bg-slate-50 group-hover:bg-white transition-all focus:bg-white focus:ring-4 focus:ring-blue-500/10 text-sm font-black text-blue-800 uppercase shadow-inner"
+                                                            placeholder="EX: COPO TÉRMICO, CANETA..."
+                                                            value={newLead.closing_metadata?.quoted_item || ''}
+                                                            onChange={e => setNewLead({
+                                                                ...newLead,
+                                                                closing_metadata: { ...(newLead.closing_metadata || {}), quoted_item: e.target.value }
+                                                            })}
                                                         />
-                                                        <span className={`text-[10px] font-bold uppercase ${p === 'ALTA' ? 'text-red-500' : p === 'BAIXA' ? 'text-slate-400' : 'text-blue-500'}`}>{p}</span>
-                                                    </label>
-                                                ))}
+                                                    </div>
+                                                </div>
                                             </div>
+
+                                            {/* WhatsApp Template Section */}
+                                            <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 mt-6">
+                                                <label className="block text-xs font-black text-blue-700 uppercase tracking-widest flex items-center gap-2 mb-3">
+                                                    <span className="material-icons-outlined text-sm text-blue-600">description</span>
+                                                    Notas do Atendimento
+                                                </label>
+                                                <textarea
+                                                    className="form-textarea w-full rounded-xl border-blue-200/60 bg-white text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 shadow-sm p-3"
+                                                    rows={3}
+                                                    placeholder="Adicione observações importantes sobre este atendimento..."
+                                                    value={newLead.closing_metadata?.wa_template || ''}
+                                                    onChange={e => setNewLead({
+                                                        ...newLead,
+                                                        closing_metadata: { ...(newLead.closing_metadata || {}), wa_template: e.target.value }
+                                                    })}
+                                                ></textarea>
+                                                <p className="text-[10px] text-blue-600/60 mt-2 italic font-medium">Estas notas são internas e ajudam no acompanhamento do lead.</p>
+                                            </div>
+
                                         </div>
                                     </div>
-                                </div>
-
-                                {/* Checklist Section */}
-                                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                                    <label className="block text-xs font-black text-gray-600 uppercase mb-3 tracking-widest flex items-center gap-2">
-                                        <span className="material-icons-outlined text-sm">fact_check</span>
-                                        Check-list de Processos
-                                    </label>
-                                    <div className="space-y-2 mb-3">
-                                        {checklistItems.map(item => (
-                                            <div key={item.id} className="flex items-center gap-2 group">
-                                                <button
-                                                    onClick={() => toggleChecklistItem(item.id)}
-                                                    className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${item.completed ? 'bg-green-500 border-green-600 text-white' : 'bg-white border-gray-300 text-transparent'}`}
-                                                >
-                                                    <span className="material-icons-outlined text-[14px]">check</span>
-                                                </button>
-                                                <span className={`text-sm flex-1 ${item.completed ? 'text-gray-400 line-through' : 'text-gray-700 font-medium'}`}>{item.text}</span>
-                                                <button onClick={() => removeChecklistItem(item.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all">
-                                                    <span className="material-icons-outlined text-sm">delete</span>
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <input
-                                            className="form-input flex-1 rounded-lg border-gray-200 text-sm"
-                                            placeholder="Novo item..."
-                                            value={newItemText}
-                                            onChange={e => setNewItemText(e.target.value)}
-                                            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addChecklistItem())}
-                                        />
-                                        <button onClick={addChecklistItem} className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 shadow-sm flex items-center justify-center">
-                                            <span className="material-icons-outlined">add</span>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* WhatsApp Template Section */}
-                                <div className="bg-green-50/50 p-4 rounded-xl border border-green-100">
-                                    <div className="flex justify-between items-center mb-3">
-                                        <label className="block text-xs font-black text-green-700 uppercase tracking-widest flex items-center gap-2">
-                                            <span className="material-icons-outlined text-sm text-green-600">message</span>
-                                            Template WhatsApp
-                                        </label>
-                                        {newLead.client_phone && (
-                                            <a
-                                                href={`https://wa.me/55${newLead.client_phone.replace(/\D/g, '')}?text=${encodeURIComponent(newLead.closing_metadata?.wa_template || '')}`}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="px-3 py-1 bg-green-500 text-white text-[9px] font-black uppercase tracking-widest rounded-full hover:bg-green-600 transition-all shadow-sm flex items-center gap-1"
-                                            >
-                                                <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" /></svg>
-                                                Enviar Agora
-                                            </a>
-                                        )}
-                                    </div>
-                                    <textarea
-                                        className="form-textarea w-full rounded-lg border-green-100 bg-white text-sm focus:ring-green-500 focus:border-green-500"
-                                        rows={2}
-                                        placeholder="Mensagem rápida para o WhatsApp..."
-                                        value={newLead.closing_metadata?.wa_template || ''}
-                                        onChange={e => setNewLead({
-                                            ...newLead,
-                                            closing_metadata: { ...(newLead.closing_metadata || {}), wa_template: e.target.value }
-                                        })}
-                                    ></textarea>
-                                    <p className="text-[10px] text-green-600/60 mt-2 italic font-medium">Use [cliente] para personalizar o nome se desejar (implementaremos o replace no envio).</p>
                                 </div>
                             </div>
-                            <div className="px-2 py-2 text-sm bg-gray-50 flex justify-between items-center">
+
+                            <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center shrink-0">
                                 <div></div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => setIsLeadModalOpen(false)} className="px-4 py-2 bg-white border border-gray-300 rounded-lg font-bold uppercase text-xs text-gray-600 hover:bg-gray-50">Cancelar</button>
+                                <div className="flex gap-3">
+                                    <button onClick={() => setIsLeadModalOpen(false)} className="px-6 py-2.5 bg-white border border-slate-200 rounded-xl font-bold uppercase text-[11px] tracking-wider text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all">Cancelar</button>
                                     <button
                                         onClick={saveLead}
                                         disabled={!partnerSaved}
-                                        className={`px-6 py-2 rounded-lg font-bold uppercase text-xs shadow-lg transition-all ${partnerSaved ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200' : 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none'}`}
+                                        className={`px-8 py-2.5 rounded-xl font-black uppercase text-[11px] tracking-widest shadow-xl transition-all flex items-center gap-2 ${partnerSaved ? 'bg-blue-600 text-white hover:bg-blue-700 hover:scale-[1.02] shadow-blue-200 active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'}`}
                                     >
+                                        {partnerSaved && <span className="material-icons-outlined text-[14px]">save</span>}
                                         Salvar Atendimento
                                     </button>
                                 </div>
                             </div>
+
                         </div>
                     </div>
                 )
@@ -2570,15 +1837,11 @@ const ManagementPage: React.FC = () => {
                                     <p className="text-xs text-gray-500">{selectedClientToTransfer?.email || 'N/A'} | {selectedClientToTransfer?.phone || 'N/A'}</p>
                                 </div>
 
-                                <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Motivo da Solicitação</label>
-                                    <textarea
-                                        className="form-textarea w-full rounded-2xl border-gray-200 focus:ring-orange-500 focus:border-orange-500 text-sm font-medium bg-gray-50 p-4"
-                                        rows={3}
-                                        placeholder="Ex: Cliente solicitou atendimento direto, ou parceria antiga..."
-                                        value={transferReason}
-                                        onChange={e => setTransferReason(e.target.value)}
-                                    />
+                                <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100 flex items-start gap-3">
+                                    <span className="material-icons-outlined text-blue-500 text-lg mt-0.5">info</span>
+                                    <p className="text-[11px] text-blue-700 font-bold leading-relaxed uppercase">
+                                        Ao clicar em enviar, uma solicitação será encaminhada para a gestão avaliar a troca de carteira deste cliente.
+                                    </p>
                                 </div>
 
                                 <div className="flex gap-4 pt-4">
@@ -2590,8 +1853,7 @@ const ManagementPage: React.FC = () => {
                                     </button>
                                     <button
                                         onClick={handleRequestTransfer}
-                                        disabled={!transferReason.trim()}
-                                        className={`flex-1 py-4 rounded-2xl font-black uppercase text-[10px] shadow-xl transition-all active:scale-95 ${transferReason.trim() ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                                        className="flex-1 py-4 rounded-2xl font-black uppercase text-[10px] shadow-xl transition-all active:scale-95 bg-orange-500 text-white hover:bg-orange-600 shadow-orange-200"
                                     >
                                         Enviar Solicitação
                                     </button>
@@ -2601,7 +1863,7 @@ const ManagementPage: React.FC = () => {
                     </div>
                 )
             }
-        </div >
+        </div>
     );
 };
 
