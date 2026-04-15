@@ -357,7 +357,7 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                                         <CustomSelect
                                             options={suppliersList.filter(s => s.supplier_category === 'PRODUTOS' || !s.supplier_category)}
                                             value={suppliersList.find(s => s.id === it.supplier_id)?.name}
-                                            onSelect={opt => updateItem(it.id, 'supplier_id', opt.id)}
+                                            onSelect={opt => updateItem(it.id, 'supplier_id', opt ? opt.id : null)}
                                             onAdd={() => onAddSupplier(it.id, 'supplier_id')}
                                             disabled={isLocked}
                                             placeholder="Selecione..."
@@ -406,7 +406,7 @@ const BudgetItemCard: React.FC<BudgetItemCardProps> = ({
                                                             return ['TRANSPORTADORA', 'LOGISTICA', 'PRODUTOS'].includes(s.supplier_category);
                                                         })}
                                                         value={suppliersList.find(s => s.id === it[row.suppKey])?.name}
-                                                        onSelect={opt => updateItem(it.id, row.suppKey, opt.id)}
+                                                        onSelect={opt => updateItem(it.id, row.suppKey, opt ? opt.id : null)}
                                                         onAdd={() => onAddSupplier(it.id, row.suppKey)}
                                                         disabled={isLocked}
                                                         placeholder="Fornecedor..."

@@ -27,15 +27,16 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
     className
 }) => {
     const [isOpen, setIsOpen] = useState(false);
-    const [search, setSearch] = useState(value || '');
+    const [search, setSearch] = useState('');
     const ref = useRef<HTMLDivElement>(null);
 
+    // Sync search display with value when closed
     useEffect(() => {
-        setSearch(value || '');
-    }, [value]);
+        if (!isOpen) setSearch('');
+    }, [isOpen]);
 
     useEffect(() => {
-        if (onSearch && isOpen) {
+        if (onSearch && isOpen && search) {
             const timer = setTimeout(() => {
                 onSearch(search);
             }, 500);
@@ -63,10 +64,22 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                 onClick={() => !disabled && setIsOpen(!isOpen)}
                 className={`form-input w-full rounded border-gray-300 flex justify-between items-center cursor-pointer bg-white py-0.5 px-2 transition-all hover:border-blue-400 ${error ? 'ring-1 ring-red-500 border-red-500' : ''} ${disabled ? 'bg-gray-100 select-none' : 'hover:shadow-sm'}`}
             >
-                <span className={`truncate flex-1 min-w-0 text-[11px] font-semibold ${!(search || value) ? 'text-gray-400' : 'text-gray-900'}`}>
-                    {value || search || placeholder || "Selecione..."}
-                </span>
-                <span className={`material-icons-outlined text-sm flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180 text-blue-500' : 'text-gray-400'}`}>expand_more</span>
+                <div className="flex-1 truncate min-w-0 mr-1">
+                    <span className={`text-[11px] font-semibold ${!value ? 'text-gray-400' : 'text-gray-900 group-hover:text-blue-600'}`}>
+                        {value || placeholder || "Selecione..."}
+                    </span>
+                </div>
+                <div className="flex items-center gap-1">
+                    {value && !disabled && (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); onSelect(null); setIsOpen(false); }}
+                            className="p-0.5 hover:bg-red-50 text-gray-300 hover:text-red-500 rounded-full transition-colors"
+                        >
+                            <span className="material-icons-outlined text-[14px]">cancel</span>
+                        </button>
+                    )}
+                    <span className={`material-icons-outlined text-sm flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180 text-blue-500' : 'text-gray-400'}`}>expand_more</span>
+                </div>
             </div>
             {isOpen && !disabled && (
                 <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-150">
@@ -86,6 +99,16 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                         )}
                     </div>
                     <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                        {/* Clear Selection Option */}
+                        {value && (
+                            <div 
+                                className="px-3 py-2 text-[10px] font-black text-red-500 hover:bg-red-50 cursor-pointer flex items-center gap-2 border-b border-red-50 transition-colors uppercase" 
+                                onClick={() => { onSelect(null); setIsOpen(false); }}
+                            >
+                                <span className="material-icons-outlined text-sm">block</span> Remover Seleção
+                            </div>
+                        )}
+
                         {(() => {
                             const hasCategories = filtered.some(o => o.supplier_category);
                             if (hasCategories && filtered.length > 0) {
@@ -135,7 +158,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                                 </div>
                             ));
                         })()}
-                        {filtered.length === 0 && (
+                        {filtered.length === 0 && search && (
                             <div className="px-4 py-6 text-center">
                                 <span className="material-icons-outlined text-gray-200 text-4xl mb-2 block">search_off</span>
                                 <div className="text-xs text-gray-400 italic">
@@ -143,7 +166,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                                 </div>
                             </div>
                         )}
-                        <div className="px-4 py-2.5 text-[11px] text-blue-600 font-black hover:bg-blue-50 cursor-pointer border-t flex items-center gap-2 transition-colors uppercase tracking-tight" onClick={() => { onAdd(); setIsOpen(false); }}>
+                        <div className="px-4 py-2.5 text-[11px] text-blue-600 font-black hover:bg-blue-50 cursor-pointer border-t flex items-center gap-2 transition-colors uppercase tracking-tight" onClick={() => { if (onAdd) onAdd(); setIsOpen(false); }}>
                             <span className="material-icons-outlined text-sm">add_circle</span> Cadastrar Novo
                         </div>
                     </div>

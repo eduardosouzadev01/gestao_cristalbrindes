@@ -106,6 +106,8 @@ const BudgetForm: React.FC = () => {
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [proposalsHistory, setProposalsHistory] = useState<any[]>([]);
 
+    const [isDataLoaded, setIsDataLoaded] = useState(false);
+
     // Collapsed items state
     const [collapsedItems, setCollapsedItems] = useState<Record<string, boolean>>({});
 
@@ -207,6 +209,7 @@ const BudgetForm: React.FC = () => {
             // Auto-number placeholder
             setBudgetNumber('AUTO');
             setActiveId(undefined);
+            setIsDataLoaded(true);
         } else if (!id || id === 'novo') {
             // Task: Restriction for sellers - only allow via CRM
             if (isSeller && !hasPermission('adm') && !hasPermission('gestao')) {
@@ -216,6 +219,7 @@ const BudgetForm: React.FC = () => {
             }
             setBudgetNumber('AUTO');
             setActiveId(undefined);
+            setIsDataLoaded(true);
         }
     }, [id, location.state]);
 
@@ -375,6 +379,7 @@ const BudgetForm: React.FC = () => {
     const loadBudget = async (idToLoad?: string) => {
         const targetId = idToLoad || activeId;
         if (!targetId) return;
+        setIsDataLoaded(false); // Reset while loading
         const { data, error } = await supabase.from('budgets').select('*, budget_items(*)').eq('id', targetId).single();
         if (data) {
             setBudgetNumber(data.budget_number);
@@ -539,11 +544,13 @@ const BudgetForm: React.FC = () => {
 
             }));
             setItems(mappedItems);
+            setIsDataLoaded(true);
         }
     };
 
 
     const saveBudget = async (silent = false, skipNavigate = false) => {
+        if (!isDataLoaded && silent) return null;
         if (isSavingRef.current || (loading && !silent)) return null;
 
         if (status === 'PROPOSTA ACEITA') {
@@ -621,7 +628,6 @@ const BudgetForm: React.FC = () => {
             }
 
             // Save items
-            await supabase.from('budget_items').delete().eq('budget_id', budgetId);
             const itemsPayload = items.map(it => {
                 const suppIndex = suppliersList.find(s => s.id === it.supplier_id);
                 return {
@@ -651,7 +657,9 @@ const BudgetForm: React.FC = () => {
                     product_image_url: it.productImage || null
                 };
             });
-            if (items.length > 0) {
+
+            await supabase.from('budget_items').delete().eq('budget_id', budgetId);
+            if (itemsPayload.length > 0) {
                 const { error: itemsError } = await supabase.from('budget_items').insert(itemsPayload);
                 if (itemsError) throw itemsError;
             }
@@ -713,14 +721,14 @@ const BudgetForm: React.FC = () => {
             return;
         }
 
-        if (!activeId || budgetNumber === 'AUTO') return;
+        if (!activeId || budgetNumber === 'AUTO' || !isDataLoaded) return;
 
         const delayDebounceFn = setTimeout(() => {
             saveBudget(true);
-        }, 1500);
+        }, 3000); // Increased debounce to 3s for safer auto-save
 
         return () => clearTimeout(delayDebounceFn);
-    }, [items, vendedor, status, dataOrcamento, dataPedido, issuer, clientData.id, clientData.emailFin, validity, shipping, deliveryDeadline, paymentMethod, observation, activeId]);
+    }, [items, vendedor, status, dataOrcamento, dataPedido, issuer, clientData.id, clientData.emailFin, validity, shipping, deliveryDeadline, paymentMethod, observation, activeId, isDataLoaded]);
 
     const handleGenerateOrderClick = () => {
         if (!activeId || budgetNumber === 'AUTO') {
@@ -1343,7 +1351,6 @@ const BudgetForm: React.FC = () => {
                                             productsList={productsList}
                                             suppliersList={suppliersList}
                                             searchProducts={searchProducts}
-                                            CustomSelect={CustomSelect}
                                             onAddSupplier={openSupplierModal}
                                         />
                                     ))}

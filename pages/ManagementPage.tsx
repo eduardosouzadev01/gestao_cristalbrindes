@@ -15,42 +15,42 @@ const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style:
 export const CRM_STATUS_CONFIG: Record<string, { label: string; colorClass: string; icon: string }> = {
     'ATENDIMENTO': { 
         label: 'Em Andamento', 
-        colorClass: '!bg-sky-50 !text-sky-700 !border-sky-100', 
+        colorClass: '!bg-sky-100 !text-sky-900 !border-sky-300', 
         icon: 'pending_actions' 
     },
     'ACOMPANHAMENTO_01': { 
         label: 'Acompanhamento 01', 
-        colorClass: '!bg-cyan-50 !text-cyan-700 !border-cyan-100', 
+        colorClass: '!bg-cyan-100 !text-cyan-900 !border-cyan-300', 
         icon: 'assignment_turned_in' 
     },
     'ACOMPANHAMENTO_02': { 
         label: 'Acompanhamento 02', 
-        colorClass: '!bg-indigo-50 !text-indigo-700 !border-indigo-100', 
+        colorClass: '!bg-indigo-100 !text-indigo-900 !border-indigo-300', 
         icon: 'task_alt' 
     },
     'PROPOSTA_ENVIADA': { 
         label: 'Proposta Enviada', 
-        colorClass: '!bg-amber-50 !text-amber-700 !border-amber-100', 
+        colorClass: '!bg-amber-100 !text-amber-900 !border-amber-300', 
         icon: 'send' 
     },
     'ENVIO_CATALOGO': { 
         label: 'Envio de Catálogo', 
-        colorClass: '!bg-orange-50 !text-orange-700 !border-orange-100', 
+        colorClass: '!bg-orange-100 !text-orange-900 !border-orange-300', 
         icon: 'auto_stories' 
     },
     'PEDIDO_ABERTO': { 
         label: 'Pedido Aberto', 
-        colorClass: '!bg-emerald-50 !text-emerald-700 !border-emerald-100', 
+        colorClass: '!bg-emerald-100 !text-emerald-900 !border-emerald-300', 
         icon: 'verified' 
     },
     'NAO_ATENDE_PRAZO': { 
         label: 'Não atende Prazo', 
-        colorClass: '!bg-rose-50 !text-rose-700 !border-rose-100', 
+        colorClass: '!bg-rose-100 !text-rose-900 !border-rose-300', 
         icon: 'event_busy' 
     },
     'NAO_APROVADO': { 
         label: 'Não Aprovado', 
-        colorClass: '!bg-slate-50 !text-slate-700 !border-slate-100', 
+        colorClass: '!bg-red-100 !text-red-900 !border-red-300', 
         icon: 'cancel' 
     }
 };
@@ -91,7 +91,8 @@ const ManagementPage: React.FC = () => {
 
     const initialLeadState: Partial<Lead> = {
         status: 'ATENDIMENTO',
-        salesperson: userSalesperson || 'VENDAS 01',
+        atendimento_status: 'ATENDIMENTO',
+        salesperson: userSalesperson || '', // Prevent silent default to VENDAS 01
         priority: 'NORMAL',
         client_name: '', client_contact_name: '', client_phone: '', client_email: '', client_doc: ''
     };
@@ -150,6 +151,16 @@ const ManagementPage: React.FC = () => {
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
     const [selectedClientToTransfer, setSelectedClientToTransfer] = useState<any>(null);
     const [transferReason, setTransferReason] = useState('');
+    
+    // Direct Transfer States
+    const [isDirectTransferModalOpen, setIsDirectTransferModalOpen] = useState(false);
+    const [leadToDirectTransfer, setLeadToDirectTransfer] = useState<Lead | null>(null);
+    const [targetSalesperson, setTargetSalesperson] = useState('');
+    const [isTransferring, setIsTransferring] = useState(false);
+
+    const SALESPERSON_OPTIONS = [
+        'VENDAS 01', 'VENDAS 02', 'VENDAS 03', 'VENDAS 04'
+    ];
 
     // Check Client Modal (initial check)
     const [isCheckClientModalOpen, setIsCheckClientModalOpen] = useState(false);
@@ -435,6 +446,55 @@ const ManagementPage: React.FC = () => {
         }
     };
 
+    const handleDirectTransfer = async () => {
+        if (!leadToDirectTransfer || !targetSalesperson) return;
+        
+        setIsTransferring(true);
+        try {
+            // 1. Atualizar o atendimento (lead) no CRM
+            const { error: leadError } = await supabase
+                .from('crm_leads')
+                .update({ salesperson: targetSalesperson })
+                .eq('id', leadToDirectTransfer.id);
+
+            if (leadError) throw leadError;
+
+            // 2. Localizar e atualizar o parceiro (cliente)
+            const conditions = [];
+            if (leadToDirectTransfer.client_doc) conditions.push(`doc.eq."${leadToDirectTransfer.client_doc.replace(/"/g, '""')}"`);
+            if (leadToDirectTransfer.client_email) conditions.push(`email.eq."${leadToDirectTransfer.client_email.replace(/"/g, '""')}"`);
+            
+            if (conditions.length > 0) {
+                const { data: partners, error: fetchPartnerError } = await supabase
+                    .from('partners')
+                    .select('id')
+                    .or(conditions.join(','))
+                    .eq('type', 'CLIENTE')
+                    .limit(1);
+
+                if (!fetchPartnerError && partners && partners.length > 0) {
+                    const { error: partnerUpdateError } = await supabase
+                        .from('partners')
+                        .update({ salesperson: targetSalesperson })
+                        .eq('id', partners[0].id);
+                    
+                    if (partnerUpdateError) console.error('Erro ao atualizar vendedor do parceiro:', partnerUpdateError);
+                }
+            }
+
+            toast.success(`Atendimento transferido com sucesso para ${targetSalesperson}!`);
+            setIsDirectTransferModalOpen(false);
+            setLeadToDirectTransfer(null);
+            setTargetSalesperson('');
+            fetchLeads();
+        } catch (error: any) {
+            console.error('Erro na transferência:', error);
+            toast.error('Erro ao transferir atendimento: ' + error.message);
+        } finally {
+            setIsTransferring(false);
+        }
+    };
+
     const handleAttendLead = async (e: React.MouseEvent, leadId: string) => {
         e.stopPropagation();
         try {
@@ -484,7 +544,7 @@ const ManagementPage: React.FC = () => {
                 client_phone: foundClient.phone,
                 client_email: foundClient.email,
                 client_doc: foundClient.doc || '',
-                salesperson: isSeller ? userSalesperson : (foundClient.salesperson || baseLead.salesperson)
+                salesperson: userSalesperson || foundClient.salesperson || 'VENDAS 01',
             });
             setEditingLead(null);
             setPartnerSaved(true);
@@ -594,6 +654,11 @@ const ManagementPage: React.FC = () => {
             return;
         }
 
+        if (!newLead.salesperson) {
+            toast.error('Vendedor responsável é obrigatório.');
+            return;
+        }
+
         if (newLead.client_email) {
             const openStatuses = ['ATENDIMENTO', 'PROPOSTA_ENVIADA', 'ENVIO_CATALOGO'];
             let checkQuery = supabase
@@ -670,7 +735,7 @@ const ManagementPage: React.FC = () => {
             setEditingLead(null);
             setShowClientForm(false);
             setPartnerSaved(false);
-            setNewLead({ ...initialLeadState, salesperson: isSeller ? appUser?.salesperson : 'VENDAS 01' });
+            setNewLead({ ...initialLeadState, salesperson: userSalesperson || 'VENDAS 01' });
             setClientSearchTerm('');
             fetchLeads();
         } catch (e: any) {
@@ -702,15 +767,16 @@ const ManagementPage: React.FC = () => {
             return;
         }
 
-        // Optimistic update for immediate feedback in summary cards
-        setLeads(prevLeads => prevLeads.map(l => l.id === lead.id ? { ...l, status: newStatus } : l));
+        // Optimistic update - update both fields to maintain consistency
+        setLeads(prevLeads => prevLeads.map(l => l.id === lead.id ? { ...l, status: newStatus as any, atendimento_status: newStatus } : l));
 
         const { error } = await supabase.from('crm_leads').update({
-            status: newStatus
+            status: newStatus,
+            atendimento_status: newStatus
         }).eq('id', lead.id);
 
         if (!error) {
-            toast.success(`Status atualizado para ${newStatus}`);
+            toast.success(`Status atualizado para ${CRM_STATUS_CONFIG[newStatus]?.label || newStatus}`);
             fetchLeads();
         } else {
             fetchLeads();
@@ -719,11 +785,12 @@ const ManagementPage: React.FC = () => {
     };
 
     const updateLeadAtendimentoStatus = async (lead: Lead, newStatus: string) => {
-        // Optimistic update
-        setLeads(prevLeads => prevLeads.map(l => l.id === lead.id ? { ...l, atendimento_status: newStatus } : l));
+        // Optimistic update - update both fields for consistency
+        setLeads(prevLeads => prevLeads.map(l => l.id === lead.id ? { ...l, atendimento_status: newStatus, status: newStatus as any } : l));
 
         const { error } = await supabase.from('crm_leads').update({
-            atendimento_status: newStatus
+            atendimento_status: newStatus,
+            status: newStatus
         }).eq('id', lead.id);
 
         if (!error) {
@@ -770,6 +837,7 @@ const ManagementPage: React.FC = () => {
 
         const { error } = await supabase.from('crm_leads').update({
             status: 'PEDIDO_ABERTO',
+            atendimento_status: 'PEDIDO_ABERTO',
             closing_metadata: metadata,
             estimated_value: finalizeForm.value,
             finish_reason_category: finalizeForm.category
@@ -794,6 +862,7 @@ const ManagementPage: React.FC = () => {
 
         const { error } = await supabase.from('crm_leads').update({
             status: 'NAO_APROVADO',
+            atendimento_status: 'NAO_APROVADO',
             lost_reason: `[${lostForm.category}] ${lostForm.reason}`,
             finish_reason_category: lostForm.category
         }).eq('id', pendingStatusLead.id);
@@ -919,7 +988,7 @@ const ManagementPage: React.FC = () => {
                     <button
                         onClick={() => {
                             setEditingLead(null);
-                            setNewLead({ ...initialLeadState, salesperson: isSeller ? appUser?.salesperson : 'VENDAS 01' });
+                            setNewLead({ ...initialLeadState, salesperson: userSalesperson || 'VENDAS 01' });
                             setIsLeadModalOpen(true);
                         }}
                         className="px-4 py-2 bg-[#1565C0] text-white rounded-lg text-[11px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-blue-700 hover:shadow-blue-500/40 transition-all flex items-center gap-2"
@@ -992,7 +1061,7 @@ const ManagementPage: React.FC = () => {
 
                     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
 
-                        <div className="p-6 border-b border-gray-100 flex flex-wrap justify-between items-center bg-gray-50/50 gap-4">
+                    <div className="p-6 border-b border-gray-200 flex flex-wrap justify-between items-center bg-gray-50 gap-4">
                             <div className="flex items-center gap-4">
                                 <div>
                                     <h2 className="text-lg font-black text-gray-900 uppercase">Planilha de Atendimentos</h2>
@@ -1033,7 +1102,7 @@ const ManagementPage: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center justify-between gap-4 py-4 px-6 bg-slate-50/50 border-b border-gray-100">
+                        <div className="flex flex-wrap items-center justify-between gap-4 py-4 px-6 bg-slate-100/50 border-b border-gray-200">
                                                     <div className="relative">
                                     <span className="material-icons-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">filter_list</span>
                                     <select 
@@ -1055,16 +1124,16 @@ const ManagementPage: React.FC = () => {
                         </div>
 
                         <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200 text-[13px]">
+                            <table className="min-w-full divide-y divide-gray-300 text-[14px]">
                                 <thead>
-                                    <tr className="bg-gray-50/50">
-                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Atendimento</th>
-                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Prioridade</th>
-                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Data</th>
-                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Cliente / Empresa</th>
-                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Item / Projeto</th>
-                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Vendedor</th>
-                                        <th className="px-6 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Ações Rápidas</th>
+                                    <tr className="bg-gray-100/50">
+                                        <th className="px-6 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-200">Atendimento</th>
+                                        <th className="px-6 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-200">Prioridade</th>
+                                        <th className="px-6 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-200">Data</th>
+                                        <th className="px-6 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-200">Cliente / Empresa</th>
+                                        <th className="px-6 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-200">Item / Projeto</th>
+                                        <th className="px-6 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-200">Vendedor</th>
+                                        <th className="px-6 py-4 text-right text-[11px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-200">Ações Rápidas</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-100">
@@ -1083,7 +1152,8 @@ const ManagementPage: React.FC = () => {
                                         })
                                         .filter(l => {
                                             if (kanbanStatusCategoryFilter === 'Todos') return true;
-                                            return l.status === kanbanStatusCategoryFilter;
+                                            const currentStatus = l.atendimento_status || l.status;
+                                            return currentStatus === kanbanStatusCategoryFilter;
                                         })
                                         .filter(l => {
                                             if (!searchTerm) return true;
@@ -1098,7 +1168,7 @@ const ManagementPage: React.FC = () => {
                                                         <div className="relative status-dropdown-container">
                                                             <button 
                                                                 onClick={() => setOpenStatusMenuId(openStatusMenuId === `${l.id}-atend` ? null : `${l.id}-atend`)}
-                                                                className={`flex items-center justify-between w-full min-w-[140px] text-[10px] font-black uppercase tracking-tighter rounded py-1.5 px-3 outline-none transition-all shadow-sm ${
+                                                                className={`flex items-center justify-between w-full min-w-[150px] text-[11px] font-black uppercase tracking-tighter rounded-md py-2 px-3 outline-none transition-all shadow-md border ${
                                                                     getStatusStyle(l.atendimento_status || 'ATENDIMENTO').colorClass
                                                                 }`}
                                                             >
@@ -1119,7 +1189,7 @@ const ManagementPage: React.FC = () => {
                                                                             <button 
                                                                                 key={id} 
                                                                                 onClick={() => {
-                                                                                    updateLeadAtendimentoStatus(l, id);
+                                                                                    updateLeadStatus(l, id);
                                                                                     setOpenStatusMenuId(null);
                                                                                 }}
                                                                                 className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left rounded-lg transition-all hover:scale-[1.02] active:scale-95 ${cfg.colorClass} border border-transparent hover:border-current/20`}
@@ -1128,7 +1198,7 @@ const ManagementPage: React.FC = () => {
                                                                                     <div className="flex items-center justify-center w-6 h-6 rounded-full bg-white/50 shadow-inner">
                                                                                         <span className="material-icons-outlined text-[16px]">{cfg.icon}</span>
                                                                                     </div>
-                                                                                    <span className="font-black text-[10px] uppercase tracking-wider">{cfg.label}</span>
+                                                                                    <span className="font-black text-[11px] uppercase tracking-wider">{cfg.label}</span>
                                                                                 </div>
                                                                                 {(l.atendimento_status || 'ATENDIMENTO') === id && <span className="material-icons-outlined text-sm opacity-50">check</span>}
                                                                             </button>
@@ -1152,12 +1222,12 @@ const ManagementPage: React.FC = () => {
                                                             {l.priority || 'NORMAL'}
                                                         </button>
                                                     </td>
-                                                    <td className="px-6 py-4 font-medium text-gray-500 tabular-nums">
+                                                    <td className="px-6 py-4 font-bold text-gray-600 tabular-nums">
                                                         {formatDate(l.created_at)}
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <div className="font-bold text-gray-900 line-clamp-1">{fixClientName(l.client_name)}</div>
-                                                        <div className="text-[11px] text-gray-400">{l.client_contact_name || l.client_phone}</div>
+                                                        <div className="font-black text-gray-950 text-base line-clamp-1">{fixClientName(l.client_name)}</div>
+                                                        <div className="text-xs font-bold text-gray-500">{l.client_contact_name || l.client_phone}</div>
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         {l.closing_metadata?.quoted_item ? (
@@ -1174,7 +1244,7 @@ const ManagementPage: React.FC = () => {
                                                             <div className="flex items-center justify-center px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-black text-[9px] border border-gray-200">
                                                                 {getSalespersonInitials(l.salesperson)}
                                                             </div>
-                                                            <span className="font-bold text-gray-600 text-[11px] truncate max-w-[80px]">{l.salesperson}</span>
+                                                            <span className="font-black text-gray-800 text-xs truncate max-w-[100px]">{l.salesperson}</span>
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
@@ -1217,6 +1287,18 @@ const ManagementPage: React.FC = () => {
                                                                 title="Editar Detalhes"
                                                             >
                                                                 <span className="material-icons-outlined text-lg">edit</span>
+                                                            </button>
+                                                            <button 
+                                                                onClick={(e) => { 
+                                                                    e.stopPropagation(); 
+                                                                    setLeadToDirectTransfer(l);
+                                                                    setTargetSalesperson(l.salesperson || '');
+                                                                    setIsDirectTransferModalOpen(true);
+                                                                }}
+                                                                className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all"
+                                                                title="Transferir Atendimento"
+                                                            >
+                                                                <span className="material-icons-outlined text-lg">swap_horiz</span>
                                                             </button>
                                                             <button 
                                                                 onClick={(e) => { e.stopPropagation(); convertToBudget(l); }}
@@ -1400,7 +1482,7 @@ const ManagementPage: React.FC = () => {
                                                                                 client_phone: l.phone,
                                                                                 client_email: l.email,
                                                                                 client_doc: l.doc,
-                                                                                salesperson: isSeller ? userSalesperson : (l.salesperson || newLead.salesperson)
+                                                                                salesperson: userSalesperson || l.salesperson || 'VENDAS 01'
                                                                             });
                                                                             setClientSearchTerm('');
                                                                             setClientSearchResults([]);
@@ -1438,7 +1520,7 @@ const ManagementPage: React.FC = () => {
                                                         onClick={() => {
                                                             setShowClientForm(true);
                                                             setPartnerSaved(false);
-                                                            setNewLead({...initialLeadState, salesperson: isSeller ? userSalesperson : 'VENDAS 01'});
+                                                            setNewLead({...initialLeadState, salesperson: userSalesperson || 'VENDAS 01'});
                                                         }}
                                                         className="w-full py-4 bg-slate-50 text-slate-600 border border-slate-200 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-100 hover:border-slate-300 transition-all flex items-center justify-center gap-3 shadow-sm active:scale-[0.98]"
                                                     >
@@ -1452,14 +1534,20 @@ const ManagementPage: React.FC = () => {
 
                                             {(editingLead || showClientForm) && (
                                                 <div className={`p-6 rounded-2xl border-2 transition-all duration-500 animate-in fade-in slide-in-from-bottom-2 ${partnerSaved ? 'border-green-500 bg-green-50/30' : 'border-slate-100 bg-slate-50/50'}`}>
-                                                    <div className="flex justify-between items-center mb-6">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className={`w-3 h-3 rounded-full ${partnerSaved ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]' : 'bg-slate-300 animate-pulse'}`}></div>
+                                                    <div className="flex justify-between items-center mb-6 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className={`w-3.5 h-3.5 rounded-full ${partnerSaved ? 'bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.5)]' : 'bg-slate-300 animate-pulse'}`}></div>
                                                             <div>
-                                                                <h4 className={`text-[11px] font-black uppercase tracking-widest ${partnerSaved ? 'text-green-600' : 'text-slate-500'}`}>
-                                                                    {partnerSaved ? 'Cliente Vinculado' : 'Formulário de Cadastro'}
+                                                                <h4 className={`text-[12px] font-black uppercase tracking-widest ${partnerSaved ? 'text-green-600' : 'text-slate-600'}`}>
+                                                                    {partnerSaved ? 'Cliente Vinculado' : 'Cadastro de Cliente'}
                                                                 </h4>
-                                                                {editingLead && <p className="text-[8px] text-slate-400 font-bold uppercase mt-0.5">Editando Atendimento Existente</p>}
+                                                                <div className="flex items-center gap-2 mt-1">
+                                                                    <span className="text-[10px] text-blue-600 font-black uppercase bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 flex items-center gap-1">
+                                                                        <span className="material-icons-outlined text-[12px]">person</span>
+                                                                        VENDEDOR: {newLead.salesperson || 'NÃO DEFINIDO'}
+                                                                    </span>
+                                                                    {editingLead && <span className="text-[8px] text-slate-400 font-bold uppercase border border-slate-200 px-2 py-0.5 rounded-md">Editando</span>}
+                                                                </div>
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-2">
@@ -1470,14 +1558,14 @@ const ManagementPage: React.FC = () => {
                                                                         setPartnerSaved(false);
                                                                         setNewLead(initialLeadState);
                                                                     }}
-                                                                    className="px-3 py-1.5 bg-white text-slate-400 hover:text-red-500 border border-slate-200 rounded-lg text-[10px] font-black uppercase transition-all shadow-sm flex items-center gap-1.5"
+                                                                    className="px-4 py-2 bg-white text-slate-500 hover:text-red-500 border border-slate-200 rounded-xl text-[10px] font-black uppercase transition-all shadow-sm flex items-center gap-2 hover:bg-red-50 hover:border-red-100"
                                                                 >
-                                                                    <span className="material-icons-outlined text-sm">logout</span> Alterar
+                                                                    <span className="material-icons-outlined text-[14px]">logout</span> Alterar
                                                                 </button>
                                                             )}
                                                             {partnerSaved && (
-                                                                <span className="bg-emerald-500 text-white text-[10px] px-3 py-1.5 rounded-lg font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-emerald-200">
-                                                                    <span className="material-icons-outlined text-sm">verified</span> OK
+                                                                <span className="bg-emerald-500 text-white text-[11px] px-4 py-2 rounded-xl font-black uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-emerald-100">
+                                                                    <span className="material-icons-outlined text-sm">verified</span> CLIENTE OK
                                                                 </span>
                                                             )}
                                                         </div>
@@ -1485,29 +1573,29 @@ const ManagementPage: React.FC = () => {
 
                                                     <div className="space-y-4">
                                                         <div>
-                                                            <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-wider ml-1">Empresa / Razão Social *</label>
+                                                            <label className="block text-[11px] font-black text-slate-500 uppercase mb-2 tracking-wider ml-1">Empresa / Razão Social *</label>
                                                             <input
-                                                                className={`w-full rounded-xl border-slate-200 focus:ring-4 focus:ring-blue-500/10 text-xs font-bold text-slate-700 placeholder:text-slate-300 ${partnerSaved ? 'bg-white/50 border-transparent' : 'bg-white shadow-sm'}`}
+                                                                className={`w-full py-3.5 px-4 rounded-xl border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 text-[13px] font-black text-slate-700 placeholder:text-slate-300 transition-all ${partnerSaved ? 'bg-slate-50 border-transparent' : 'bg-white shadow-sm hover:border-slate-300'}`}
                                                                 placeholder="DIGITE O NOME..."
                                                                 value={newLead.client_name || ''}
                                                                 onChange={e => { setNewLead({ ...newLead, client_name: e.target.value }); setPartnerSaved(false); }}
                                                             />
                                                         </div>
 
-                                                        <div className="grid grid-cols-2 gap-4">
+                                                        <div className="grid grid-cols-2 gap-5">
                                                             <div>
-                                                                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-wider ml-1">Contato</label>
+                                                                <label className="block text-[11px] font-black text-slate-500 uppercase mb-2 tracking-wider ml-1">Contato</label>
                                                                 <input
-                                                                    className={`w-full rounded-xl border-slate-200 focus:ring-4 focus:ring-blue-500/10 text-xs font-bold text-slate-700 placeholder:text-slate-300 ${partnerSaved ? 'bg-white/50 border-transparent' : 'bg-white shadow-sm'}`}
+                                                                    className={`w-full py-3 px-4 rounded-xl border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 text-sm font-black text-slate-700 placeholder:text-slate-300 transition-all ${partnerSaved ? 'bg-slate-50 border-transparent' : 'bg-white shadow-sm hover:border-slate-300'}`}
                                                                     placeholder="NOME DO CONTATO..."
                                                                     value={newLead.client_contact_name || ''}
                                                                     onChange={e => { setNewLead({ ...newLead, client_contact_name: e.target.value }); setPartnerSaved(false); }}
                                                                 />
                                                             </div>
                                                             <div>
-                                                                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-wider ml-1">Doc (CPF/CNPJ)</label>
+                                                                <label className="block text-[11px] font-black text-slate-500 uppercase mb-2 tracking-wider ml-1">Doc (CPF/CNPJ)</label>
                                                                 <input
-                                                                    className={`w-full rounded-xl border-slate-200 focus:ring-4 focus:ring-blue-500/10 text-xs font-bold text-slate-700 placeholder:text-slate-300 ${partnerSaved ? 'bg-white/50 border-transparent' : 'bg-white shadow-sm'}`}
+                                                                    className={`w-full py-3 px-4 rounded-xl border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 text-sm font-black text-slate-700 placeholder:text-slate-300 transition-all ${partnerSaved ? 'bg-slate-50 border-transparent' : 'bg-white shadow-sm hover:border-slate-300'}`}
                                                                     placeholder="000.000.000-00"
                                                                     value={newLead.client_doc || ''}
                                                                     onChange={e => { setNewLead({ ...newLead, client_doc: maskCpfCnpj(e.target.value) }); setPartnerSaved(false); }}
@@ -1515,21 +1603,21 @@ const ManagementPage: React.FC = () => {
                                                             </div>
                                                         </div>
 
-                                                        <div className="grid grid-cols-2 gap-4">
+                                                        <div className="grid grid-cols-2 gap-5">
                                                             <div>
-                                                                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-wider ml-1">WhatsApp</label>
+                                                                <label className="block text-[11px] font-black text-slate-500 uppercase mb-2 tracking-wider ml-1">WhatsApp</label>
                                                                 <input
-                                                                    className={`w-full rounded-xl border-slate-200 focus:ring-4 focus:ring-blue-500/10 text-xs font-bold text-slate-700 placeholder:text-slate-300 ${partnerSaved ? 'bg-white/50 border-transparent' : 'bg-white shadow-sm'}`}
+                                                                    className={`w-full py-3 px-4 rounded-xl border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 text-sm font-black text-slate-700 placeholder:text-slate-300 transition-all ${partnerSaved ? 'bg-slate-50 border-transparent' : 'bg-white shadow-sm hover:border-slate-300'}`}
                                                                     placeholder="(00) 00000-0000"
                                                                     value={newLead.client_phone || ''}
                                                                     onChange={e => { setNewLead({ ...newLead, client_phone: maskPhone(e.target.value) }); setPartnerSaved(false); }}
                                                                 />
                                                             </div>
                                                             <div>
-                                                                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-wider ml-1">E-mail</label>
+                                                                <label className="block text-[11px] font-black text-slate-500 uppercase mb-2 tracking-wider ml-1">E-mail</label>
                                                                 <input
                                                                     type="email"
-                                                                    className={`w-full rounded-xl border-slate-200 focus:ring-4 focus:ring-blue-500/10 text-xs font-bold text-slate-700 placeholder:text-slate-300 ${partnerSaved ? 'bg-white/50 border-transparent' : 'bg-white shadow-sm'}`}
+                                                                    className={`w-full py-3 px-4 rounded-xl border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 text-sm font-black text-slate-700 placeholder:text-slate-300 transition-all ${partnerSaved ? 'bg-slate-50 border-transparent' : 'bg-white shadow-sm hover:border-slate-300'}`}
                                                                     placeholder="CLIENTE@EMAIL.COM..."
                                                                     value={newLead.client_email || ''}
                                                                     onChange={e => { setNewLead({ ...newLead, client_email: e.target.value.toLowerCase() }); setPartnerSaved(false); }}
@@ -1570,7 +1658,39 @@ const ManagementPage: React.FC = () => {
                                             </div>
 
                                             <div className="grid grid-cols-12 gap-6">
-                                                <div className="col-span-7">
+                                                <div className="col-span-12">
+                                                    <div className="flex justify-between items-center mb-1.5 px-1">
+                                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Vendedor Responsável</label>
+                                                        {isSeller && (
+                                                            <span className="flex items-center gap-1 text-[10px] font-bold text-blue-600 uppercase bg-blue-50 px-2 py-0.5 rounded-full">
+                                                                <span className="material-icons-outlined text-[10px]">lock</span>
+                                                                Vinculado à sua conta
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="relative group">
+                                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none text-blue-500">
+                                                            <span className="material-icons-outlined text-lg">person</span>
+                                                        </div>
+                                                        <select
+                                                            className={`w-full pl-12 pr-10 py-3.5 rounded-2xl border-slate-100 bg-slate-50 transition-all text-sm font-black text-blue-800 uppercase shadow-inner appearance-none ${isSeller ? 'cursor-not-allowed opacity-80' : 'cursor-pointer group-hover:bg-white focus:bg-white focus:ring-4 focus:ring-blue-500/10'}`}
+                                                            value={newLead.salesperson || ''}
+                                                            onChange={e => setNewLead({ ...newLead, salesperson: e.target.value })}
+                                                            disabled={isSeller}
+                                                        >
+                                                            {['VENDAS 01', 'VENDAS 02', 'VENDAS 03', 'VENDAS 04', 'VENDAS 05', 'RECEPÇÃO', 'INTERNO', 'EXTERNO'].map(v => (
+                                                                <option key={v} value={v}>{v}</option>
+                                                            ))}
+                                                        </select>
+                                                        {!isSeller && (
+                                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                                                <span className="material-icons-outlined">expand_more</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="col-span-12">
                                                     <div className="flex justify-between items-center mb-1.5 px-1">
                                                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Item Buscado *</label>
                                                     </div>
@@ -1856,6 +1976,99 @@ const ManagementPage: React.FC = () => {
                                         className="flex-1 py-4 rounded-2xl font-black uppercase text-[10px] shadow-xl transition-all active:scale-95 bg-orange-500 text-white hover:bg-orange-600 shadow-orange-200"
                                     >
                                         Enviar Solicitação
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* Direct Transfer Modal (Immediate) - Redesigned Horizontal Landscape */}
+            {
+                isDirectTransferModalOpen && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+                        <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-[0_32px_100px_-20px_rgba(0,0,0,0.2)] overflow-hidden animate-in zoom-in-95 duration-200 border-t border-slate-100">
+                            {/* Modern Header */}
+                            <div className="p-8 pb-4 flex flex-col md:flex-row items-center gap-6">
+                                <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center border-2 border-blue-100/50 shadow-sm shrink-0">
+                                    <span className="material-icons-outlined text-3xl">swap_horiz</span>
+                                </div>
+                                <div className="text-center md:text-left flex-1">
+                                    <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter leading-none mb-2">Transferir Lead</h3>
+                                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50/50 rounded-full border border-blue-100">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                        <span className="text-[10px] text-blue-600 font-black uppercase tracking-widest">{leadToDirectTransfer?.client_name}</span>
+                                    </div>
+                                </div>
+                                <div className="hidden md:block">
+                                    <button 
+                                        onClick={() => { setIsDirectTransferModalOpen(false); setLeadToDirectTransfer(null); }}
+                                        className="w-10 h-10 rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors flex items-center justify-center"
+                                    >
+                                        <span className="material-icons-outlined">close</span>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div className="px-8 pb-10 pt-2 space-y-8">
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between px-1">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Selecione o Novo Vendedor</label>
+                                    </div>
+                                    
+                                    {/* Horizontal Selection Grid */}
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        {SALESPERSON_OPTIONS.map(sp => {
+                                            const isSelected = targetSalesperson === sp;
+                                            return (
+                                                <button
+                                                    key={sp}
+                                                    onClick={() => setTargetSalesperson(sp)}
+                                                    className={`group relative p-4 rounded-3xl border-2 transition-all duration-300 flex flex-col items-center gap-3 text-center ${isSelected ? 'bg-blue-600 border-blue-600 text-white shadow-xl shadow-blue-200 scale-105 z-10' : 'bg-slate-50/50 border-transparent text-slate-400 hover:border-blue-200 hover:bg-white hover:shadow-lg'}`}
+                                                >
+                                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-sm font-black transition-all ${isSelected ? 'bg-white/20' : 'bg-white shadow-sm group-hover:bg-blue-50 group-hover:text-blue-600'}`}>
+                                                        {getSalespersonInitials(sp)}
+                                                    </div>
+                                                    <div>
+                                                        <p className={`text-[10px] font-black uppercase tracking-wider leading-none ${isSelected ? 'text-white' : 'text-slate-800'}`}>{sp.replace('VENDAS ', 'V')}</p>
+                                                        <p className={`text-[8px] font-bold uppercase mt-1 tracking-tighter ${isSelected ? 'text-white/70' : 'text-slate-400'}`}>Equipe</p>
+                                                    </div>
+                                                    {isSelected && (
+                                                        <div className="absolute top-2 right-2">
+                                                            <span className="material-icons-outlined text-base animate-in zoom-in duration-300">check_circle</span>
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col md:flex-row items-center gap-4">
+                                    <button
+                                        onClick={handleDirectTransfer}
+                                        disabled={!targetSalesperson || isTransferring || targetSalesperson === leadToDirectTransfer?.salesperson}
+                                        className={`flex-1 w-full py-5 rounded-3xl font-black uppercase text-[11px] tracking-[0.15em] transition-all active:scale-95 flex items-center justify-center gap-3 ${!targetSalesperson || isTransferring || targetSalesperson === leadToDirectTransfer?.salesperson ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-blue-600 shadow-xl shadow-slate-200 hover:shadow-blue-200'}`}
+                                    >
+                                        {isTransferring ? (
+                                            <>
+                                                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                                                Transferindo...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span className="material-icons-outlined text-base">verified</span>
+                                                Confirmar Transferência
+                                            </>
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => { setIsDirectTransferModalOpen(false); setLeadToDirectTransfer(null); }}
+                                        className="md:w-auto w-full px-8 py-5 text-slate-400 font-bold uppercase text-[9px] tracking-widest hover:text-red-500 transition-colors bg-slate-50 hover:bg-red-50 rounded-3xl"
+                                        disabled={isTransferring}
+                                    >
+                                        Cancelar
                                     </button>
                                 </div>
                             </div>
