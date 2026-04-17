@@ -127,14 +127,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('Supabase auth error:', error);
       
       // Handle network/DNS errors specifically
-      if (error.message?.includes('fetch') || error.name === 'AuthRetryableFetchError') {
+      if (error.message?.includes('fetch') || error.name === 'AuthRetryableFetchError' || error.message?.includes('network')) {
+        const isPlaceholder = supabase.auth.getSession().then(() => false).catch(() => true); // Check if init failed
+        const currentUrl = (supabase as any).supabaseUrl || 'N/A';
+        
+        if (currentUrl.includes('placeholder')) {
+          return {
+            success: false,
+            error: 'Erro Crítico: O sistema está configurado com uma URL de teste (placeholder). Verifique as variáveis de ambiente (VITE_SUPABASE_URL).'
+          };
+        }
+
+        const domain = currentUrl.replace('https://', '').split('/')[0];
+
         return { 
           success: false, 
-          error: 'Erro de conexão com o servidor. Sua rede ou firewall pode estar bloqueando o acesso ao banco de dados.' 
+          error: `Erro de conexão com o servidor (${domain}). Sua rede ou firewall pode estar bloqueando o acesso ao banco de dados Supabase. Tente usar outra rede (Wi-Fi/4G) ou solicite ao TI a liberação deste domínio.` 
         };
+
       }
       
       return { success: false, error: 'E-mail ou senha incorretos.' };
+
     }
 
     if (!data.user || !data.user.email) {

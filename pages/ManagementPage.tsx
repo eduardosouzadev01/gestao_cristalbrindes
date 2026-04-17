@@ -11,7 +11,10 @@ import { maskPhone, maskCpfCnpj } from '../src/utils/maskUtils';
 import { LeadTableRow } from '../src/components/crm/LeadTableRow';
 import { LeadModal } from '../src/components/crm/LeadModal';
 
+import { exportLeadsToExcel } from '../src/utils/crmExport';
+
 const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
 
 // CRM STATUS CONFIG (Independent for leads)
 export const CRM_STATUS_CONFIG: Record<string, { label: string; colorClass: string; icon: string }> = {
@@ -1030,10 +1033,51 @@ const ManagementPage: React.FC = () => {
                                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Histórico e gestão de leads ativos e finalizados</p>
                                 </div>
                                 <div className="flex items-center gap-2">
+                                    <button 
+                                        onClick={() => {
+                                            const filteredLeads = leads
+                                                .filter(l => kanbanSellerFilter === 'Todos' || l.salesperson === kanbanSellerFilter)
+                                                .filter(l => {
+                                                    if (kanbanPeriodFilter === 'Todos') return true;
+                                                    if (kanbanPeriodFilter === 'Custom') {
+                                                        if (!startDate || !endDate) return true;
+                                                        const leadDate = new Date(l.created_at).toISOString().split('T')[0];
+                                                        return leadDate >= startDate && leadDate <= endDate;
+                                                    }
+                                                    const diff = new Date().getTime() - new Date(l.created_at).getTime();
+                                                    const days = Math.floor(diff / 86400000);
+                                                    if (kanbanPeriodFilter === 'Hoje') return days === 0;
+                                                    if (kanbanPeriodFilter === '7d') return days <= 7;
+                                                    if (kanbanPeriodFilter === '30d') return days <= 30;
+                                                    return true;
+                                                })
+                                                .filter(l => {
+                                                    if (kanbanStatusCategoryFilter === 'Todos') return true;
+                                                    const currentStatus = l.atendimento_status || l.status;
+                                                    return currentStatus === kanbanStatusCategoryFilter;
+                                                })
+                                                .filter(l => {
+                                                    if (!searchTerm) return true;
+                                                    const term = searchTerm.toLowerCase();
+                                                    return (l.client_name?.toLowerCase().includes(term) || 
+                                                            (l.client_contact_name && l.client_contact_name.toLowerCase().includes(term)) || 
+                                                            (l.client_phone && l.client_phone.includes(term)) || 
+                                                            (l.salesperson && l.salesperson.toLowerCase().includes(term)) || 
+                                                            (l.closing_metadata?.quoted_item && l.closing_metadata.quoted_item.toLowerCase().includes(term)));
+                                                });
+                                            exportLeadsToExcel(filteredLeads);
+                                        }}
+                                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/10"
+                                        title="Exportar dados filtrados para Excel"
+                                    >
+                                        <span className="material-icons-outlined text-sm">download</span>
+                                        Exportar Excel
+                                    </button>
                                     <button onClick={() => fetchLeads()} className="p-2.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Sincronizar dados">
                                         <span className="material-icons-outlined text-lg">refresh</span>
                                     </button>
                                 </div>
+
                             </div>
 
                             <div className="flex flex-wrap items-center gap-3">
