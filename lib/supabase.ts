@@ -1,8 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Fallback to avoid crashing the app if env vars are missing
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder-url.supabase.co';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key';
+const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || 'https://placeholder-url.supabase.co').trim();
+const supabaseKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key').trim();
+
 
 if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
   console.error('CRITICAL ERROR: Supabase URL or Key is missing in environment variables!');
