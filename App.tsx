@@ -1,5 +1,5 @@
 import React, { useState, Suspense } from 'react';
-import { HashRouter, Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import { createHashRouter, RouterProvider, Routes, Route, Link, useLocation, useNavigate, Navigate, Outlet } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './lib/auth';
@@ -30,6 +30,7 @@ const UserManagementPage   = React.lazy(() => import('./pages/UserManagementPage
 const CatalogListPage      = React.lazy(() => import('./pages/CatalogListPage'));
 const CatalogEditorPage    = React.lazy(() => import('./pages/CatalogEditorPage'));
 const CatalogPreviewPage   = React.lazy(() => import('./pages/CatalogPreviewPage'));
+const FinancialControlPage = React.lazy(() => import('./pages/FinancialControlPage'));
 
 // ─── Loading fallback ────────────────────────────────────────────────────────
 const PageLoader: React.FC = () => (
@@ -131,6 +132,7 @@ const Header: React.FC = () => {
       subItems: [
         { name: 'Painel Financeiro', path: '/painel-financeiro', permission: 'financeiro.receber', icon: 'dashboard' },
         { name: 'Pedidos & Recebíveis', path: '/pedidos-recebiveis', permission: 'financeiro.receber', icon: 'payments' },
+        { name: 'Planilha de Controle', path: '/financeiro-controle', permission: 'financeiro.receber', icon: 'table_view' },
         { name: 'Contas a Pagar', path: '/payables', permission: 'financeiro.pagar', icon: 'credit_card_off' },
         { name: 'Comissões', path: '/comissoes', permission: 'comissoes', icon: 'monetization_on' }
       ]
@@ -323,8 +325,27 @@ const RouteTracker: React.FC = () => {
 
 // ─── App Layout ──────────────────────────────────────────────────────────────
 const AppLayout: React.FC = () => {
-  const { isAuthenticated, appUser, hasPermission } = useAuth();
+  const { isAuthenticated } = useAuth();
+  
+  if (!isAuthenticated) return <Outlet />;
 
+  return (
+    <div className="min-h-screen flex flex-col">
+      <RouteTracker />
+      <Header />
+      <main className="flex-1 pb-8">
+        <Suspense fallback={<PageLoader />}>
+          <Outlet />
+        </Suspense>
+      </main>
+    </div>
+  );
+};
+
+// ─── Home Redirect Component ──────────────────────────────────────────────
+const HomeRedirect: React.FC = () => {
+  const { appUser, hasPermission } = useAuth();
+  
   const getLandingPage = () => {
     const lastPath = localStorage.getItem('lastPath');
     if (lastPath && lastPath !== '/' && lastPath !== '/login') {
@@ -335,69 +356,11 @@ const AppLayout: React.FC = () => {
     return '/pedidos';
   };
 
-  if (!isAuthenticated) {
-    return (
-      <Suspense fallback={<PageLoader />}>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/proposta/:id" element={<ErrorBoundary><ProposalDetail /></ErrorBoundary>} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      </Suspense>
-    );
-  }
-
-  return (
-    <div className="min-h-screen flex flex-col">
-      <RouteTracker />
-      <Header />
-      <main className="flex-1 py-6">
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            <Route path="/" element={<ProtectedRoute permission="pedidos"><Navigate to={getLandingPage()} replace /></ProtectedRoute>} />
-            <Route path="/pedidos" element={<ProtectedRoute permission="pedidos"><OrderList /></ProtectedRoute>} />
-            <Route path="/pedido/novo" element={<ProtectedRoute permission="pedidos"><OrderForm /></ProtectedRoute>} />
-            <Route path="/pedido/:id" element={<ProtectedRoute permission="pedidos"><OrderForm /></ProtectedRoute>} />
-            <Route path="/orcamentos" element={<ProtectedRoute permission="pedidos"><BudgetList /></ProtectedRoute>} />
-            <Route path="/orcamento/novo" element={<ProtectedRoute permission="pedidos"><BudgetForm /></ProtectedRoute>} />
-            <Route path="/orcamento/:id" element={<ProtectedRoute permission="pedidos"><BudgetForm /></ProtectedRoute>} />
-            <Route path="/propostas" element={<ProtectedRoute permission="pedidos"><ProposalList /></ProtectedRoute>} />
-            <Route path="/proposta/:id" element={<ProtectedRoute permission="pedidos"><ProposalDetail /></ProtectedRoute>} />
-            <Route path="/catalogos" element={<ProtectedRoute permission="fatores"><CatalogListPage /></ProtectedRoute>} />
-            <Route path="/catalogo/novo" element={<ProtectedRoute permission="fatores"><CatalogEditorPage /></ProtectedRoute>} />
-            <Route path="/catalogo/:id" element={<ProtectedRoute permission="fatores"><CatalogEditorPage /></ProtectedRoute>} />
-            <Route path="/catalogo/:id/preview" element={<ProtectedRoute permission="fatores"><CatalogPreviewPage /></ProtectedRoute>} />
-            <Route path="/crm" element={<ProtectedRoute permission="pedidos"><ManagementPage /></ProtectedRoute>} />
-            <Route path="/usuarios" element={<ProtectedRoute permission="fatores"><UserManagementPage /></ProtectedRoute>} />
-            <Route path="/processos" element={<ProtectedRoute permission="financeiro"><InternalTasksPage /></ProtectedRoute>} />
-            <Route path="/produtos" element={<ProtectedRoute permission="produtos"><ProductsPage /></ProtectedRoute>} />
-            <Route path="/clientes" element={<ProtectedRoute permission="cadastros"><ClientList /></ProtectedRoute>} />
-            <Route path="/fornecedores" element={<ProtectedRoute permission="cadastros"><SupplierList /></ProtectedRoute>} />
-            <Route path="/cadastros/novo" element={<ProtectedRoute permission="cadastros"><RegistrationForm /></ProtectedRoute>} />
-            <Route path="/cadastros/editar/:id" element={<ProtectedRoute permission="cadastros"><RegistrationForm /></ProtectedRoute>} />
-            <Route path="/cadastros" element={<Navigate to="/clientes" replace />} />
-            <Route path="/comissoes" element={<ProtectedRoute permission="comissoes"><CommissionPage /></ProtectedRoute>} />
-            <Route path="/relatorios" element={<Navigate to="/crm" replace />} />
-            <Route path="/painel-financeiro" element={<ProtectedRoute permission="financeiro.receber"><FinancialDashboardPage /></ProtectedRoute>} />
-            <Route path="/pedidos-recebiveis" element={<ProtectedRoute permission="financeiro.receber"><OrdersReceivablesPage /></ProtectedRoute>} />
-            <Route path="/saldo-pedidos" element={<Navigate to="/pedidos-recebiveis" replace />} />
-            <Route path="/receivables" element={<Navigate to="/pedidos-recebiveis" replace />} />
-            <Route path="/payables" element={<ProtectedRoute permission="financeiro.pagar"><PayablesPage /></ProtectedRoute>} />
-            <Route path="/configuracoes" element={<ProtectedRoute permission="fatores"><CalculationFactors /></ProtectedRoute>} />
-            <Route path="/configuracoes/fatores/novo" element={<ProtectedRoute permission="fatores"><CalculationFactorForm /></ProtectedRoute>} />
-            <Route path="/configuracoes/fatores/editar/:id" element={<ProtectedRoute permission="fatores"><CalculationFactorForm /></ProtectedRoute>} />
-            <Route path="/login" element={<Navigate to="/" replace />} />
-            <Route path="*" element={<Navigate to={getLandingPage()} replace />} />
-          </Routes>
-        </Suspense>
-      </main>
-    </div>
-  );
+  return <Navigate to={getLandingPage()} replace />;
 };
 
 // ─── Root App ────────────────────────────────────────────────────────────────
 const App: React.FC = () => {
-  // QueryClient inside component so cache can be cleared on logout and between sessions
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
@@ -407,16 +370,57 @@ const App: React.FC = () => {
     },
   }));
 
-  return (
-    <QueryClientProvider client={queryClient}>
-      <HashRouter>
+  const router = React.useMemo(() => createHashRouter([
+    {
+      path: '/',
+      element: (
         <AuthProvider>
           <Toaster position="top-right" richColors />
           <ErrorBoundary>
             <AppLayout />
           </ErrorBoundary>
         </AuthProvider>
-      </HashRouter>
+      ),
+      children: [
+        { index: true, element: <ProtectedRoute permission="pedidos"><HomeRedirect /></ProtectedRoute> },
+        { path: 'pedidos', element: <ProtectedRoute permission="pedidos"><OrderList /></ProtectedRoute> },
+        { path: 'pedido/novo', element: <ProtectedRoute permission="pedidos"><OrderForm /></ProtectedRoute> },
+        { path: 'pedido/:id', element: <ProtectedRoute permission="pedidos"><OrderForm /></ProtectedRoute> },
+        { path: 'orcamentos', element: <ProtectedRoute permission="pedidos"><BudgetList /></ProtectedRoute> },
+        { path: 'orcamento/novo', element: <ProtectedRoute permission="pedidos"><BudgetForm /></ProtectedRoute> },
+        { path: 'orcamento/:id', element: <ProtectedRoute permission="pedidos"><BudgetForm /></ProtectedRoute> },
+        { path: 'propostas', element: <ProtectedRoute permission="pedidos"><ProposalList /></ProtectedRoute> },
+        { path: 'proposta/:id', element: <ErrorBoundary><ProposalDetail /></ErrorBoundary> },
+        { path: 'catalogos', element: <ProtectedRoute permission="fatores"><CatalogListPage /></ProtectedRoute> },
+        { path: 'catalogo/novo', element: <ProtectedRoute permission="fatores"><CatalogEditorPage /></ProtectedRoute> },
+        { path: 'catalogo/:id', element: <ProtectedRoute permission="fatores"><CatalogEditorPage /></ProtectedRoute> },
+        { path: 'catalogo/:id/preview', element: <ProtectedRoute permission="fatores"><CatalogPreviewPage /></ProtectedRoute> },
+        { path: 'crm', element: <ProtectedRoute permission="pedidos"><ManagementPage /></ProtectedRoute> },
+        { path: 'usuarios', element: <ProtectedRoute permission="fatores"><UserManagementPage /></ProtectedRoute> },
+        { path: 'processos', element: <ProtectedRoute permission="financeiro"><InternalTasksPage /></ProtectedRoute> },
+        { path: 'produtos', element: <ProtectedRoute permission="produtos"><ProductsPage /></ProtectedRoute> },
+        { path: 'clientes', element: <ProtectedRoute permission="cadastros"><ClientList /></ProtectedRoute> },
+        { path: 'fornecedores', element: <ProtectedRoute permission="cadastros"><SupplierList /></ProtectedRoute> },
+        { path: 'cadastros/novo', element: <ProtectedRoute permission="cadastros"><RegistrationForm /></ProtectedRoute> },
+        { path: 'cadastros/editar/:id', element: <ProtectedRoute permission="cadastros"><RegistrationForm /></ProtectedRoute> },
+        { path: 'cadastros', element: <Navigate to="/clientes" replace /> },
+        { path: 'comissoes', element: <ProtectedRoute permission="comissoes"><CommissionPage /></ProtectedRoute> },
+        { path: 'painel-financeiro', element: <ProtectedRoute permission="financeiro.receber"><FinancialDashboardPage /></ProtectedRoute> },
+        { path: 'pedidos-recebiveis', element: <ProtectedRoute permission="financeiro.receber"><OrdersReceivablesPage /></ProtectedRoute> },
+        { path: 'financeiro-controle', element: <ProtectedRoute permission="financeiro.receber"><FinancialControlPage /></ProtectedRoute> },
+        { path: 'payables', element: <ProtectedRoute permission="financeiro.pagar"><PayablesPage /></ProtectedRoute> },
+        { path: 'configuracoes', element: <ProtectedRoute permission="fatores"><CalculationFactors /></ProtectedRoute> },
+        { path: 'configuracoes/fatores/novo', element: <ProtectedRoute permission="fatores"><CalculationFactorForm /></ProtectedRoute> },
+        { path: 'configuracoes/fatores/editar/:id', element: <ProtectedRoute permission="fatores"><CalculationFactorForm /></ProtectedRoute> },
+        { path: 'login', element: <LoginPage /> },
+        { path: '*', element: <HomeRedirect /> }
+      ]
+    }
+  ]), []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
     </QueryClientProvider>
   );
 };

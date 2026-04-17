@@ -125,6 +125,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     if (error) {
       console.error('Supabase auth error:', error);
+      
+      // Handle network/DNS errors specifically
+      if (error.message?.includes('fetch') || error.name === 'AuthRetryableFetchError') {
+        return { 
+          success: false, 
+          error: 'Erro de conexão com o servidor. Sua rede ou firewall pode estar bloqueando o acesso ao banco de dados.' 
+        };
+      }
+      
       return { success: false, error: 'E-mail ou senha incorretos.' };
     }
 

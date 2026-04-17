@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-mono: "DM Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+:root {
+    /* ─── FLUENT BLUE ─── */
+    --fluent-brand: #0F6CBD;
+    --fluent-brand-hover: #115EA3;
+    --fluent-brand-active: #0C3B5E;
+    --fluent-brand-bg: #EBF3FC;
+    --fluent-brand-bg-hover: #CFE4FA;
+
+    /* ─── NEUTRAL PALETTE (Fluent 2) ─── */
+    --neutral-foreground-1: #242424;
+    --neutral-foreground-2: #424242;
+    --neutral-foreground-3: #616161;
+    --neutral-foreground-4: #707070;
+    --neutral-foreground-disabled: #BDBDBD;
+
+    --neutral-background-1: #FFFFFF;
+    --neutral-background-2: #FAFAFA;
+    --neutral-background-3: #F5F5F5;
+    --neutral-background-4: #F0F0F0;
+    --neutral-background-5: #E0E0E0;
+    --neutral-background-subtle: #F5F5F5;
+    --neutral-background-hover: #F5F5F5;
+    --neutral-background-selected: #EBF3FC;
+
+    --neutral-stroke-1: #D1D1D1;
+    --neutral-stroke-2: #E0E0E0;
+    --neutral-stroke-subtle: #E8E8E8;
+    --neutral-stroke-focus: #0F6CBD;
+
+    /* ─── SEMANTIC ─── */
+    --status-success-bg: #DFF6DD;
+    --status-success-fg: #0E700E;
+    --status-success-border: #9FD89F;
+    --status-warning-bg: #FFF1D6;
+    --status-warning-fg: #8A6116;
+    --status-warning-border: #FDCF72;
+    --status-danger-bg: #FDE7E9;
+    --status-danger-fg: #BC2F32;
+    --status-danger-border: #F6A2A5;
+    --status-info-bg: #EBF3FC;
+    --status-info-fg: #0F548C;
+    --status-info-border: #96C6FA;
+
+    /* ─── TIMING ─── */
+    --duration-fast: 0.1s;
+    --duration-normal: 0.2s;
+    --ease-fluent: cubic-bezier(0.33, 0, 0.67, 1);
+}
+
+body {
+    font-family: var(--font-sans);
+    background: #FAFBFC;
+    color: var(--neutral-foreground-2);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* fluent internal styles from index.css */
+input, select, textarea {
+    border: 1px solid var(--neutral-stroke-1) !important;
+    border-radius: 4px;
+    transition: border-color var(--duration-fast) var(--ease-fluent);
+}
+
+input:focus, select:focus, textarea:focus {
+    border-color: var(--neutral-stroke-focus) !important;
+    outline: 2px solid var(--fluent-brand) !important;
+    outline-offset: -2px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--neutral-stroke-1);
+    border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #ABABAB;
+}

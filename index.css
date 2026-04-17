@@ -117,7 +117,7 @@
 
 body {
     font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
-    background: #FFFFFF;
+    background: #FAFBFC;
     background-attachment: fixed;
     color: var(--neutral-foreground-2);
     font-size: 14px;
@@ -277,7 +277,7 @@ table tbody tr {
 
 /* No zebra — Outlook uses clean white */
 table tbody tr:nth-child(even) {
-    background: transparent;
+    background: var(--neutral-background-2) !important;
 }
 
 table tbody tr:hover {
@@ -606,4 +606,19 @@ td .text-gray-400.uppercase {
 }
 .rich-text-content u, [contenteditable] u {
     text-decoration: underline !important;
+}
+
+/* ─── CUSTOM UTILITIES ─── */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--neutral-stroke-1);
+    border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--neutral-stroke-focus);
 }

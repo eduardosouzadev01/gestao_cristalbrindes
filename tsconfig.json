@@ -25,5 +25,10 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "exclude": [
+    "pages/_deprecated",
+    "temp_extracted",
+    "supabase/functions"
+  ]
 }
