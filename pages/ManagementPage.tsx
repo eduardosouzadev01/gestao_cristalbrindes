@@ -1172,7 +1172,9 @@ const ManagementPage: React.FC = () => {
                                         <th className="px-6 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-200">Atendimento</th>
                                         <th className="px-6 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-200">Prioridade</th>
                                         <th className="px-6 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-200">Data</th>
+                                        <th className="px-6 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-200">Nº Orç.</th>
                                         <th className="px-6 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-200">Cliente / Empresa</th>
+                                        <th className="px-6 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-200">Data Orç.</th>
                                         <th className="px-6 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-200">Item / Projeto</th>
                                         <th className="px-6 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-200">Vendedor</th>
                                         <th className="px-6 py-4 text-right text-[11px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-200">Ações Rápidas</th>
@@ -1180,7 +1182,7 @@ const ManagementPage: React.FC = () => {
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-100">
                                     {loading ? (
-                                        <tr><td colSpan={8} className="px-6 py-10 text-center text-gray-400 font-bold uppercase text-xs animate-pulse tracking-widest">Carregando dados da nuvem...</td></tr>
+                                        <tr><td colSpan={9} className="px-6 py-10 text-center text-gray-400 font-bold uppercase text-xs animate-pulse tracking-widest">Carregando dados da nuvem...</td></tr>
                                     ) : (leads || [])
                                         .filter(l => kanbanSellerFilter === 'Todos' || l.salesperson === kanbanSellerFilter)
                                         .filter(l => {

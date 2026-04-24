@@ -101,9 +101,40 @@ const LeadTableRowComponent: React.FC<LeadTableRowProps> = ({
             <td className="px-6 py-4 font-bold text-gray-600 tabular-nums">
                 {formatDate(l.created_at)}
             </td>
+            <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                <input 
+                    type="text"
+                    defaultValue={l.budget_number || ''}
+                    placeholder="Nº Orç"
+                    onBlur={async (e) => {
+                        const val = e.target.value;
+                        if (val !== (l.budget_number || '')) {
+                            await supabase.from('crm_leads').update({ budget_number: val }).eq('id', l.id);
+                        }
+                    }}
+                    className="w-16 text-[11px] font-bold px-2 py-1.5 border border-gray-200 rounded text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-gray-50 hover:bg-white transition-colors"
+                />
+            </td>
             <td className="px-6 py-4">
                 <div className="font-black text-gray-950 text-base line-clamp-1">{fixClientName(l.client_name)}</div>
                 <div className="text-xs font-bold text-gray-500">{l.client_contact_name || l.client_phone}</div>
+            </td>
+            <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                <input 
+                    type={l.budget_date ? "date" : "text"}
+                    placeholder=""
+                    defaultValue={l.budget_date || ''}
+                    onFocus={(e) => (e.target.type = "date")}
+                    onBlur={async (e) => {
+                        const val = e.target.value;
+                        if (!val) e.target.type = "text";
+                        
+                        if (val !== (l.budget_date || '')) {
+                            await supabase.from('crm_leads').update({ budget_date: val }).eq('id', l.id);
+                        }
+                    }}
+                    className="w-[130px] text-[11px] font-bold px-2 py-1.5 border border-gray-200 rounded text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-gray-50 hover:bg-white transition-colors"
+                />
             </td>
             <td className="px-6 py-4">
                 {l.closing_metadata?.quoted_item ? (

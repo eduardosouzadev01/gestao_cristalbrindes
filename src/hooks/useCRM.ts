@@ -22,6 +22,8 @@ export interface Lead {
     follow_up_done?: boolean;
     follow_up_at?: string;
     finish_reason_category?: string;
+    budget_number?: string;
+    budget_date?: string;
     closing_metadata?: {
         checklist?: { id: string; text: string; completed: boolean }[];
         wa_template?: string;
