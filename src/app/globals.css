@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-jakarta: "Plus Jakarta Sans", var(--font-sans);
+  --font-mono: "DM Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+:root {
+    /* ─── FLUENT BLUE ─── */
+    --fluent-brand: #0F6CBD;
+    --fluent-brand-hover: #115EA3;
+    --fluent-brand-active: #0C3B5E;
+    --fluent-brand-bg: #EBF3FC;
+    --fluent-brand-bg-hover: #CFE4FA;
+
+    /* ─── NEUTRAL PALETTE (Fluent 2) ─── */
+    --neutral-foreground-1: #242424;
+    --neutral-foreground-2: #424242;
+    --neutral-foreground-3: #616161;
+    --neutral-foreground-4: #707070;
+    --neutral-foreground-disabled: #BDBDBD;
+
+    --neutral-background-1: #FFFFFF;
+    --neutral-background-2: #FAFAFA;
+    --neutral-background-3: #F5F5F5;
+    --neutral-background-4: #F0F0F0;
+    --neutral-background-5: #E0E0E0;
+    --neutral-background-subtle: #F5F5F5;
+    --neutral-background-hover: #F5F5F5;
+    --neutral-background-selected: #EBF3FC;
+
+    --neutral-stroke-1: #E3E3E4;
+    --neutral-stroke-2: #F0F0F0;
+    --neutral-stroke-subtle: #F5F5F5;
+    --neutral-stroke-focus: #A1A1A1;
+
+    /* ─── SEMANTIC ─── */
+    --status-success-bg: #DFF6DD;
+    --status-success-fg: #0E700E;
+    --status-success-border: #9FD89F;
+    --status-warning-bg: #FFF1D6;
+    --status-warning-fg: #8A6116;
+    --status-warning-border: #FDCF72;
+    --status-danger-bg: #FDE7E9;
+    --status-danger-fg: #BC2F32;
+    --status-danger-border: #F6A2A5;
+    --status-info-bg: #EBF3FC;
+    --status-info-fg: #0F548C;
+    --status-info-border: #96C6FA;
+
+    /* ─── TIMING ─── */
+    --duration-fast: 0.1s;
+    --duration-normal: 0.2s;
+    --ease-fluent: cubic-bezier(0.33, 0, 0.67, 1);
+}
+
+body {
+    font-family: var(--font-sans);
+    background: #F5F5F8;
+    color: var(--neutral-foreground-2);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* fluent internal styles from index.css */
+input, select, textarea {
+    border: 1px solid var(--neutral-stroke-1);
+    border-radius: 6px;
+    padding-left: 12px;
+    padding-right: 12px;
+    height: 40px;
+    transition: all var(--duration-normal) var(--ease-fluent);
+    background: white;
+}
+
+textarea {
+    height: auto;
+    padding: 12px;
+}
+
+input:focus, select:focus, textarea:focus {
+    border-color: var(--fluent-brand) !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--neutral-stroke-1);
+    border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #ABABAB;
+}
