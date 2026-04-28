@@ -26,7 +26,17 @@ export const ProposalView: React.FC<ProposalViewProps> = ({ proposal }) => {
         return info.email;
     };
 
-    const groupedItems = proposal.items?.reduce((acc: any[], item: any) => {
+    interface GroupedItem {
+        key: string;
+        pName: string;
+        pDesc: string;
+        pCode: string;
+        pColor: string;
+        pImg: string;
+        subItems: any[];
+    }
+
+    const groupedItems: GroupedItem[] = proposal.items?.reduce((acc: GroupedItem[], item: any) => {
         const pName = item.product_name || item.productName || '';
         const pDesc = item.product_description || item.productDescription || '';
         const pCode = item.product_code || item.productCode || '';
@@ -34,7 +44,7 @@ export const ProposalView: React.FC<ProposalViewProps> = ({ proposal }) => {
         const pImg = item.product_image_url || item.productImage || '';
 
         const key = `${pName}-${pDesc}-${pCode}-${pColor}`;
-        const existing = acc.find((g: any) => g.key === key);
+        const existing = acc.find((g) => g.key === key);
         if (existing) {
             existing.subItems.push(item);
         } else {

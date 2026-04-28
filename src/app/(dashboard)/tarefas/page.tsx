@@ -22,7 +22,7 @@ interface InternalTask {
 }
 
 export default function InternalTasksPage() {
-    const { user } = useAuth();
+    const { appUser } = useAuth();
     const [tasks, setTasks] = useState<InternalTask[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -64,7 +64,7 @@ export default function InternalTasksPage() {
 
         const payload = {
             ...taskForm,
-            created_by_email: user?.email || 'sistema',
+            created_by_email: appUser?.email || 'sistema',
             updated_at: new Date().toISOString()
         };
 

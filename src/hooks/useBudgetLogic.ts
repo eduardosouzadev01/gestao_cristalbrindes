@@ -65,6 +65,8 @@ export function useBudgetLogic(id?: string) {
     const updateMutation = useUpdateBudget();
     const createMutation = useCreateBudget();
 
+    const isLeadLoaded = useRef(false);
+
     // Load Lead Data if converting
     useEffect(() => {
         if (leadId && id === 'novo' && !isLeadLoaded.current) {
@@ -391,6 +393,7 @@ export function useBudgetLogic(id?: string) {
         totalProfit,
         
         // Global Actions
+        handleSearchProducts,
         handleSave,
         handleDuplicate: async () => {
             try {
@@ -654,47 +657,5 @@ export function useBudgetLogic(id?: string) {
                 setIsGeneratingOrder(false);
             }
         }
-    };
-
-    return {
-        isLoading: isLoadingBudget || saving,
-        budgetNumber,
-        status,
-        salesperson,
-        budgetDate,
-        issuer,
-        validity,
-        shipping,
-        deliveryDeadline,
-        paymentMethod,
-        observation,
-        clientData,
-        items,
-        suppliersList,
-        productsList,
-        factors,
-        isSaving: saving,
-        isGeneratingOrder,
-        setBudgetNumber,
-        setSalesperson,
-        setStatus,
-        setBudgetDate,
-        setIssuer,
-        setValidity,
-        setShipping,
-        setDeliveryDeadline,
-        setPaymentMethod,
-        setObservation,
-        setClientData,
-        addItem,
-        handleSearchProducts,
-        updateItem,
-        removeItem,
-        duplicateItem,
-        handleSave,
-        handleDuplicate,
-        handleGenerateProposal,
-        handleViewProposal,
-        handleGenerateOrder
     };
 }

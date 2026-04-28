@@ -43,7 +43,7 @@ export default function CatalogPreviewPage() {
       },
       jsPDF: {
         unit: 'px' as const,
-        format: [A4_WIDTH, A4_HEIGHT],
+        format: [A4_WIDTH, A4_HEIGHT] as [number, number],
         orientation: 'portrait' as const,
       },
       pagebreak: { mode: ['css', 'avoid-all'], selector: '.pdf-page' },

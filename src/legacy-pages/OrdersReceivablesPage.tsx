@@ -47,7 +47,7 @@ const statusColors: Record<string, string> = {
 
 const OrdersReceivablesPage: React.FC = () => {
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { appUser } = useAuth();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState<string | null>(null);

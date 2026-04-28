@@ -5,6 +5,7 @@ interface RichTextEditorProps {
     onChange: (value: string) => void;
     placeholder?: string;
     disabled?: boolean;
+    readOnly?: boolean;
     className?: string;
 }
 
@@ -12,9 +13,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     value,
     onChange,
     placeholder,
-    disabled,
+    disabled: disabledProp,
+    readOnly,
     className
 }) => {
+    const disabled = disabledProp || readOnly;
     const editorRef = useRef<HTMLDivElement>(null);
     const [isExpanded, setIsExpanded] = useState(false);
 

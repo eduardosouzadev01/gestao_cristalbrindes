@@ -423,7 +423,7 @@ export function useCrmLogic() {
         const priorityOrder = ['NORMAL', 'ALTA', 'URGENTE', 'VIP'];
         const currentPriority = lead.priority || 'NORMAL';
         const currentIndex = priorityOrder.indexOf(currentPriority);
-        const nextPriority = priorityOrder[(currentIndex + 1) % priorityOrder.length];
+        const nextPriority = priorityOrder[(currentIndex + 1) % priorityOrder.length] as Lead['priority'];
 
         try {
             await updateLeadMutation.mutateAsync({

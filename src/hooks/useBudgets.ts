@@ -26,10 +26,14 @@ export interface BudgetItem {
     quantity: number;
     unit_price: number;
     customization_cost: number;
+    customization_supplier_id?: string | null;
     supplier_transport_cost: number;
+    transport_supplier_id?: string | null;
     client_transport_cost: number;
+    client_transport_supplier_id?: string | null;
     extra_expense: number;
     layout_cost: number;
+    layout_supplier_id?: string | null;
     calculation_factor: number;
     bv_pct: number;
     extra_pct: number;
