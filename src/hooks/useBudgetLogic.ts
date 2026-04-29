@@ -173,6 +173,7 @@ export function useBudgetLogic(id?: string) {
     const [saving, setSaving] = useState(false);
     const [isGeneratingOrder, setIsGeneratingOrder] = useState(false);
     const isSavingRef = useRef(false);
+    const lastSavedDataRef = useRef<string>('');
 
     // Sync state with budget data when loaded
     useEffect(() => {
@@ -255,11 +256,25 @@ export function useBudgetLogic(id?: string) {
 
         const timer = setTimeout(() => {
             const hasData = clientData.name || items.some(it => it.productName);
-            if (hasData) {
-                console.log('Auto-saving budget...');
-                handleSave(true);
+            if (!hasData) return;
+
+            // Deep check to avoid redundant saves
+            const currentData = JSON.stringify({
+                clientData, items, budgetNumber, salesperson, status, 
+                issuer, validity, shipping, deliveryDeadline, 
+                paymentMethod, observation
+            });
+
+            if (currentData === lastSavedDataRef.current) {
+                console.log('No changes detected, skipping auto-save.');
+                return;
             }
-        }, 3000); // 3 seconds debounce
+
+            console.log('Auto-saving budget...');
+            handleSave(true).then(() => {
+                lastSavedDataRef.current = currentData;
+            });
+        }, 10000); // 10 seconds debounce to reduce server load
 
         return () => clearTimeout(timer);
     }, [
@@ -517,6 +532,15 @@ export function useBudgetLogic(id?: string) {
                 const activeId = saveResult.activeId;
                 const currentBudgetNumber = saveResult.finalBudgetNumber;
 
+                // Check for existing proposals to determine version suffix
+                const { count } = await supabase
+                    .from('proposals')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('budget_id', activeId);
+
+                const suffix = (count && count > 0) ? `-${count}` : '';
+                const finalProposalNumber = `${currentBudgetNumber}${suffix}`;
+
                 // Update status immediately directly
                 await supabase.from('budgets').update({ status: 'PROPOSTA GERADA' }).eq('id', activeId);
                 setStatus('PROPOSTA GERADA');
@@ -555,7 +579,7 @@ export function useBudgetLogic(id?: string) {
 
                 const proposalPayload = {
                     budget_id: activeId,
-                    proposal_number: currentBudgetNumber === 'AUTO' ? `P-${activeId.substring(0,8)}` : currentBudgetNumber,
+                    proposal_number: finalProposalNumber,
                     client_id: clientData.id || null,
                     salesperson,
                     items: itemsToSnap,
