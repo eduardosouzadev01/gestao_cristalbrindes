@@ -192,22 +192,41 @@ export function useCrmLogic() {
 
         setIsSavingPartner(true);
         try {
+            const doc = newLead.client_doc?.trim();
+            // Placeholders ou doc vazio não podem ser usados como chave de upsert
+            const PLACEHOLDER_DOCS = ['00.000.000/0000-00', '00.000.000/0001-00', ''];
+            const hasValidDoc = doc && !PLACEHOLDER_DOCS.includes(doc);
+
             const partnerData = {
                 name: newLead.client_name,
                 contact_name: newLead.client_contact_name,
                 phone: newLead.client_phone,
                 email: newLead.client_email,
-                doc: newLead.client_doc,
-                salesperson_id: newLead.salesperson
+                doc: doc || null,
+                salesperson: newLead.salesperson,
+                type: 'CLIENTE' as const
             };
 
-            const { data, error } = await supabase
-                .from('partners')
-                .upsert([partnerData], { onConflict: 'doc' })
-                .select()
-                .single();
+            let data: any;
+            let error: any;
 
-                if (error) throw error;
+            if (hasValidDoc) {
+                // UPSERT: doc real → atualiza se já existir, insere se não
+                ({ data, error } = await supabase
+                    .from('partners')
+                    .upsert([partnerData], { onConflict: 'doc' })
+                    .select()
+                    .single());
+            } else {
+                // INSERT simples: sem doc ou doc placeholder
+                ({ data, error } = await supabase
+                    .from('partners')
+                    .insert([partnerData])
+                    .select()
+                    .single());
+            }
+
+            if (error) throw error;
 
             setNewLead(prev => ({ 
                 ...prev, 

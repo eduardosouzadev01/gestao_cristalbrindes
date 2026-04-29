@@ -4,6 +4,8 @@ import React from 'react';
 import { calculateItemTotal, calculateItemRealTotal } from '@/utils/formulas';
 import { formatCurrency, parseCurrencyToNumber } from '@/utils/formatCurrency';
 import RichTextEditor from '@/components/common/RichTextEditor';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import CustomSelect from './CustomSelect';
 
 interface BudgetItemCardProps {
@@ -17,6 +19,7 @@ interface BudgetItemCardProps {
     onDuplicate: () => void;
     onSearch?: (term: string) => void;
     isLocked?: boolean;
+    isInvalid?: boolean;
 }
 
 export default function BudgetItemCard({
@@ -29,8 +32,25 @@ export default function BudgetItemCard({
     onRemove,
     onDuplicate,
     onSearch,
-    isLocked = false
+    isLocked = false,
+    isInvalid = false
 }: BudgetItemCardProps) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging
+    } = useSortable({ id: item.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 50 : 'auto',
+        opacity: isDragging ? 0.5 : 1,
+    };
+
     const totalVenda = calculateItemTotal(item);
     const unitVenda = totalVenda / (item.quantity || 1);
 
@@ -65,20 +85,30 @@ export default function BudgetItemCard({
     const zebraBg = index % 2 === 1 ? 'bg-[#F9FAFB]' : 'bg-white';
 
     return (
-        <div className={`font-sans border rounded-md mb-4 transition-all shadow-none ${
-            item.isApproved 
-                ? 'bg-[#ebfbf0] border-[#86efac] ring-1 ring-[#bbf7d0]' 
-                : `${zebraBg} border-slate-300`
-        } relative group`}>
+        <div 
+            id={`budget-item-${item.id}`}
+            ref={setNodeRef}
+            style={style}
+            className={`font-sans border rounded-md mb-4 transition-all shadow-none ${
+                isInvalid
+                    ? 'bg-rose-50 border-rose-500 ring-2 ring-rose-200 animate-pulse-subtle'
+                    : item.isApproved 
+                        ? 'bg-[#ebfbf0] border-[#86efac] ring-1 ring-[#bbf7d0]' 
+                        : `${zebraBg} border-slate-300`
+            } relative group ${isDragging ? 'scale-[1.02] rotate-1 shadow-xl border-emerald-500 ring-2 ring-emerald-100' : ''}`}>
             
             {/* CARD HEADER: Item ID and Product Search */}
             <div className={`flex items-center justify-between px-5 py-3 border-b ${
                 item.isApproved ? 'bg-[#dcfce7] border-[#86efac]' : 'bg-transparent border-[#E3E3E4]'
             }`}>
                 <div className="flex items-center gap-4 flex-1">
-                    <div className={`w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-md border text-[14px] font-medium shadow-none ${
-                        item.isApproved ? 'bg-[#bbf7d0] border-[#86efac] text-[#166534]' : 'bg-white border-slate-300 text-slate-400'
-                    }`}>
+                    <div 
+                        {...attributes}
+                        {...listeners}
+                        className={`w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-md border text-[14px] font-medium shadow-none cursor-grab active:cursor-grabbing transition-colors ${
+                            item.isApproved ? 'bg-[#bbf7d0] border-[#86efac] text-[#166534]' : 'bg-white border-slate-300 text-slate-400 hover:border-emerald-500 hover:text-emerald-600'
+                        }`}
+                    >
                         {index + 1}
                     </div>
                     

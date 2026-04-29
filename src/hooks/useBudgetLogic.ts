@@ -45,6 +45,7 @@ export function useBudgetLogic(id?: string) {
     const [suppliersList, setSuppliersList] = useState<any[]>([]);
     const [productsList, setProductsList] = useState<any[]>([]);
     const [factors, setFactors] = useState<any[]>([]);
+    const [invalidItemIds, setInvalidItemIds] = useState<(string | number)[]>([]);
     
     // items hook
     const { 
@@ -363,6 +364,7 @@ export function useBudgetLogic(id?: string) {
         isLoading: isLoadingBudget,
         isSaving: saving,
         isGeneratingOrder,
+        invalidItemIds,
         
         // Form States
         budgetNumber, setBudgetNumber,
@@ -384,7 +386,12 @@ export function useBudgetLogic(id?: string) {
         
         // Item Actions
         addItem,
-        updateItem,
+        setItems,
+        updateItem: (id: string | number, field: string, value: any) => {
+            updateItem(id, field, value);
+            // Clear invalid status if user is fixing the item
+            setInvalidItemIds(prev => prev.filter(invalidId => invalidId !== id));
+        },
         removeItem,
         duplicateItem,
         totalRevenue,
@@ -444,6 +451,7 @@ export function useBudgetLogic(id?: string) {
                     }));
                     await supabase.from('budget_items').insert(itemsToSave);
                     toast.success('Orçamento duplicado com sucesso!');
+                    router.push(`/orcamentos/${newBudget.id}`);
                 }
             } catch (err: any) {
                 toast.error('Erro ao duplicar: ' + err.message);
@@ -454,9 +462,22 @@ export function useBudgetLogic(id?: string) {
                 // Validation: Prevent generating proposal if supplier is filled but price is zero
                 const invalidItems = items.filter(it => it.supplier_id && (Number(it.priceUnit) === 0 || !it.priceUnit));
                 if (invalidItems.length > 0) {
+                    const firstInvalidId = invalidItems[0].id;
+                    setInvalidItemIds(invalidItems.map(it => it.id));
+                    
                     toast.error('Preenchimento obrigatório: Itens com fornecedor selecionado devem ter o Valor Unitário informado.');
+                    
+                    // Scroll to the first invalid item
+                    setTimeout(() => {
+                        const element = document.getElementById(`budget-item-${firstInvalidId}`);
+                        if (element) {
+                            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    }, 100);
                     return;
                 }
+                
+                setInvalidItemIds([]);
 
                 // Save Budget first (ensure data is consistent)
                 const saveResult = await handleSave(true);

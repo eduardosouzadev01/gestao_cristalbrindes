@@ -1,6 +1,21 @@
 'use client';
 
 import React from 'react';
+import {
+    DndContext, 
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import BudgetItemCard from './BudgetItemCard';
 
 interface ItemsListProps {
@@ -13,7 +28,9 @@ interface ItemsListProps {
     onDuplicateItem: (item: any) => void;
     onAddItem: () => void;
     onSearchProducts?: (term: string) => void;
+    onReorderItems: (items: any[]) => void;
     isLocked?: boolean;
+    invalidItemIds?: (string | number)[];
 }
 
 export default function ItemsList({
@@ -26,8 +43,31 @@ export default function ItemsList({
     onDuplicateItem,
     onAddItem,
     onSearchProducts,
-    isLocked = false
+    onReorderItems,
+    isLocked = false,
+    invalidItemIds = []
 }: ItemsListProps) {
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+
+    function handleDragEnd(event: DragEndEvent) {
+        const { active, over } = event;
+
+        if (over && active.id !== over.id) {
+            const oldIndex = items.findIndex((item) => item.id === active.id);
+            const newIndex = items.findIndex((item) => item.id === over.id);
+            onReorderItems(arrayMove(items, oldIndex, newIndex));
+        }
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center px-2">
@@ -50,23 +90,35 @@ export default function ItemsList({
                 )}
             </div>
 
-            <div className="space-y-4">
-                {items.map((item, index) => (
-                    <BudgetItemCard 
-                        key={item.id}
-                        index={index}
-                        item={item}
-                        suppliersList={suppliersList}
-                        productsList={productsList}
-                        factors={factors}
-                        onUpdate={(field, value) => onUpdateItem(item.id, field, value)}
-                        onRemove={() => onRemoveItem(item.id)}
-                        onDuplicate={() => onDuplicateItem(item)}
-                        onSearch={onSearchProducts}
-                        isLocked={isLocked}
-                    />
-                ))}
-            </div>
+            <DndContext 
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+            >
+                <div className="space-y-4">
+                    <SortableContext 
+                        items={items.map(i => i.id)}
+                        strategy={verticalListSortingStrategy}
+                    >
+                        {items.map((item, index) => (
+                            <BudgetItemCard 
+                                key={item.id}
+                                index={index}
+                                item={item}
+                                suppliersList={suppliersList}
+                                productsList={productsList}
+                                factors={factors}
+                                onUpdate={(field, value) => onUpdateItem(item.id, field, value)}
+                                onRemove={() => onRemoveItem(item.id)}
+                                onDuplicate={() => onDuplicateItem(item)}
+                                onSearch={onSearchProducts}
+                                isLocked={isLocked}
+                                isInvalid={invalidItemIds.includes(item.id)}
+                            />
+                        ))}
+                    </SortableContext>
+                </div>
+            </DndContext>
 
             {items.length > 0 && !isLocked && (
                 <button 
