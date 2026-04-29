@@ -12,6 +12,19 @@ import { useState, useEffect } from 'react';
 
 export default function BudgetPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
+
+    // Exit confirmation - MUST BE BEFORE ANY CONDITIONAL RETURN
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            e.preventDefault();
+            e.returnValue = 'Tem certeza que deseja sair? Verifique se as alterações foram salvas.';
+            return e.returnValue;
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, []);
+
     const logic = useBudgetLogic(id);
 
     const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
@@ -38,18 +51,6 @@ export default function BudgetPage({ params }: { params: Promise<{ id: string }>
             </div>
         );
     }
-
-    // Exit confirmation
-    useEffect(() => {
-        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            e.preventDefault();
-            e.returnValue = 'Tem certeza que deseja sair? Verifique se as alterações foram salvas.';
-            return e.returnValue;
-        };
-
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, []);
 
     return (
         <div className="min-h-screen bg-[#F5F5F8] pb-32">

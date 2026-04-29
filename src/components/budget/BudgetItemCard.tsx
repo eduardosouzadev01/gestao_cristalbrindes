@@ -165,9 +165,10 @@ export default function BudgetItemCard({
                                     const baseName = rawName.split(' - ')[0].split(' (')[0].trim();
                                     
                                     if (baseName) {
+                                        const codeBase = p.code?.replace(/[A-Z]$/i, '') || p.code || '';
                                         const { data: vData } = await supabase.from('products')
                                             .select('color, stock, image_url, code, images')
-                                            .ilike('name', `%${baseName}%`)
+                                            .or(`name.ilike.%${baseName}%,code.ilike.${codeBase}%`)
                                             .limit(50);
                                         
                                         if (vData && vData.length > 0) {
