@@ -69,8 +69,9 @@ export default function BudgetItemCard({
         onUpdate('fator', multiplier);
     };
 
-    const handlePaymentChange = (val: number) => {
+    const handlePaymentChange = (val: number, label: string) => {
         onUpdate('mockPayment', val);
+        onUpdate('paymentMethodLabel', label);
         const multiplier = 1 + ((item.mockNF ?? 14) + (item.mockMargin ?? 15) + val) / 100;
         onUpdate('fator', multiplier);
     };
@@ -78,8 +79,8 @@ export default function BudgetItemCard({
     const paymentOptions = [
         { val: 0, label: '50% + 50% ( - sem acréscimo )' },
         { val: 0, label: 'À Vista ( - Sem acréscimo )' },
-        { val: 4, label: '1x no cartão de Crédito ( 4% de Acréscimo )' },
-        { val: 4, label: '7 à 15 dias Faturados ( 4% de Acréscimo )' },
+        { val: 5, label: '1x no cartão de Crédito ( 5% de Acréscimo )' },
+        { val: 5, label: '7 à 15 dias Faturados ( 5% de Acréscimo )' },
         { val: 8, label: '21 à 30 dias Faturados ( 8% de Acréscimo )' }
     ];
 
@@ -532,10 +533,10 @@ export default function BudgetItemCard({
                                 <label className="text-[9px] uppercase font-medium text-slate-400 tracking-widest ml-1">Forma de Faturamento (Acréscimo)</label>
                                 <select
                                     className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-[11px] font-medium text-slate-700 focus:ring-4 focus:ring-blue-50/50 outline-none cursor-pointer"
-                                    value={paymentOptions.find(opt => opt.val === (item.mockPayment || 0))?.label || paymentOptions[0].label}
+                                    value={item.paymentMethodLabel || paymentOptions.find(opt => opt.val === (item.mockPayment || 0))?.label || paymentOptions[0].label}
                                     onChange={e => {
                                         const selected = paymentOptions.find(opt => opt.label === e.target.value);
-                                        if (selected) handlePaymentChange(selected.val);
+                                        if (selected) handlePaymentChange(selected.val, selected.label);
                                     }}
                                     disabled={isLocked}
                                 >
