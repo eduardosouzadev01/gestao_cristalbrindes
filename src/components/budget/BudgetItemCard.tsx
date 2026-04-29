@@ -527,12 +527,15 @@ export default function BudgetItemCard({
                                 <label className="text-[9px] uppercase font-medium text-slate-400 tracking-widest ml-1">Forma de Faturamento (Acréscimo)</label>
                                 <select
                                     className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-[11px] font-medium text-slate-700 focus:ring-4 focus:ring-blue-50/50 outline-none cursor-pointer"
-                                    value={item.mockPayment || 0}
-                                    onChange={e => handlePaymentChange(Number(e.target.value))}
+                                    value={paymentOptions.find(opt => opt.val === (item.mockPayment || 0))?.label || paymentOptions[0].label}
+                                    onChange={e => {
+                                        const selected = paymentOptions.find(opt => opt.label === e.target.value);
+                                        if (selected) handlePaymentChange(selected.val);
+                                    }}
                                     disabled={isLocked}
                                 >
                                     {paymentOptions.map((opt, i) => (
-                                        <option key={i} value={opt.val}>{opt.label}</option>
+                                        <option key={i} value={opt.label}>{opt.label}</option>
                                     ))}
                                 </select>
                             </div>

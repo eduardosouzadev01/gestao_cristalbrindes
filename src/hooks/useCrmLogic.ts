@@ -155,7 +155,7 @@ export function useCrmLogic() {
 
     // Filtering Logic
     const filteredLeads = useMemo(() => {
-        return leads.filter(lead => {
+        const filtered = leads.filter(lead => {
             const matchesSearch = 
                 lead.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (lead.client_email && lead.client_email.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -164,6 +164,21 @@ export function useCrmLogic() {
             const matchesSeller = sellerFilter === 'Todos' || lead.salesperson === sellerFilter;
 
             return matchesSearch && matchesSeller;
+        });
+
+        // Sort: ATENDIMENTO (Em Andamento) first, then by date desc
+        return [...filtered].sort((a, b) => {
+            const statusA = a.atendimento_status || 'ATENDIMENTO';
+            const statusB = b.atendimento_status || 'ATENDIMENTO';
+            
+            if (statusA === 'ATENDIMENTO' && statusB !== 'ATENDIMENTO') return -1;
+            if (statusA !== 'ATENDIMENTO' && statusB === 'ATENDIMENTO') return 1;
+            
+            // Secondary sort: Proposta Enviada
+            if (statusA === 'PROPOSTA_ENVIADA' && statusB !== 'PROPOSTA_ENVIADA') return -1;
+            if (statusA !== 'PROPOSTA_ENVIADA' && statusB === 'PROPOSTA_ENVIADA') return 1;
+
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         });
     }, [leads, searchTerm, sellerFilter]);
 
