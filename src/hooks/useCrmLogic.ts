@@ -166,8 +166,21 @@ export function useCrmLogic() {
             return matchesSearch && matchesSeller;
         });
 
-        // Sort: ATENDIMENTO (Em Andamento) first, then by date desc
+        const PRIORITY_WEIGHT: Record<string, number> = {
+            'URGENTE': 100,
+            'ALTA': 80,
+            'VIP': 60,
+            'NORMAL': 40,
+            'BAIXA': 20
+        };
+
+        // Sort: Priority First, then ATENDIMENTO status, then by date desc
         return [...filtered].sort((a, b) => {
+            const weightA = PRIORITY_WEIGHT[a.priority || 'NORMAL'] || 40;
+            const weightB = PRIORITY_WEIGHT[b.priority || 'NORMAL'] || 40;
+            
+            if (weightA !== weightB) return weightB - weightA;
+
             const statusA = a.atendimento_status || 'ATENDIMENTO';
             const statusB = b.atendimento_status || 'ATENDIMENTO';
             

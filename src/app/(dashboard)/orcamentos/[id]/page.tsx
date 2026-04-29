@@ -8,7 +8,7 @@ import ClientInfo from '@/components/budget/ClientInfo';
 import ItemsList from '@/components/budget/ItemsList';
 import CommercialTerms from '@/components/budget/CommercialTerms';
 import { GenerateOrderModal } from '@/components/modals/GenerateOrderModal';
-import { useState } from 'react';
+import { useState, useEffect, use } from 'react';
 
 export default function BudgetPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
@@ -38,6 +38,18 @@ export default function BudgetPage({ params }: { params: Promise<{ id: string }>
             </div>
         );
     }
+
+    // Exit confirmation
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            e.preventDefault();
+            e.returnValue = 'Tem certeza que deseja sair? Verifique se as alterações foram salvas.';
+            return e.returnValue;
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, []);
 
     return (
         <div className="min-h-screen bg-[#F5F5F8] pb-32">

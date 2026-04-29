@@ -237,6 +237,27 @@ export function useBudgetLogic(id?: string) {
         syncData();
     }, [budget, setItems, isInternalOperation]);
 
+    // Auto-save logic
+    useEffect(() => {
+        // Don't auto-save if it's a new unsaved budget (to avoid creating empty budgets)
+        // or if it's currently loading or in an internal operation
+        if (id === 'novo' || isLoadingBudget || isInternalOperation) return;
+
+        const timer = setTimeout(() => {
+            const hasData = clientData.name || items.some(it => it.productName);
+            if (hasData) {
+                console.log('Auto-saving budget...');
+                handleSave(true);
+            }
+        }, 3000); // 3 seconds debounce
+
+        return () => clearTimeout(timer);
+    }, [
+        clientData, items, budgetNumber, salesperson, status, 
+        issuer, validity, shipping, deliveryDeadline, 
+        paymentMethod, observation
+    ]);
+
     const handleSave = async (silent = false) => {
         if (isSavingRef.current) {
             console.log('Save already in progress, skipping...');
