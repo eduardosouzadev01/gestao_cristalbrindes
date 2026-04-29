@@ -244,12 +244,9 @@ const LeadTableRowComponent: React.FC<LeadTableRowProps> = ({
             {/* Client */}
             <td className="px-4 py-2">
                 <div className="font-medium text-[#111827] text-[13px] leading-tight uppercase tracking-tight">
-                    {l.client_contact_name ? (
-                        <>
-                            {l.client_contact_name} <span className="text-[#717171] font-medium ml-1">- {fixClientName(l.client_name)}</span>
-                        </>
-                    ) : (
-                        fixClientName(l.client_name)
+                    {fixClientName(l.client_name)}
+                    {l.client_contact_name && (
+                        <span className="text-[#717171] font-medium ml-1">- {l.client_contact_name}</span>
                     )}
                 </div>
             </td>

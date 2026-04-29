@@ -3,6 +3,7 @@
 import React from 'react';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
+import ReminderMonitor from '@/components/crm/ReminderMonitor';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -33,6 +34,7 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen flex flex-col">
+      <ReminderMonitor />
       <div className="print:hidden"><Header /></div>
       <main className="flex-1 pb-8">
         {children}

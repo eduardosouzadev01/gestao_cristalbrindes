@@ -288,6 +288,7 @@ export default function InternalProposalDetailPage() {
                 </html>
             `;
 
+            console.log('Calling Edge Function: send-email');
             const { data, error } = await supabase.functions.invoke('send-email', {
                 body: {
                     to: emailForm.to + (emailForm.cc ? `, ${emailForm.cc}` : ''),

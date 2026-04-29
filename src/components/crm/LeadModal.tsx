@@ -342,6 +342,90 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                                         onChange={e => setNewLead({ ...newLead, closing_metadata: { ...(newLead.closing_metadata || {}), wa_template: e.target.value } })}
                                     ></textarea>
                                 </div>
+
+                                {/* Reminders Section */}
+                                {editingLead && (
+                                    <div className="pt-6 border-t border-[#E0E0E0] space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2 text-[#242424]">
+                                                <span className="material-icons-outlined text-[#0F6CBD]">alarm_add</span>
+                                                <h4 className="text-[11px] font-medium uppercase tracking-[0.04em] font-jakarta">Agendar Aviso / Retorno</h4>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white p-6 rounded-md border border-[#E0E0E0] space-y-4 shadow-sm">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-bold text-[#707070] uppercase tracking-widest font-jakarta">DATA E HORA</label>
+                                                    <input 
+                                                        type="datetime-local" 
+                                                        id="reminder_at"
+                                                        className="w-full h-11 px-3 bg-[#F9FAFB] border border-[#D1D1D1] rounded-md text-xs font-medium text-[#242424] focus:bg-white focus:border-[#0F6CBD] transition-all font-jakarta"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-bold text-[#707070] uppercase tracking-widest font-jakarta">ASSUNTO</label>
+                                                    <input 
+                                                        type="text" 
+                                                        id="reminder_title"
+                                                        placeholder="Ex: Retornar sobre nota"
+                                                        className="w-full h-11 px-3 bg-[#F9FAFB] border border-[#D1D1D1] rounded-md text-xs font-medium text-[#242424] focus:bg-white focus:border-[#0F6CBD] transition-all font-jakarta uppercase"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-bold text-[#707070] uppercase tracking-widest font-jakarta">DESCRIÇÃO DO AVISO</label>
+                                                <textarea 
+                                                    id="reminder_message"
+                                                    placeholder="Detalhes do que precisa ser feito..."
+                                                    className="w-full p-3 bg-[#F9FAFB] border border-[#D1D1D1] rounded-md text-xs font-medium text-[#242424] focus:bg-white focus:border-[#0F6CBD] transition-all font-jakarta uppercase resize-none h-20"
+                                                />
+                                            </div>
+                                            <button
+                                                onClick={async () => {
+                                                    const dateVal = (document.getElementById('reminder_at') as HTMLInputElement).value;
+                                                    const titleVal = (document.getElementById('reminder_title') as HTMLInputElement).value;
+                                                    const msgVal = (document.getElementById('reminder_message') as HTMLInputElement).value;
+
+                                                    if (!dateVal || !titleVal) {
+                                                        import('sonner').then(({ toast }) => toast.error('Data e Título são obrigatórios.'));
+                                                        return;
+                                                    }
+
+                                                    try {
+                                                        const { error } = await import('@/lib/supabase').then(({ supabase }) => 
+                                                            supabase.from('crm_reminders').insert([{
+                                                                lead_id: editingLead.id,
+                                                                user_email: appUser.email,
+                                                                title: titleVal,
+                                                                message: msgVal,
+                                                                scheduled_at: new Date(dateVal).toISOString()
+                                                            }])
+                                                        );
+
+                                                        if (error) throw error;
+                                                        
+                                                        import('sonner').then(({ toast }) => toast.success('Aviso agendado com sucesso!'));
+                                                        
+                                                        // Clear inputs
+                                                        (document.getElementById('reminder_at') as HTMLInputElement).value = '';
+                                                        (document.getElementById('reminder_title') as HTMLInputElement).value = '';
+                                                        (document.getElementById('reminder_message') as HTMLInputElement).value = '';
+                                                    } catch (err: any) {
+                                                        import('sonner').then(({ toast }) => toast.error('Erro ao agendar: ' + err.message));
+                                                    }
+                                                }}
+                                                className="w-full py-3 bg-[#242424] text-white text-[10px] font-bold uppercase tracking-widest rounded-md hover:bg-black transition-all flex items-center justify-center gap-2 font-jakarta shadow-md"
+                                            >
+                                                <span className="material-icons-outlined text-lg">calendar_today</span>
+                                                AGENDAR AVISO
+                                            </button>
+                                        </div>
+
+                                        {/* List of Pending Reminders */}
+                                        <ReminderList leadId={editingLead.id} />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -399,5 +483,79 @@ export const LeadModal: React.FC<LeadModalProps> = ({
             </div>
         </div>
 
+    );
+};
+
+const ReminderList: React.FC<{ leadId: string }> = ({ leadId }) => {
+    const [reminders, setReminders] = React.useState<any[]>([]);
+    const [loading, setLoading] = React.useState(true);
+
+    const fetchReminders = React.useCallback(async () => {
+        try {
+            const { data, error } = await import('@/lib/supabase').then(({ supabase }) => 
+                supabase
+                    .from('crm_reminders')
+                    .select('*')
+                    .eq('lead_id', leadId)
+                    .is('acknowledged_at', null)
+                    .order('scheduled_at', { ascending: true })
+            );
+
+            if (!error && data) {
+                setReminders(data);
+            }
+        } catch (err) {
+            console.error('Error fetching reminders:', err);
+        } finally {
+            setLoading(false);
+        }
+    }, [leadId]);
+
+    React.useEffect(() => {
+        fetchReminders();
+    }, [fetchReminders]);
+
+    if (loading) return null;
+    if (reminders.length === 0) return null;
+
+    return (
+        <div className="space-y-3">
+            <h5 className="text-[9px] font-bold text-[#707070] uppercase tracking-widest font-jakarta">Lembretes Pendentes</h5>
+            <div className="space-y-2">
+                {reminders.map(r => (
+                    <div key={r.id} className="flex items-center justify-between p-3 bg-white border border-[#E0E0E0] rounded-md shadow-sm">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-[#EBF3FC] flex items-center justify-center text-[#0F6CBD]">
+                                <span className="material-icons-outlined text-sm">alarm</span>
+                            </div>
+                            <div>
+                                <p className="text-[11px] font-bold text-[#242424] uppercase font-jakarta">{r.title}</p>
+                                <p className="text-[10px] text-[#707070] font-jakarta">
+                                    {new Date(r.scheduled_at).toLocaleString('pt-BR')}
+                                </p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={async () => {
+                                try {
+                                    const { error } = await import('@/lib/supabase').then(({ supabase }) => 
+                                        supabase
+                                            .from('crm_reminders')
+                                            .update({ acknowledged_at: new Date().toISOString() })
+                                            .eq('id', r.id)
+                                    );
+                                    if (!error) fetchReminders();
+                                } catch (err) {
+                                    console.error('Error acknowledging reminder:', err);
+                                }
+                            }}
+                            className="text-[10px] font-bold text-[#DC2626] hover:underline uppercase tracking-widest font-jakarta"
+                        >
+                            Remover
+                        </button>
+                    </div>
+                ))}
+            </div>
+        </div>
     );
 };
