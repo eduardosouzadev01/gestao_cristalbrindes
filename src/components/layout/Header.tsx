@@ -114,7 +114,7 @@ const Header: React.FC = () => {
                   router.push('/crm');
                 }
               }}
-              className="flex-shrink-0 flex items-center h-full mr-8 hover:opacity-80 transition-opacity"
+              className="flex-shrink-0 flex items-center h-full mr-8 hover:opacity-80 transition-opacity cursor-pointer"
             >
               <img
                 src="/img/Cristal Brindes_menu.png"

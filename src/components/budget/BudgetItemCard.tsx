@@ -20,6 +20,7 @@ interface BudgetItemCardProps {
     onSearch?: (term: string) => void;
     isLocked?: boolean;
     isInvalid?: boolean;
+    onAddSupplier?: () => void;
 }
 
 export default function BudgetItemCard({
@@ -33,7 +34,8 @@ export default function BudgetItemCard({
     onDuplicate,
     onSearch,
     isLocked = false,
-    isInvalid = false
+    isInvalid = false,
+    onAddSupplier
 }: BudgetItemCardProps) {
     const {
         attributes,
@@ -393,6 +395,7 @@ export default function BudgetItemCard({
                                     options={suppliersList}
                                     value={suppliersList.find(s => s.id === item.supplier_id)?.name}
                                     onSelect={opt => onUpdate('supplier_id', opt ? opt.id : null)}
+                                    onAdd={onAddSupplier}
                                     placeholder="Selecione..."
                                     disabled={isLocked}
                                 />
@@ -435,6 +438,7 @@ export default function BudgetItemCard({
                                                 options={suppliersList}
                                                 value={suppliersList.find(s => s.id === item[row.suppKey])?.name}
                                                 onSelect={opt => onUpdate(row.suppKey, opt ? opt.id : null)}
+                                                onAdd={onAddSupplier}
                                                 placeholder="Fornecedor..."
                                                 compact
                                                 disabled={isLocked}

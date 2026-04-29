@@ -8,6 +8,7 @@ import ClientInfo from '@/components/budget/ClientInfo';
 import ItemsList from '@/components/budget/ItemsList';
 import CommercialTerms from '@/components/budget/CommercialTerms';
 import { GenerateOrderModal } from '@/components/modals/GenerateOrderModal';
+import { QuickSupplierModal } from '@/components/modals/QuickSupplierModal';
 import { useState, useEffect } from 'react';
 
 export default function BudgetPage({ params }: { params: Promise<{ id: string }> }) {
@@ -66,7 +67,7 @@ export default function BudgetPage({ params }: { params: Promise<{ id: string }>
             />
 
             <main className="max-w-[1600px] mx-auto px-4 py-6">
-                <fieldset disabled={['PROPOSTA GERADA', 'PROPOSTA ENVIADA', 'PROPOSTA ACEITA'].includes(logic.status)} className="space-y-4 border-0 p-0 m-0 min-w-0">
+                <fieldset className="space-y-4 border-0 p-0 m-0 min-w-0">
                 
                 {/* Header info & Client Info Grid */}
                 <div className="grid grid-cols-12 gap-4 items-stretch">
@@ -116,7 +117,8 @@ export default function BudgetPage({ params }: { params: Promise<{ id: string }>
                         onSearchProducts={logic.handleSearchProducts}
                         onReorderItems={logic.setItems}
                         invalidItemIds={logic.invalidItemIds}
-                        isLocked={['PROPOSTA GERADA', 'PROPOSTA ENVIADA', 'PROPOSTA ACEITA'].includes(logic.status)}
+                        isLocked={false}
+                        onAddSupplier={logic.openQuickSupplierModal}
                     />
                 </section>
                 </fieldset>
@@ -134,6 +136,15 @@ export default function BudgetPage({ params }: { params: Promise<{ id: string }>
                 loading={logic.isGeneratingOrder || false}
                 approvedItems={logic.items.filter(it => it.isApproved)}
                 suppliersList={logic.suppliersList}
+            />
+
+            <QuickSupplierModal
+                isOpen={logic.isQuickSupplierModalOpen}
+                onClose={logic.closeQuickSupplierModal}
+                newSupplier={logic.newSupplier}
+                setNewSupplier={logic.setNewSupplier}
+                onSave={logic.handleSaveQuickSupplier}
+                loading={logic.isSavingSupplier}
             />
         </div>
     );

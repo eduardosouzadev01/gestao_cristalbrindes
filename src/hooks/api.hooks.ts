@@ -23,4 +23,38 @@ export function useClients() {
     });
 }
 
-// Para usar Zod depois (Item 4 das Melhorias), você vai criar validações na mesma pasta do componente.
+
+export function useSuppliers() {
+    return useQuery({
+        queryKey: ['suppliers'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('partners')
+                .select('*')
+                .eq('type', 'FORNECEDOR')
+                .order('name');
+
+            if (error) throw error;
+            return data;
+        },
+    });
+}
+
+export function useCreatePartner() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (partner: any) => {
+            const { data, error } = await supabase
+                .from('partners')
+                .insert([partner])
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+            queryClient.invalidateQueries({ queryKey: ['clients'] });
+        }
+    });
+}

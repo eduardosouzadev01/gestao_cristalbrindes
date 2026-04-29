@@ -31,6 +31,7 @@ interface ItemsListProps {
     onReorderItems: (items: any[]) => void;
     isLocked?: boolean;
     invalidItemIds?: (string | number)[];
+    onAddSupplier?: () => void;
 }
 
 export default function ItemsList({
@@ -45,7 +46,8 @@ export default function ItemsList({
     onSearchProducts,
     onReorderItems,
     isLocked = false,
-    invalidItemIds = []
+    invalidItemIds = [],
+    onAddSupplier
 }: ItemsListProps) {
     const sensors = useSensors(
         useSensor(PointerSensor, {

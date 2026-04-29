@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { getTodayISO } from '@/utils/dateUtils';
 import { useOrderItems } from './useOrderItems';
 import { useBudget, useUpdateBudget, useCreateBudget } from './useBudgets';
+import { useSuppliers, useCreatePartner } from './api.hooks';
 import { calculateItemTotal } from '@/utils/formulas';
 
 export function useBudgetLogic(id?: string) {
@@ -42,10 +43,21 @@ export function useBudgetLogic(id?: string) {
     const [observation, setObservation] = useState('');
 
     // Lists
-    const [suppliersList, setSuppliersList] = useState<any[]>([]);
+    const { data: suppliersList = [] } = useSuppliers();
     const [productsList, setProductsList] = useState<any[]>([]);
     const [factors, setFactors] = useState<any[]>([]);
     const [invalidItemIds, setInvalidItemIds] = useState<(string | number)[]>([]);
+
+    // Quick Supplier Modal state
+    const [isQuickSupplierModalOpen, setIsQuickSupplierModalOpen] = useState(false);
+    const [newSupplier, setNewSupplier] = useState({
+        name: '',
+        doc: '',
+        phone: '',
+        email: '',
+        supplier_category: 'PRODUTOS'
+    });
+    const createPartnerMutation = useCreatePartner();
     
     // items hook
     const { 
@@ -116,16 +128,14 @@ export function useBudgetLogic(id?: string) {
         }
     }, [leadId, id, setItems]);
 
-    // Load Base Data (Suppliers, Products, Factors)
+    // Load Base Data (Products, Factors)
     useEffect(() => {
         const loadBase = async () => {
-            const [suppliersRes, productsRes, factorsRes] = await Promise.all([
-                supabase.from('partners').select('*').eq('type', 'FORNECEDOR'),
+            const [productsRes, factorsRes] = await Promise.all([
                 supabase.from('products').select('*').limit(50),
                 supabase.from('calculation_factors').select('*')
             ]);
             
-            setSuppliersList(suppliersRes.data || []);
             setProductsList(productsRes.data || []);
             setFactors(factorsRes.data || []);
         };
@@ -698,6 +708,33 @@ export function useBudgetLogic(id?: string) {
             } finally {
                 setIsGeneratingOrder(false);
             }
-        }
+        },
+
+        // Supplier Quick Add
+        openQuickSupplierModal: () => setIsQuickSupplierModalOpen(true),
+        closeQuickSupplierModal: () => {
+            setIsQuickSupplierModalOpen(false);
+            setNewSupplier({ name: '', doc: '', phone: '', email: '', supplier_category: 'PRODUTOS' });
+        },
+        handleSaveQuickSupplier: async () => {
+            if (!newSupplier.name || !newSupplier.doc) {
+                return toast.error('Nome e Documento são obrigatórios.');
+            }
+            try {
+                await createPartnerMutation.mutateAsync({
+                    ...newSupplier,
+                    type: 'FORNECEDOR'
+                });
+                toast.success('Fornecedor cadastrado com sucesso!');
+                setIsQuickSupplierModalOpen(false);
+                setNewSupplier({ name: '', doc: '', phone: '', email: '', supplier_category: 'PRODUTOS' });
+            } catch (err: any) {
+                toast.error('Erro ao cadastrar fornecedor: ' + err.message);
+            }
+        },
+        isQuickSupplierModalOpen,
+        newSupplier,
+        setNewSupplier,
+        isSavingSupplier: createPartnerMutation.isPending
     };
 }
