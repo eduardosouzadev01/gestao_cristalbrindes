@@ -8,7 +8,7 @@ import ClientInfo from '@/components/budget/ClientInfo';
 import ItemsList from '@/components/budget/ItemsList';
 import CommercialTerms from '@/components/budget/CommercialTerms';
 import { GenerateOrderModal } from '@/components/modals/GenerateOrderModal';
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function BudgetPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
