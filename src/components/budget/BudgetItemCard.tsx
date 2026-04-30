@@ -56,6 +56,10 @@ export default function BudgetItemCard({
     const totalVenda = calculateItemTotal(item);
     const unitVenda = totalVenda / (item.quantity || 1);
 
+    // Lock item if approved to guarantee data integrity
+    const isLockedByApproval = item.isApproved && !isLocked;
+    const effectiveLock = isLocked || isLockedByApproval;
+
     const handleMarginClick = (m: number) => {
         onUpdate('isManualMargin', false);
         onUpdate('mockMargin', m);
@@ -214,7 +218,7 @@ export default function BudgetItemCard({
                             placeholder="Buscar produto no catálogo..."
                             value={item.productName}
                             onSearch={onSearch}
-                            disabled={isLocked}
+                            disabled={effectiveLock}
                         />
                     </div>
                 </div>
@@ -240,6 +244,13 @@ export default function BudgetItemCard({
                             {formatCurrency(totalVenda)}
                         </span>
                     </div>
+                    
+                    {effectiveLock && item.isApproved && (
+                        <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-md border border-emerald-100 text-[9px] font-bold uppercase tracking-widest animate-in fade-in zoom-in duration-300">
+                            <span className="material-icons-outlined text-xs">lock</span>
+                            Item Bloqueado
+                        </div>
+                    )}
                     
                     {!isLocked && (
                         <div className="flex gap-1 ml-4">
@@ -315,7 +326,7 @@ export default function BudgetItemCard({
                                 value={item.productCode || ''}
                                 onChange={e => onUpdate('productCode', e.target.value.toUpperCase())}
                                 placeholder="Ref..."
-                                disabled={isLocked}
+                                disabled={effectiveLock}
                             />
                         </div>
                     </div>
@@ -341,9 +352,9 @@ export default function BudgetItemCard({
                                         className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm font-medium text-slate-700 focus:ring-4 focus:ring-blue-50/50 focus:border-blue-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                         value={formatCurrency(item.priceUnit || 0)}
                                         onChange={e => onUpdate('priceUnit', parseCurrencyToNumber(e.target.value))}
-                                        disabled={isLocked}
+                                        disabled={effectiveLock}
                                     />
-                                    {!isLocked && <span className="absolute right-3 top-1/2 -translate-y-1/2 material-icons-outlined text-xs text-slate-300">edit</span>}
+                                    {!effectiveLock && <span className="absolute right-3 top-1/2 -translate-y-1/2 material-icons-outlined text-xs text-slate-300">edit</span>}
                                 </div>
                             </div>
                             <div className="col-span-5 space-y-1.5">
@@ -386,7 +397,7 @@ export default function BudgetItemCard({
                                         placeholder="Ex: Azul"
                                         value={item.productColor || ''}
                                         onChange={e => onUpdate('productColor', e.target.value)}
-                                        disabled={isLocked}
+                                        disabled={effectiveLock}
                                     />
                                 )}
                             </div>
@@ -398,7 +409,7 @@ export default function BudgetItemCard({
                                     onSelect={opt => onUpdate('supplier_id', opt ? opt.id : null)}
                                     onAdd={onAddSupplier}
                                     placeholder="Selecione..."
-                                    disabled={isLocked}
+                                    disabled={effectiveLock}
                                 />
                             </div>
                         </div>
@@ -410,7 +421,7 @@ export default function BudgetItemCard({
                                 value={item.productDescription || ''}
                                 onChange={val => onUpdate('productDescription', val)}
                                 placeholder="Detalhes que o cliente verá na proposta..."
-                                readOnly={isLocked}
+                                readOnly={effectiveLock}
                             />
                         </div>
                     </div>
@@ -450,7 +461,7 @@ export default function BudgetItemCard({
                                                 className="w-full text-right bg-transparent border-none p-0 focus:ring-0 font-medium text-xs text-slate-800 disabled:text-slate-400"
                                                 value={formatCurrency(item[row.key] || 0)}
                                                 onChange={e => onUpdate(row.key, parseCurrencyToNumber(e.target.value))}
-                                                disabled={isLocked}
+                                                disabled={effectiveLock}
                                             />
                                         </div>
                                     </div>
@@ -470,7 +481,7 @@ export default function BudgetItemCard({
                                                 onClick={() => !isLocked && handleNFToggle(val)} 
                                                 className={`flex-1 py-1 rounded-md text-[10px] font-medium uppercase transition-all ${
                                                     (item.mockNF ?? 14) === val ? 'bg-blue-600 text-white shadow-none' : 'text-slate-400 hover:text-slate-600'
-                                                } ${isLocked ? 'cursor-not-allowed opacity-80' : ''}`}
+                                                } ${effectiveLock ? 'cursor-not-allowed opacity-80' : ''}`}
                                             >
                                                 {val}%
                                             </button>
@@ -498,7 +509,7 @@ export default function BudgetItemCard({
                                                 type="number"
                                                 className={`w-full rounded-md border px-1 py-1.5 text-[10px] font-medium text-center focus:ring-0 transition-all ${
                                                     item.isManualMargin ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-slate-300 text-slate-400'
-                                                } ${isLocked ? 'cursor-not-allowed opacity-80' : ''}`}
+                                                } ${effectiveLock ? 'cursor-not-allowed opacity-80' : ''}`}
                                                 value={item.isManualMargin ? (item.mockMargin ?? '') : ''}
                                                 placeholder="..."
                                                 onChange={e => {
@@ -508,7 +519,7 @@ export default function BudgetItemCard({
                                                     const multiplier = 1 + ((item.mockNF ?? 14) + val + (item.mockPayment ?? 0)) / 100;
                                                     onUpdate('fator', multiplier);
                                                 }}
-                                                disabled={isLocked}
+                                                disabled={effectiveLock}
                                             />
                                         </div>
                                     </div>
@@ -538,7 +549,7 @@ export default function BudgetItemCard({
                                         const selected = paymentOptions.find(opt => opt.label === e.target.value);
                                         if (selected) handlePaymentChange(selected.val, selected.label);
                                     }}
-                                    disabled={isLocked}
+                                    disabled={effectiveLock}
                                 >
                                     {paymentOptions.map((opt, i) => (
                                         <option key={i} value={opt.label}>{opt.label}</option>

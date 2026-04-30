@@ -41,6 +41,7 @@ export function useBudgetLogic(id?: string) {
     const [deliveryDeadline, setDeliveryDeadline] = useState('15/20 dias úteis');
     const [paymentMethod, setPaymentMethod] = useState('50% no pedido e 50% no pedido pronto.');
     const [observation, setObservation] = useState('');
+    const [lastProposalId, setLastProposalId] = useState<string | null>(null);
 
     // Lists
     const { data: suppliersList = [] } = useSuppliers();
@@ -242,6 +243,19 @@ export function useBudgetLogic(id?: string) {
                     }));
                     setItems(mapped);
                 }
+
+                // Fetch last proposal ID
+                if (budget && budget.id) {
+                    const { data: propData } = await supabase
+                        .from('proposals')
+                        .select('id')
+                        .eq('budget_id', budget.id)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .maybeSingle();
+                    
+                    if (propData) setLastProposalId(propData.id);
+                }
             }
         };
 
@@ -411,6 +425,7 @@ export function useBudgetLogic(id?: string) {
         isSaving: saving,
         isGeneratingOrder,
         invalidItemIds,
+        lastProposalId,
         
         // Form States
         budgetNumber, setBudgetNumber,

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 interface BudgetHeaderProps {
@@ -11,7 +12,8 @@ interface BudgetHeaderProps {
     onGenerateOrder: () => void;
     onGenerateProposal: () => void;
     onViewProposal?: () => void;
-    isSaving?: boolean;
+    isViewOnly?: boolean;
+    proposalId?: string | null;
 }
 
 export default function BudgetHeader({ 
@@ -22,7 +24,8 @@ export default function BudgetHeader({
     onGenerateOrder,
     onGenerateProposal,
     onViewProposal,
-    isSaving 
+    isSaving,
+    proposalId
 }: BudgetHeaderProps) {
     const router = useRouter();
 
@@ -80,14 +83,14 @@ export default function BudgetHeader({
                 </button>
 
                 <div className="flex bg-amber-50 rounded-md border border-amber-200">
-                    {['PROPOSTA GERADA', 'PROPOSTA ENVIADA', 'PROPOSTA ACEITA', 'PEDIDO GERADO'].includes(status) ? (
-                        <button 
-                            onClick={onViewProposal || onGenerateProposal}
+                    {['PROPOSTA GERADA', 'PROPOSTA ENVIADA', 'PROPOSTA ACEITA', 'PEDIDO GERADO'].includes(status) && proposalId ? (
+                        <Link 
+                            href={`/propostas/${proposalId}`}
                             className="flex items-center gap-2 px-4 py-2.5 text-amber-700 text-[10px] font-medium uppercase tracking-widest hover:bg-amber-100 transition-all active:scale-95"
                         >
                             <span className="material-icons-outlined text-lg">visibility</span>
                             VER PROPOSTA
-                        </button>
+                        </Link>
                     ) : (
                         <button 
                             onClick={onGenerateProposal}

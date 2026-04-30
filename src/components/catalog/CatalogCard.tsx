@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { Catalog } from '../../types/catalog';
 
@@ -96,14 +97,14 @@ const CatalogCard: React.FC<CatalogCardProps> = ({ catalog, onDuplicate, onDelet
           </p>
         </div>
 
-        <button
-          onClick={() => router.push(`/catalogo/${catalog.id}`)}
+        <Link
+          href={`/catalogo/${catalog.id}`}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-medium uppercase tracking-widest text-white transition-all hover:opacity-90 active:scale-95"
           style={{ background: catalog.primary_color }}
         >
           <span className="material-icons-outlined text-[13px]">edit</span>
           Editar
-        </button>
+        </Link>
       </div>
     </div>
   );

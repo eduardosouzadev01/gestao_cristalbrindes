@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { fixClientName } from '@/utils/textUtils';
 import { useAuth } from '@/lib/auth';
@@ -70,13 +71,13 @@ export default function OrdersListPage() {
                         </h1>
                         <p className="text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mt-1">Controle total de produção e entrega</p>
                     </div>
-                    <button
-                        onClick={() => router.push('/pedidos/novo')}
-                        className="flex items-center gap-3 px-6 py-3 bg-[#0F6CBD] text-white rounded-md text-[10px] font-medium uppercase tracking-widest hover:bg-[#115EA3] transition-all shadow-none shadow-none-[#0F6CBD]/20"
+                    <Link
+                        href="/pedidos/novo"
+                        className="flex items-center gap-3 px-6 py-3 bg-[#0F6CBD] text-white rounded-md text-[10px] font-medium uppercase tracking-widest hover:bg-[#115EA3] transition-all shadow-none"
                     >
                         <span className="material-icons-outlined text-sm">add</span>
                         Novo Pedido
-                    </button>
+                    </Link>
                 </div>
             </div>
 
@@ -158,6 +159,9 @@ export default function OrdersListPage() {
                                         key={order.id} 
                                         className={`group transition-all hover:bg-slate-50/80 cursor-pointer ${idx % 2 === 0 ? 'bg-white' : 'bg-[#FAFAFB]'}`}
                                         onClick={() => router.push(`/pedidos/${order.id}`)}
+                                        onAuxClick={(e) => {
+                                            if (e.button === 1) window.open(`/pedidos/${order.id}`, '_blank');
+                                        }}
                                     >
                                         <td className="px-6 py-4">
                                             <span className="text-[11px] font-medium text-[#0F6CBD]">#{order.order_number}</span>
@@ -188,12 +192,12 @@ export default function OrdersListPage() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <button 
+                                            <Link 
+                                                href={`/pedidos/${order.id}`}
                                                 className="w-8 h-8 flex items-center justify-center rounded-md bg-white border border-[#E3E3E4] text-slate-400 hover:text-[#0F6CBD] hover:border-[#0F6CBD] transition-all group-hover:shadow-none"
-                                                onClick={(e) => { e.stopPropagation(); router.push(`/pedidos/${order.id}`); }}
                                             >
                                                 <span className="material-icons-outlined text-sm">edit</span>
-                                            </button>
+                                            </Link>
                                         </td>
                                     </tr>
                                 ))

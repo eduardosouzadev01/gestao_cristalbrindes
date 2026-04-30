@@ -56,6 +56,11 @@ export default function BudgetTable({ budgets, loading }: BudgetTableProps) {
                                 index % 2 === 1 ? 'bg-[#F9FAFB]' : 'bg-white'
                             } hover:bg-[#F0F7FF]`}
                             onClick={() => router.push(`/orcamentos/${b.id}`)}
+                            onAuxClick={(e) => {
+                                if (e.button === 1) {
+                                    window.open(`/orcamentos/${b.id}`, '_blank');
+                                }
+                            }}
                         >
                             <td className="px-6 py-4">
                                 <div className="flex flex-col">

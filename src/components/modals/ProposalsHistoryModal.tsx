@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { useRouter } from 'next/navigation';
 
@@ -70,17 +71,15 @@ export const ProposalsHistoryModal: React.FC<ProposalsHistoryModalProps> = ({ is
                                         <td className="px-6 py-4 text-xs font-medium text-gray-700 text-right">{formatCurrency(prop.total_amount)}</td>
                                         <td className="px-6 py-4 text-center">
                                             <div className="flex justify-center items-center gap-2">
-                                                <button 
-                                                    onClick={() => {
-                                                        onClose();
-                                                        router.push(`/propostas/${prop.id}`);
-                                                    }}
+                                                <Link 
+                                                    href={`/propostas/${prop.id}`}
+                                                    onClick={() => onClose()}
                                                     className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-white text-blue-600 border border-blue-200 hover:bg-blue-50 transition-all text-[10px] font-medium uppercase shadow-none active:scale-95"
                                                     title="Visualizar Proposta"
                                                 >
                                                     <span className="material-icons-outlined text-base">visibility</span>
                                                     VER
-                                                </button>
+                                                </Link>
                                                 <button 
                                                     onClick={async () => {
                                                         if (!window.confirm('Tem certeza que deseja excluir esta proposta?')) return;

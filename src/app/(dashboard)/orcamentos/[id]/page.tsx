@@ -64,6 +64,7 @@ export default function BudgetPage({ params }: { params: Promise<{ id: string }>
                 onGenerateProposal={logic.handleGenerateProposal}
                 onViewProposal={logic.handleViewProposal}
                 isSaving={logic.isSaving}
+                proposalId={logic.lastProposalId}
             />
 
             <main className="max-w-[1600px] mx-auto px-4 py-6">

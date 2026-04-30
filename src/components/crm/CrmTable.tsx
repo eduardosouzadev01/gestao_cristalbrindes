@@ -147,8 +147,8 @@ const CrmTable: React.FC<CrmTableProps> = ({
                 </div>
             )}
 
-            <div className="bg-white rounded-md border border-[#E3E3E4] shadow-none min-h-[500px]">
-                <div className="overflow-x-auto overflow-y-visible">
+            <div className="bg-white rounded-md border border-[#E3E3E4] shadow-none min-h-[600px] overflow-visible">
+                <div className="overflow-visible">
                 <table className="w-full border-collapse">
                     <thead>
                         <tr className="border-b border-[#E3E3E4]">

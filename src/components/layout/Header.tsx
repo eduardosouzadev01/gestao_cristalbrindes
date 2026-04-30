@@ -106,14 +106,8 @@ const Header: React.FC = () => {
       <div className="max-w-[1920px] w-full mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-[52px]">
           <div className="flex items-center">
-            <button
-              onClick={() => {
-                if (appUser?.email === 'cristalbrindes@cristalbrindes') {
-                  router.push('/crm?tab=PERFORMANCE');
-                } else {
-                  router.push('/crm');
-                }
-              }}
+            <Link
+              href={appUser?.email === 'cristalbrindes@cristalbrindes' ? '/crm?tab=PERFORMANCE' : '/crm'}
               className="flex-shrink-0 flex items-center h-full mr-8 hover:opacity-80 transition-opacity cursor-pointer"
             >
               <img
@@ -122,7 +116,7 @@ const Header: React.FC = () => {
                 className="h-8 w-auto object-contain"
                 style={{ mixBlendMode: 'multiply' }}
               />
-            </button>
+            </Link>
                 <nav className="hidden sm:ml-2 sm:flex sm:space-x-0 h-full items-center">
               {menuStructure.map((item) => {
                 if (!hasPermission(item.permission)) return null;

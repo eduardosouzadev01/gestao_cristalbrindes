@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { toast } from 'sonner';
@@ -135,6 +136,9 @@ export default function ProposalListPage() {
                                         key={item.id} 
                                         className={`hover:bg-[#F9FAFB] transition-colors cursor-pointer group ${idx % 2 === 0 ? 'bg-white' : 'bg-[#FAFBFC]'}`}
                                         onClick={() => router.push(`/propostas/${item.id}`)}
+                                        onAuxClick={(e) => {
+                                            if (e.button === 1) window.open(`/propostas/${item.id}`, '_blank');
+                                        }}
                                     >
                                         <td className="px-8 py-4 whitespace-nowrap">
                                             <span className="px-3 py-1.5 bg-[#EBF3FC] text-[#0F6CBD] text-xs font-medium rounded-md uppercase">#{item.proposal_number}</span>
@@ -162,12 +166,12 @@ export default function ProposalListPage() {
                                         </td>
                                         <td className="px-8 py-4 text-right whitespace-nowrap">
                                             <div className="flex justify-end gap-2">
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); router.push(`/propostas/${item.id}`); }}
+                                                <Link
+                                                    href={`/propostas/${item.id}`}
                                                     className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-[#0F6CBD] hover:bg-[#EBF3FC] rounded-md transition-all"
                                                 >
                                                     <span className="material-icons-outlined text-xl">visibility</span>
-                                                </button>
+                                                </Link>
                                                 {(appUser?.permissions?.fullAccess || appUser?.permissions?.canDelete) && (
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); deleteProposal(item); }}

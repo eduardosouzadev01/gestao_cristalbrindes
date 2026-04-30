@@ -5,6 +5,7 @@ import { CRM_STATUS_CONFIG, getStatusStyle, getSubStatusStyle, SUB_STATUS_CONFIG
 import { formatDate } from '../../utils/dateUtils';
 import { fixClientName } from '../../utils/textUtils';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { useUpdateLead } from '@/hooks/useCRM';
@@ -317,20 +318,20 @@ const LeadTableRowComponent: React.FC<LeadTableRowProps> = ({
                         <span className="material-icons-outlined text-xl">more_vert</span>
                     </button>
                     <div className="absolute right-0 top-full mt-0 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover/actions:opacity-100 group-hover/actions:visible transition-all z-[100] flex flex-col py-1">
-                        <button
-                            onClick={(e) => { e.stopPropagation(); router.push('/pedidos?clientName=' + encodeURIComponent(l.client_name)); }}
+                        <Link
+                            href={'/pedidos?clientName=' + encodeURIComponent(l.client_name)}
                             className="w-full px-4 py-2.5 text-left text-[10px] font-medium text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-colors flex items-center gap-2.5 uppercase tracking-widest"
                         >
                             <span className="material-icons-outlined text-[16px]">shopping_bag</span>
                             Ver Pedidos
-                        </button>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); router.push('/orcamentos?clientName=' + encodeURIComponent(l.client_name)); }}
+                        </Link>
+                        <Link
+                            href={'/orcamentos?clientName=' + encodeURIComponent(l.client_name)}
                             className="w-full px-4 py-2.5 text-left text-[10px] font-medium text-gray-600 hover:bg-emerald-50 hover:text-emerald-600 transition-colors flex items-center gap-2.5 uppercase tracking-widest"
                         >
                             <span className="material-icons-outlined text-[16px]">request_quote</span>
                             Ver Orçamentos
-                        </button>
+                        </Link>
                         <div className="h-px w-full bg-gray-100 my-1" />
                         <button
                             onClick={() => onEdit(l)}
