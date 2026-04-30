@@ -26,8 +26,9 @@ export default function BudgetsPage() {
     } = useBudgetsLogic();
 
     const canSeeAll = appUser?.role !== 'VENDEDOR';
-    const SELLERS = ['VENDAS 01', 'VENDAS 02', 'VENDAS 03', 'VENDAS 04', 'VENDAS 05', 'VENDAS 06'];
+    const SELLERS = ['VENDAS 01', 'VENDAS 02', 'VENDAS 03', 'VENDAS 04', 'VENDAS 05'];
     const activeSellers = canSeeAll ? SELLERS : [appUser?.salesperson].filter(Boolean) as string[];
+
 
     return (
         <div className="flex flex-col min-h-screen bg-[#F5F5F8] pb-10">
@@ -65,11 +66,12 @@ export default function BudgetsPage() {
                             value={sellerFilter}
                             onChange={e => setSellerFilter(e.target.value)}
                         >
-                            <option value="Todos">Vendedor: Todos</option>
+                            {canSeeAll && <option value="Todos">Vendedor: Todos</option>}
                             {activeSellers.map(s => (
                                 <option key={s} value={s}>{s}</option>
                             ))}
                         </select>
+
 
                         {/* Status filter */}
                         <select

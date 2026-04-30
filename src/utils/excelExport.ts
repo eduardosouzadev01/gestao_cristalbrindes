@@ -43,6 +43,11 @@ interface ExcelItemData {
     bvPct: number;
     extraPct: number;
     totalVenda: number;
+    supplierName?: string;
+    customizationSupplierName?: string;
+    transportSupplierName?: string;
+    clientTransportSupplierName?: string;
+    layoutSupplierName?: string;
 }
 
 const esc = (str: string): string => {
@@ -177,6 +182,13 @@ export const generateBudgetExcel = (data: ExcelProposalData): void => {
         label: 'QUANTIDADE',
         values: data.items.map(it => it.quantity),
         style: 'CalcNumber',
+    });
+    
+    // Row 1: FORNECEDOR
+    calcRows.push({
+        label: 'FORNECEDOR',
+        values: data.items.map(it => it.supplierName || '---'),
+        style: 'CalcText',
     });
 
     // Row 1: CUSTO PARCIAL (qty * unit) - FORMULA
@@ -432,20 +444,21 @@ export const generateBudgetExcel = (data: ExcelProposalData): void => {
 
     // Now find the row numbers for key references
     const ROW_QTY = rowMap[0];
-    const ROW_CUSTO_PARCIAL = rowMap[1];
-    const ROW_CUSTO_TOTAL_FRETES = rowMap[8]; // index 8
-    const ROW_MARGEM = rowMap[10]; // after spacer at 9
-    const ROW_IMPOSTO_PCT = rowMap[11];
-    const ROW_FATOR = rowMap[13]; // after payment at 12
-    const ROW_BV_PCT = rowMap[14];
-    const ROW_EXTRA_PCT = rowMap[15];
+    const ROW_SUPPLIER = rowMap[1];
+    const ROW_CUSTO_PARCIAL = rowMap[2];
+    const ROW_CUSTO_TOTAL_FRETES = rowMap[9]; // index 9 now
+    const ROW_MARGEM = rowMap[11];
+    const ROW_IMPOSTO_PCT = rowMap[12];
+    const ROW_FATOR = rowMap[14]; 
+    const ROW_BV_PCT = rowMap[15];
+    const ROW_EXTRA_PCT = rowMap[16];
 
     // Results rows
-    const ROW_TOTAL_VENDA = rowMap[19]; // after spacers
-    const ROW_UNIT_VENDA = rowMap[20];
-    const ROW_IMPOSTO_VAL = rowMap[22]; // after spacer
-    const ROW_BV_VAL = rowMap[23];
-    const ROW_LUCRO = rowMap[24];
+    const ROW_TOTAL_VENDA = rowMap[20];
+    const ROW_UNIT_VENDA = rowMap[21];
+    const ROW_IMPOSTO_VAL = rowMap[23];
+    const ROW_BV_VAL = rowMap[24];
+    const ROW_LUCRO = rowMap[25];
 
     // Build the calculation data rows
     let calcDataXml = '';
@@ -475,32 +488,32 @@ export const generateBudgetExcel = (data: ExcelProposalData): void => {
             if (cr.isFormula) {
                 let formula = '';
                 // Compute the actual formula string
-                if (ci === 1) {
+                if (ci === 2) {
                     // CUSTO PARCIAL = qty * unitPrice
                     formula = `=${rc(ROW_QTY, vc)}*${rc(productNameRowNum, vc)}`;
-                } else if (ci === 4) {
+                } else if (ci === 5) {
                     // CUSTO TOTAL = parcial + personal + layout
-                    formula = `=${rc(ROW_CUSTO_PARCIAL, vc)}+${rc(rowMap[2], vc)}+${rc(rowMap[3], vc)}`;
-                } else if (ci === 8) {
+                    formula = `=${rc(ROW_CUSTO_PARCIAL, vc)}+${rc(rowMap[3], vc)}+${rc(rowMap[4], vc)}`;
+                } else if (ci === 9) {
                     // CUSTO TOTAL + FRETES = custoTotal + freteForn + freteCliente + extra
-                    formula = `=${rc(rowMap[4], vc)}+${rc(rowMap[5], vc)}+${rc(rowMap[6], vc)}+${rc(rowMap[7], vc)}`;
-                } else if (ci === 13) {
+                    formula = `=${rc(rowMap[5], vc)}+${rc(rowMap[6], vc)}+${rc(rowMap[7], vc)}+${rc(rowMap[8], vc)}`;
+                } else if (ci === 14) {
                     // FATOR = 1 + (margem + imposto + pagamento) / 100
-                    formula = `=1+(${rc(ROW_MARGEM, vc)}+${rc(ROW_IMPOSTO_PCT, vc)}+${rc(rowMap[12], vc)})/100`;
-                } else if (ci === 19) {
-                    // PREÇO TOTAL VENDA = ROUND((custoTotalFretes/(2-fator))/(1-bv/100-extra/100)/qty, 2)*qty
-                    formula = `=ROUND((${rc(ROW_CUSTO_TOTAL_FRETES, vc)}/(2-${rc(ROW_FATOR, vc)}))/(1-${rc(ROW_BV_PCT, vc)}/100-${rc(ROW_EXTRA_PCT, vc)}/100)/${rc(ROW_QTY, vc)},2)*${rc(ROW_QTY, vc)}`;
+                    formula = `=1+(${rc(ROW_MARGEM, vc)}+${rc(ROW_IMPOSTO_PCT, vc)}+${rc(rowMap[13], vc)})/100`;
                 } else if (ci === 20) {
-                    // PREÇO UNITÁRIO = total / qty
+                    // PREÇO TOTAL VENDA
+                    formula = `=ROUND((${rc(ROW_CUSTO_TOTAL_FRETES, vc)}/(2-${rc(ROW_FATOR, vc)}))/(1-${rc(ROW_BV_PCT, vc)}/100-${rc(ROW_EXTRA_PCT, vc)}/100)/${rc(ROW_QTY, vc)},2)*${rc(ROW_QTY, vc)}`;
+                } else if (ci === 21) {
+                    // PREÇO UNITÁRIO
                     formula = `=IF(${rc(ROW_QTY, vc)}>0,${rc(ROW_TOTAL_VENDA, vc)}/${rc(ROW_QTY, vc)},0)`;
-                } else if (ci === 22) {
-                    // IMPOSTO VALOR = totalVenda * impostoNF / 100
-                    formula = `=${rc(ROW_TOTAL_VENDA, vc)}*${rc(ROW_IMPOSTO_PCT, vc)}/100`;
                 } else if (ci === 23) {
-                    // BV VALOR = totalVenda * bvPct / 100
-                    formula = `=${rc(ROW_TOTAL_VENDA, vc)}*${rc(ROW_BV_PCT, vc)}/100`;
+                    // IMPOSTO VALOR
+                    formula = `=${rc(ROW_TOTAL_VENDA, vc)}*${rc(ROW_IMPOSTO_PCT, vc)}/100`;
                 } else if (ci === 24) {
-                    // LUCRO = totalVenda - custoTotalFretes - impostoVal - bvVal
+                    // BV VALOR
+                    formula = `=${rc(ROW_TOTAL_VENDA, vc)}*${rc(ROW_BV_PCT, vc)}/100`;
+                } else if (ci === 25) {
+                    // LUCRO
                     formula = `=${rc(ROW_TOTAL_VENDA, vc)}-${rc(ROW_CUSTO_TOTAL_FRETES, vc)}-${rc(ROW_IMPOSTO_VAL, vc)}-${rc(ROW_BV_VAL, vc)}`;
                 }
 

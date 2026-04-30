@@ -13,6 +13,9 @@ export const ProposalView: React.FC<ProposalViewProps> = ({ proposal }) => {
     if (!proposal) return null;
 
     const info = ISSUER_INFO[proposal.issuer || 'CRISTAL'] || ISSUER_INFO['CRISTAL'];
+    
+    // Prioritize snapshot data for historical integrity, fallback to current record
+    const clientData = proposal.client_snapshot || proposal.client || {};
 
     const getSalespersonEmail = () => {
         if (!proposal) return info.email;
@@ -81,11 +84,11 @@ export const ProposalView: React.FC<ProposalViewProps> = ({ proposal }) => {
                         Aos cuidados de
                     </h2>
                     <div className="space-y-2 text-[12px]">
-                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-24 shrink-0">Empresa</span> <span className="text-slate-800 uppercase truncate">{fixClientName(proposal.client?.name)}</span></p>
-                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-24 shrink-0">CNPJ/CPF</span> <span className="text-slate-700">{proposal.client?.doc || 'NÃO INFORMADO'}</span></p>
-                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-24 shrink-0">Contato</span> <span className="text-slate-700">{proposal.client?.contact_name || 'NÃO INFORMADO'}</span></p>
-                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-24 shrink-0">Email</span> <span className="text-[#0F6CBD] truncate">{proposal.client?.email || 'NÃO INFORMADO'}</span></p>
-                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-24 shrink-0">Telefone</span> <span className="text-slate-700">{proposal.client?.phone || 'NÃO INFORMADO'}</span></p>
+                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-24 shrink-0">Empresa</span> <span className="text-slate-800 uppercase break-words">{fixClientName(clientData.name)}</span></p>
+                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-24 shrink-0">CNPJ/CPF</span> <span className="text-slate-700">{clientData.doc || 'NÃO INFORMADO'}</span></p>
+                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-24 shrink-0">Contato</span> <span className="text-slate-700">{clientData.contact_name || 'NÃO INFORMADO'}</span></p>
+                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-24 shrink-0">Email</span> <span className="text-[#0F6CBD] break-all">{clientData.email || 'NÃO INFORMADO'}</span></p>
+                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-24 shrink-0">Telefone</span> <span className="text-slate-700">{clientData.phone || 'NÃO INFORMADO'}</span></p>
                     </div>
                 </div>
 
@@ -95,10 +98,10 @@ export const ProposalView: React.FC<ProposalViewProps> = ({ proposal }) => {
                         Dados do Atendimento
                     </h2>
                     <div className="space-y-2 text-[12px]">
-                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-28 shrink-0">Fornecedor</span> <span className="text-slate-800 uppercase truncate">EQUIPE {info.name}</span></p>
+                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-28 shrink-0">Fornecedor</span> <span className="text-slate-800 uppercase break-words">EQUIPE {info.name}</span></p>
                         <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-28 shrink-0">CNPJ</span> <span className="text-slate-700">{info.cnpj}</span></p>
-                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-28 shrink-0">Representante</span> <span className="text-[#0F6CBD] uppercase truncate">{proposal.salesperson}</span></p>
-                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-28 shrink-0">Email</span> <span className="text-[#0F6CBD] truncate">{getSalespersonEmail()}</span></p>
+                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-28 shrink-0">Representante</span> <span className="text-[#0F6CBD] uppercase break-words">{proposal.salesperson}</span></p>
+                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-28 shrink-0">Email</span> <span className="text-[#0F6CBD] break-all">{getSalespersonEmail()}</span></p>
                         <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-28 shrink-0">Telefone</span> <span className="text-slate-700">{info.phone}</span></p>
                     </div>
                 </div>

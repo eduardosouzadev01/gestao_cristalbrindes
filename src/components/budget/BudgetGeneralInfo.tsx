@@ -13,6 +13,7 @@ interface BudgetGeneralInfoProps {
     issuer: string;
     setIssuer: (v: string) => void;
     isLocked?: boolean;
+    canEditSalesperson?: boolean;
 }
 
 export default function BudgetGeneralInfo({
@@ -25,7 +26,8 @@ export default function BudgetGeneralInfo({
     setBudgetDate,
     issuer,
     setIssuer,
-    isLocked
+    isLocked,
+    canEditSalesperson
 }: BudgetGeneralInfoProps) {
     return (
         <div className="bg-white p-6 rounded-md border border-slate-300 shadow-none font-sans h-full">
@@ -49,10 +51,14 @@ export default function BudgetGeneralInfo({
                 <div className="col-span-1">
                     <label className="block text-[9px] font-medium text-[#717171] uppercase mb-1 tracking-wider ml-1">Vendedor</label>
                     <select
-                        disabled={true}
+                        disabled={!canEditSalesperson}
                         value={salesperson}
                         onChange={(e) => setSalesperson(e.target.value)}
-                        className="w-full h-11 px-3 bg-[#F9FAFB] border border-slate-300 rounded-md text-[12px] font-medium text-slate-500 outline-none cursor-not-allowed"
+                        className={`w-full h-11 px-3 border border-slate-300 rounded-md text-[12px] font-medium outline-none transition-all ${
+                            !canEditSalesperson 
+                            ? "bg-[#F9FAFB] text-slate-500 cursor-not-allowed" 
+                            : "bg-white text-slate-800 cursor-pointer focus:border-[#0F6CBD] focus:ring-4 focus:ring-[#0F6CBD]/10"
+                        }`}
                     >
                         <option value="">Selecione</option>
                         <option value="EDUARDO SOUZA">EDUARDO SOUZA</option>

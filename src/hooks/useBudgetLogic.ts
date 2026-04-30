@@ -11,9 +11,11 @@ import { useOrderItems } from './useOrderItems';
 import { useBudget, useUpdateBudget, useCreateBudget } from './useBudgets';
 import { useSuppliers, useCreatePartner } from './api.hooks';
 import { calculateItemTotal } from '@/utils/formulas';
+import { generateBudgetExcel } from '@/utils/excelExport';
+import { fixClientName } from '@/utils/textUtils';
 
 export function useBudgetLogic(id?: string) {
-    const { appUser } = useAuth();
+    const { appUser, hasPermission } = useAuth();
     const searchParams = useSearchParams();
     const leadId = searchParams.get('leadId');
     const router = useRouter();
@@ -42,6 +44,7 @@ export function useBudgetLogic(id?: string) {
     const [paymentMethod, setPaymentMethod] = useState('50% no pedido e 50% no pedido pronto.');
     const [observation, setObservation] = useState('');
     const [lastProposalId, setLastProposalId] = useState<string | null>(null);
+    const [proposals, setProposals] = useState<any[]>([]);
 
     // Lists
     const { data: suppliersList = [] } = useSuppliers();
@@ -181,6 +184,13 @@ export function useBudgetLogic(id?: string) {
         const syncData = async () => {
             const isRecentlySaved = Date.now() - lastSaveTime < 3000;
             if (budget && !updateMutation.isPending && !createMutation.isPending && !isInternalOperation && !isRecentlySaved) {
+                const isSalesperson = appUser?.role === 'VENDEDOR';
+                if (isSalesperson && budget.salesperson !== appUser?.salesperson && !appUser?.permissions.fullAccess) {
+                    toast.error('Acesso negado: Este orçamento pertence a outro vendedor.');
+                    router.push('/orcamentos');
+                    return;
+                }
+
                 setBudgetNumber(budget.budget_number);
                 setSalesperson(budget.salesperson);
                 setStatus(budget.status);
@@ -191,6 +201,7 @@ export function useBudgetLogic(id?: string) {
                 setDeliveryDeadline(budget.delivery_deadline);
                 setPaymentMethod(budget.payment_method);
                 setObservation(budget.observation);
+
                 
                 // Fetch and set Client Data if exists
                 if (budget.client_id) {
@@ -239,22 +250,24 @@ export function useBudgetLogic(id?: string) {
                         productDescription: it.product_description,
                         productColor: it.product_color,
                         productCode: it.product_code,
-                        productImage: it.product_image_url
+                        productImage: it.product_image_url,
+                        paymentMethodLabel: it.payment_method_label
                     }));
                     setItems(mapped);
                 }
 
-                // Fetch last proposal ID
+                // Fetch all proposals
                 if (budget && budget.id) {
                     const { data: propData } = await supabase
                         .from('proposals')
-                        .select('id')
+                        .select('*')
                         .eq('budget_id', budget.id)
-                        .order('created_at', { ascending: false })
-                        .limit(1)
-                        .maybeSingle();
+                        .order('created_at', { ascending: false });
                     
-                    if (propData) setLastProposalId(propData.id);
+                    if (propData) {
+                        setProposals(propData);
+                        if (propData.length > 0) setLastProposalId(propData[0].id);
+                    }
                 }
             }
         };
@@ -380,6 +393,7 @@ export function useBudgetLogic(id?: string) {
                             product_color: it.productColor || '',
                             product_code: it.productCode || '',
                             product_image_url: it.productImage || '',
+                            payment_method_label: it.paymentMethodLabel || '',
                             total_item_value: calculateItemTotal(it)
                         }));
 
@@ -426,6 +440,7 @@ export function useBudgetLogic(id?: string) {
         isGeneratingOrder,
         invalidItemIds,
         lastProposalId,
+        proposals,
         
         // Form States
         budgetNumber, setBudgetNumber,
@@ -508,6 +523,7 @@ export function useBudgetLogic(id?: string) {
                         product_color: it.productColor || '',
                         product_code: it.productCode || '',
                         product_image_url: it.productImage || '',
+                        payment_method_label: it.paymentMethodLabel || '',
                         total_item_value: calculateItemTotal(it)
                     }));
                     await supabase.from('budget_items').insert(itemsToSave);
@@ -520,25 +536,14 @@ export function useBudgetLogic(id?: string) {
         },
         handleGenerateProposal: async () => {
             try {
-                // Validation: Prevent generating proposal if supplier is filled but price is zero
-                const invalidItems = items.filter(it => it.supplier_id && (Number(it.priceUnit) === 0 || !it.priceUnit));
-                if (invalidItems.length > 0) {
-                    const firstInvalidId = invalidItems[0].id;
-                    setInvalidItemIds(invalidItems.map(it => it.id));
-                    
-                    toast.error('Preenchimento obrigatório: Itens com fornecedor selecionado devem ter o Valor Unitário informado.');
-                    
-                    // Scroll to the first invalid item
-                    setTimeout(() => {
-                        const element = document.getElementById(`budget-item-${firstInvalidId}`);
-                        if (element) {
-                            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }
-                    }, 100);
+                setInvalidItemIds([]);
+                
+                // Task 1: Check if at least one item is approved
+                const approvedItems = items.filter(it => it.isApproved);
+                if (approvedItems.length === 0) {
+                    toast.error('Não é possível gerar proposta sem pelo menos 1 item marcado como aprovado.');
                     return;
                 }
-                
-                setInvalidItemIds([]);
 
                 // Save Budget first (ensure data is consistent)
                 const saveResult = await handleSave(true);
@@ -547,14 +552,14 @@ export function useBudgetLogic(id?: string) {
                 const activeId = saveResult.activeId;
                 const currentBudgetNumber = saveResult.finalBudgetNumber;
 
-                // Check for existing proposals to determine version suffix
+                // Task 2: sequential numbering <budget_number>-01, -02...
                 const { count } = await supabase
                     .from('proposals')
                     .select('*', { count: 'exact', head: true })
                     .eq('budget_id', activeId);
 
-                const suffix = (count && count > 0) ? `-${count}` : '';
-                const finalProposalNumber = `${currentBudgetNumber}${suffix}`;
+                const sequence = (count || 0) + 1;
+                const finalProposalNumber = `${currentBudgetNumber}-${String(sequence).padStart(2, '0')}`;
 
                 // Update status immediately directly
                 await supabase.from('budgets').update({ status: 'PROPOSTA GERADA' }).eq('id', activeId);
@@ -589,7 +594,13 @@ export function useBudgetLogic(id?: string) {
                     customization_supplier_id: it.customization_supplier_id || null,
                     transport_supplier_id: it.transport_supplier_id || null,
                     client_transport_supplier_id: it.client_transport_supplier_id || null,
-                    layout_supplier_id: it.layout_supplier_id || null
+                    layout_supplier_id: it.layout_supplier_id || null,
+                    // Store names in snapshot for Excel export
+                    supplier_name: suppliersList.find(s => s.id === it.supplier_id)?.name || '',
+                    customization_supplier_name: suppliersList.find(s => s.id === it.customization_supplier_id)?.name || '',
+                    transport_supplier_name: suppliersList.find(s => s.id === it.transport_supplier_id)?.name || '',
+                    client_transport_supplier_name: suppliersList.find(s => s.id === it.client_transport_supplier_id)?.name || '',
+                    layout_supplier_name: suppliersList.find(s => s.id === it.layout_supplier_id)?.name || ''
                 }));
 
                 const proposalPayload = {
@@ -605,7 +616,14 @@ export function useBudgetLogic(id?: string) {
                     delivery_deadline: deliveryDeadline,
                     payment_method: paymentMethod,
                     observation,
-                    issuer
+                    issuer,
+                    client_snapshot: {
+                        name: clientData.name,
+                        email: clientData.email,
+                        doc: clientData.doc,
+                        phone: clientData.phone,
+                        contact_name: clientData.contactName
+                    }
                 };
 
                 const { data: newProposal, error: proposalError } = await supabase
@@ -617,7 +635,7 @@ export function useBudgetLogic(id?: string) {
                 if (proposalError) throw new Error('Erro ao criar registro da proposta: ' + proposalError.message);
 
                 toast.success('Proposta gerada com sucesso!', {
-                    description: 'O status do orçamento foi atualizado.'
+                    description: `Proposta ${finalProposalNumber} criada.`
                 });
                 
                 // 4. Redirect to the new proposal view
@@ -627,6 +645,26 @@ export function useBudgetLogic(id?: string) {
                 console.error('Generate proposal error:', err);
                 const msg = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
                 toast.error('Erro ao processar proposta: ' + msg);
+            }
+        },
+        handleDeleteProposal: async (pid: string) => {
+            const confirmed = window.confirm('Tem certeza que deseja excluir esta proposta permanentemente?');
+            if (confirmed) {
+                try {
+                    const { error } = await supabase.from('proposals').delete().eq('id', pid);
+                    if (error) throw error;
+                    toast.success('Proposta excluída!');
+                    queryClient.invalidateQueries({ queryKey: ['budget', id] });
+                    
+                    // Re-check status
+                    const { count } = await supabase.from('proposals').select('*', { count: 'exact', head: true }).eq('budget_id', id);
+                    if (count === 0) {
+                        await supabase.from('budgets').update({ status: 'EM ABERTO' }).eq('id', id);
+                        setStatus('EM ABERTO');
+                    }
+                } catch (err: any) {
+                    toast.error('Erro ao excluir: ' + err.message);
+                }
             }
         },
         handleViewProposal: async () => {
@@ -774,6 +812,63 @@ export function useBudgetLogic(id?: string) {
         isQuickSupplierModalOpen,
         newSupplier,
         setNewSupplier,
-        isSavingSupplier: createPartnerMutation.isPending
+        isSavingSupplier: createPartnerMutation.isPending,
+        handleExportExcel: async () => {
+            try {
+                if (items.length === 0) {
+                    return toast.error('Não há itens para exportar.');
+                }
+
+                generateBudgetExcel({
+                    proposalNumber: budgetNumber,
+                    budgetNumber: budgetNumber,
+                    date: new Date(budgetDate).toLocaleDateString('pt-BR'),
+                    salesperson: salesperson || '',
+                    issuer: issuer || 'CRISTAL',
+                    client: {
+                        name: fixClientName(clientData.name || ''),
+                        doc: clientData.doc || '',
+                        email: clientData.email || '',
+                        phone: clientData.phone || '',
+                        contact_name: clientData.contactName || '',
+                    },
+                    validity: validity || '15 dias',
+                    shipping: shipping || 'Cliente retira',
+                    deliveryDeadline: deliveryDeadline || '15 / 20 dias úteis',
+                    paymentMethod: paymentMethod || 'À vista ou parcelado',
+                    observation: observation || '',
+                    items: items.map(it => ({
+                        productName: it.productName || '',
+                        productCode: it.productCode || '',
+                        productColor: it.productColor || '',
+                        quantity: it.quantity || 0,
+                        priceUnit: it.priceUnit || 0,
+                        custoPersonalizacao: it.custoPersonalizacao || 0,
+                        layoutCost: it.layoutCost || 0,
+                        transpFornecedor: it.transpFornecedor || 0,
+                        transpCliente: it.transpCliente || 0,
+                        despesaExtra: it.despesaExtra || 0,
+                        fator: it.fator || 1.35,
+                        mockNF: it.mockNF || 0,
+                        mockMargin: it.mockMargin || 0,
+                        mockPayment: it.mockPayment || 0,
+                        bvPct: it.bvPct || 0,
+                        extraPct: it.extraPct || 0,
+                        totalVenda: calculateItemTotal(it),
+                        supplierName: suppliersList.find(s => s.id === it.supplier_id)?.name || '',
+                        customizationSupplierName: suppliersList.find(s => s.id === it.customization_supplier_id)?.name || '',
+                        transportSupplierName: suppliersList.find(s => s.id === it.transport_supplier_id)?.name || '',
+                        clientTransportSupplierName: suppliersList.find(s => s.id === it.client_transport_supplier_id)?.name || '',
+                        layoutSupplierName: suppliersList.find(s => s.id === it.layout_supplier_id)?.name || '',
+                    })),
+                });
+
+                toast.success('Memória de cálculo exportada!');
+            } catch (err: any) {
+                toast.error('Erro ao exportar: ' + err.message);
+            }
+        },
+        hasPermission: hasPermission
     };
 }
+

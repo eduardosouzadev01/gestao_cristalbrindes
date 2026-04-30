@@ -12,8 +12,12 @@ interface BudgetHeaderProps {
     onGenerateOrder: () => void;
     onGenerateProposal: () => void;
     onViewProposal?: () => void;
+    onDeleteProposal?: (id: string) => void;
+    onExportExcel?: () => void;
     isViewOnly?: boolean;
+    isSaving?: boolean;
     proposalId?: string | null;
+    proposals?: any[];
 }
 
 export default function BudgetHeader({ 
@@ -24,10 +28,14 @@ export default function BudgetHeader({
     onGenerateOrder,
     onGenerateProposal,
     onViewProposal,
+    onDeleteProposal,
+    onExportExcel,
     isSaving,
-    proposalId
+    proposalId,
+    proposals = []
 }: BudgetHeaderProps) {
     const router = useRouter();
+    const [showProposals, setShowProposals] = React.useState(false);
 
     const getStatusColor = (s: string) => {
         switch (s) {
@@ -82,23 +90,70 @@ export default function BudgetHeader({
                     {isSaving ? 'Salvando...' : 'Salvar'}
                 </button>
 
-                <div className="flex bg-amber-50 rounded-md border border-amber-200">
-                    {['PROPOSTA GERADA', 'PROPOSTA ENVIADA', 'PROPOSTA ACEITA', 'PEDIDO GERADO'].includes(status) && proposalId ? (
-                        <Link 
-                            href={`/propostas/${proposalId}`}
-                            className="flex items-center gap-2 px-4 py-2.5 text-amber-700 text-[10px] font-medium uppercase tracking-widest hover:bg-amber-100 transition-all active:scale-95"
-                        >
-                            <span className="material-icons-outlined text-lg">visibility</span>
-                            VER PROPOSTA
-                        </Link>
-                    ) : (
-                        <button 
-                            onClick={onGenerateProposal}
-                            className="flex items-center gap-2 px-4 py-2.5 text-amber-700 text-[10px] font-medium uppercase tracking-widest hover:bg-amber-100 transition-all active:scale-95"
-                        >
-                            <span className="material-icons-outlined text-lg">description</span>
-                            GERAR PROPOSTA
-                        </button>
+                <button 
+                    onClick={onExportExcel}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-md border border-[#E3E3E4] text-[#707070] text-[10px] font-medium uppercase tracking-widest hover:bg-[#F0FDF4] hover:text-[#10B981] hover:border-[#10B981] transition-all active:scale-95 shadow-none"
+                >
+                    <span className="material-icons-outlined text-sm">table_chart</span>
+                    Excel Base
+                </button>
+
+                <div className="relative">
+                    <button 
+                        onClick={() => setShowProposals(!showProposals)}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 text-amber-700 text-[10px] font-medium uppercase tracking-widest border border-amber-200 rounded-md hover:bg-amber-100 transition-all active:scale-95"
+                    >
+                        <span className="material-icons-outlined text-lg">description</span>
+                        Propostas ({proposals.length})
+                        <span className="material-icons-outlined text-sm">{showProposals ? 'expand_less' : 'expand_more'}</span>
+                    </button>
+
+                    {showProposals && (
+                        <>
+                            <div className="fixed inset-0 z-40" onClick={() => setShowProposals(false)}></div>
+                            <div className="absolute right-0 mt-2 w-72 bg-white border border-[#E3E3E4] rounded-md shadow-lg z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                <div className="p-3 bg-[#F9FAFB] border-b border-[#E3E3E4] flex justify-between items-center">
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Propostas Geradas</span>
+                                    <button 
+                                        onClick={onGenerateProposal}
+                                        className="text-[9px] font-bold text-[#0F6CBD] uppercase tracking-widest hover:underline"
+                                    >
+                                        + Gerar Nova
+                                    </button>
+                                </div>
+                                <div className="max-h-64 overflow-y-auto">
+                                    {proposals.length === 0 ? (
+                                        <div className="p-4 text-center text-[10px] text-slate-400 uppercase">Nenhuma proposta gerada</div>
+                                    ) : (
+                                        proposals.map((prop: any) => (
+                                            <div key={prop.id} className="group p-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 flex items-center justify-between gap-3">
+                                                <Link 
+                                                    href={`/propostas/${prop.id}`}
+                                                    className="flex-1 min-w-0"
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[11px] font-semibold text-slate-700">#{prop.proposal_number}</span>
+                                                        <span className="text-[9px] text-slate-400">{new Date(prop.created_at).toLocaleDateString('pt-BR')}</span>
+                                                    </div>
+                                                    <div className="text-[9px] text-[#0F6CBD] font-medium mt-0.5 truncate">
+                                                        Total: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(prop.total_amount)}
+                                                    </div>
+                                                </Link>
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        onDeleteProposal?.(prop.id);
+                                                    }}
+                                                    className="w-7 h-7 flex items-center justify-center rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                                                >
+                                                    <span className="material-icons-outlined text-sm">delete</span>
+                                                </button>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </>
                     )}
                 </div>
 

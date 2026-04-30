@@ -2,6 +2,7 @@
 
 import React, { use } from 'react';
 import { useBudgetLogic } from '@/hooks/useBudgetLogic';
+import { useAuth } from '@/lib/auth';
 import BudgetHeader from '@/components/budget/BudgetHeader';
 import BudgetGeneralInfo from '@/components/budget/BudgetGeneralInfo';
 import ClientInfo from '@/components/budget/ClientInfo';
@@ -27,6 +28,8 @@ export default function BudgetPage({ params }: { params: Promise<{ id: string }>
     }, []);
 
     const logic = useBudgetLogic(id);
+    const { hasPermission } = useAuth();
+    const canEditSalesperson = hasPermission('gestao');
 
     const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
     const [commercialData, setCommercialData] = useState({
@@ -63,8 +66,11 @@ export default function BudgetPage({ params }: { params: Promise<{ id: string }>
                 onGenerateOrder={() => setIsOrderModalOpen(true)}
                 onGenerateProposal={logic.handleGenerateProposal}
                 onViewProposal={logic.handleViewProposal}
+                onDeleteProposal={logic.handleDeleteProposal}
+                onExportExcel={logic.handleExportExcel}
                 isSaving={logic.isSaving}
                 proposalId={logic.lastProposalId}
+                proposals={logic.proposals}
             />
 
             <main className="max-w-[1600px] mx-auto px-4 py-6">
@@ -83,6 +89,7 @@ export default function BudgetPage({ params }: { params: Promise<{ id: string }>
                             setBudgetDate={logic.setBudgetDate}
                             issuer={logic.issuer}
                             setIssuer={logic.setIssuer}
+                            canEditSalesperson={canEditSalesperson}
                         />
                     </div>
                     <div className="col-span-12 xl:col-span-8 flex flex-col">

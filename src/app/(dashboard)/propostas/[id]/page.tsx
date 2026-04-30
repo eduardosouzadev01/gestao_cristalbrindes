@@ -47,10 +47,10 @@ export default function InternalProposalDetailPage() {
             if (error) throw error;
             setProposal(data);
             
-            // Set document title for PDF filename
+            // Task 1: Set document title for PDF filename immediately
             if (data) {
-                const clientName = fixClientName(data.client?.name || '');
-                document.title = `Proposta ${data.proposal_number} ${clientName}`;
+                const clientName = fixClientName(data.client_snapshot?.name || data.client?.name || '');
+                document.title = `Proposta ${data.proposal_number} - ${clientName}`;
             }
         } catch (error: any) {
             toast.error('Erro ao carregar proposta: ' + error.message);
@@ -61,67 +61,18 @@ export default function InternalProposalDetailPage() {
     };
 
     const handleDownloadPDF = () => {
+        // Ensure title is correct before printing
+        if (proposal) {
+            const clientName = fixClientName(proposal.client_snapshot?.name || proposal.client?.name || '');
+            document.title = `Proposta ${proposal.proposal_number} - ${clientName}`;
+        }
         window.print();
-    };
-
-    const handleExportExcel = async () => {
-        if (!proposal || !proposal.items) {
-            toast.error('Não foi possível carregar os itens da proposta.');
-            return;
-        }
-        
-        try {
-            const excelItems = proposal.items.map((bi: any) => ({
-                productName: bi.product_name || bi.productName || '',
-                productCode: bi.product_code || bi.productCode || '',
-                productColor: bi.product_color || bi.productColor || '',
-                quantity: bi.quantity || 0,
-                priceUnit: bi.unit_price || bi.priceUnit || 0,
-                custoPersonalizacao: bi.customization_cost || bi.custoPersonalizacao || 0,
-                layoutCost: bi.layout_cost || bi.layoutCost || 0,
-                transpFornecedor: bi.supplier_transport_cost || bi.transpFornecedor || 0,
-                transpCliente: bi.client_transport_cost || bi.transpCliente || 0,
-                despesaExtra: bi.extra_expense || bi.despesaExtra || 0,
-                fator: bi.calculation_factor || bi.fator || 1.35,
-                mockNF: bi.tax_pct || bi.mockNF || 0,
-                mockMargin: bi.margin_pct || bi.mockMargin || 0,
-                mockPayment: bi.payment_tax_pct || bi.mockPayment || 0,
-                bvPct: bi.bv_pct || bi.bvPct || 0,
-                extraPct: bi.extra_pct || bi.extraPct || 0,
-                totalVenda: bi.totalVenda || bi.total_item_value || 0,
-            }));
-
-            generateBudgetExcel({
-                proposalNumber: proposal.proposal_number,
-                budgetNumber: proposal.proposal_number || '', // Uses proposal number as fallback
-                date: new Date(proposal.created_at).toLocaleDateString('pt-BR'),
-                salesperson: proposal.salesperson || '',
-                issuer: proposal.issuer || 'CRISTAL',
-                client: {
-                    name: fixClientName(proposal.client?.name || ''),
-                    doc: proposal.client?.doc || '',
-                    email: proposal.client?.email || '',
-                    phone: proposal.client?.phone || '',
-                    contact_name: proposal.client?.contact_name || '',
-                },
-                validity: proposal.validity || '15 dias',
-                shipping: proposal.shipping || 'Cliente retira',
-                deliveryDeadline: proposal.delivery_deadline || '15 / 20 dias úteis',
-                paymentMethod: proposal.payment_method || 'À vista ou parcelado',
-                observation: proposal.observation || '',
-                items: excelItems,
-            });
-
-            toast.success('Planilha exportada com sucesso!');
-        } catch (err: any) {
-            toast.error('Erro ao exportar planilha: ' + err.message);
-        }
     };
 
     const handleOpenEmailModal = () => {
         if (!proposal) return;
         setEmailForm({
-            to: proposal.client?.email || '',
+            to: proposal.client_snapshot?.email || proposal.client?.email || '',
             cc: '',
             senderId: 'vendas01@cristalbrindes.com.br'
         });
@@ -236,7 +187,7 @@ export default function InternalProposalDetailPage() {
                         </div>
 
                         <div class="content-box">
-                            <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; font-weight: 800; margin-bottom: 16px;">Olá, ${proposal.client?.contact_name && proposal.client?.contact_name !== 'Não informado' ? proposal.client.contact_name : (fixClientName(proposal.client?.name || 'Cliente'))}!</h2>
+                            <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; font-weight: 800; margin-bottom: 16px;">Olá, ${(proposal.client_snapshot?.contact_name || proposal.client?.contact_name) && (proposal.client_snapshot?.contact_name || proposal.client?.contact_name) !== 'Não informado' ? (proposal.client_snapshot?.contact_name || proposal.client?.contact_name) : (fixClientName(proposal.client_snapshot?.name || proposal.client?.name || 'Cliente'))}!</h2>
                             <p style="font-size: 15px; line-height: 1.6; color: #475569; margin-bottom: 32px;">
                                 Sua proposta comercial foi gerada. Abaixo você encontra todos os detalhes técnicos, valores e prazos:
                             </p>
@@ -246,11 +197,11 @@ export default function InternalProposalDetailPage() {
                                     <td width="48%" valign="top" style="padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc;">
                                         <div style="font-size: 11px; font-weight: bold; color: #3b82f6; text-transform: uppercase; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Aos Cuidados De</div>
                                         <div style="font-size: 13px; line-height: 1.8; color: #475569;">
-                                            <strong>Empresa:</strong> <span style="color: #0f172a;">${fixClientName(proposal.client?.name)}</span><br>
-                                            <strong>CNPJ:</strong> ${proposal.client?.doc || 'Não informado'}<br>
-                                            <strong>Contato:</strong> ${proposal.client?.contact_name || 'Não informado'}<br>
-                                            <strong>E-mail:</strong> <span style="color: #2563eb;">${proposal.client?.email || 'N/A'}</span><br>
-                                            <strong>Telefone:</strong> ${proposal.client?.phone || 'N/A'}
+                                            <strong>Empresa:</strong> <span style="color: #0f172a;">${fixClientName(proposal.client_snapshot?.name || proposal.client?.name)}</span><br>
+                                            <strong>CNPJ:</strong> ${proposal.client_snapshot?.doc || proposal.client?.doc || 'Não informado'}<br>
+                                            <strong>Contato:</strong> ${proposal.client_snapshot?.contact_name || proposal.client?.contact_name || 'Não informado'}<br>
+                                            <strong>E-mail:</strong> <span style="color: #2563eb; word-break: break-all;">${proposal.client_snapshot?.email || proposal.client?.email || 'N/A'}</span><br>
+                                            <strong>Telefone:</strong> ${proposal.client_snapshot?.phone || proposal.client?.phone || 'N/A'}
                                         </div>
                                     </td>
                                     <td width="4%"></td>
@@ -334,9 +285,6 @@ export default function InternalProposalDetailPage() {
                 <div className="flex flex-wrap justify-center gap-4">
                     <button onClick={handleOpenEmailModal} className="flex items-center gap-2 px-6 py-3 bg-white border border-[#D1D1D1] rounded-md text-[10px] font-medium uppercase tracking-widest hover:border-[#0F6CBD] hover:text-[#0F6CBD] hover:bg-[#EBF3FC]/50 transition-all active:scale-95 shadow-none">
                         <span className="material-icons-outlined text-sm">email</span> Enviar por E-mail
-                    </button>
-                    <button onClick={handleExportExcel} className="flex items-center gap-2 px-6 py-3 bg-white border border-[#D1D1D1] rounded-md text-[10px] font-medium uppercase tracking-widest hover:border-[#10B981] hover:text-[#10B981] hover:bg-[#F0FDF4] transition-all active:scale-95 shadow-none">
-                        <span className="material-icons-outlined text-sm">table_chart</span> Excel Base
                     </button>
                     <button onClick={handleDownloadPDF} className="flex items-center gap-3 px-8 py-3 bg-[#0F6CBD] text-white rounded-md text-[10px] font-medium uppercase tracking-widest hover:bg-[#115EA3] transition-all active:scale-95 shadow-none shadow-none-[#0F6CBD]/20">
                         <span className="material-icons-outlined text-sm">picture_as_pdf</span> Imprimir / PDF

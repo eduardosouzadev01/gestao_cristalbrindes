@@ -341,7 +341,7 @@ export default function BudgetItemCard({
                                     className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm font-medium focus:ring-4 focus:ring-blue-50/50 focus:border-blue-400 transition-all disabled:bg-slate-50 disabled:text-slate-500"
                                     value={item.quantity || ''}
                                     onChange={e => onUpdate('quantity', Number(e.target.value))}
-                                    disabled={isLocked}
+                                    disabled={effectiveLock}
                                 />
                             </div>
                             <div className="col-span-4 space-y-1.5">
@@ -453,7 +453,7 @@ export default function BudgetItemCard({
                                                 onAdd={onAddSupplier}
                                                 placeholder="Fornecedor..."
                                                 compact
-                                                disabled={isLocked}
+                                                disabled={effectiveLock}
                                             />
                                         </div>
                                         <div className="col-span-3">
@@ -499,7 +499,7 @@ export default function BudgetItemCard({
                                                     !item.isManualMargin && (item.mockMargin ?? 15) === m 
                                                         ? 'bg-blue-600 border-blue-600 text-white shadow-none' 
                                                         : 'bg-white border-slate-300 text-slate-400 hover:border-blue-400'
-                                                } ${isLocked ? 'cursor-not-allowed opacity-80' : ''}`}
+                                                } ${effectiveLock ? 'cursor-not-allowed opacity-80' : ''}`}
                                             >
                                                 {m}%
                                             </button>
@@ -533,7 +533,7 @@ export default function BudgetItemCard({
                                             value={item.bvPct || ''}
                                             placeholder="0"
                                             onChange={e => onUpdate('bvPct', Number(e.target.value))}
-                                            disabled={isLocked}
+                                            disabled={effectiveLock}
                                         />
                                         <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-medium text-slate-300">%</span>
                                     </div>

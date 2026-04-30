@@ -11,9 +11,20 @@ export function useBudgetsLogic() {
     const [searchTerm, setSearchTerm] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+
+    
     const [sellerFilter, setSellerFilter] = useState('Todos');
     const [periodFilter, setPeriodFilter] = useState('Todos');
     const [statusFilter, setStatusFilter] = useState('Todos');
+
+    // Initialize seller filter for salespeople
+    useEffect(() => {
+        if (appUser && appUser.role === 'VENDEDOR' && sellerFilter === 'Todos') {
+            setSellerFilter(appUser.salesperson || 'NONE');
+        }
+    }, [appUser, sellerFilter]);
+
+
 
     // Period Filter Effect
     useEffect(() => {
