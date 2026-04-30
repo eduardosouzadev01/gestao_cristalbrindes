@@ -36,12 +36,13 @@ export interface Lead {
     };
 }
 
-export function useLeads(startDate?: string, endDate?: string) {
+export function useLeads(startDate?: string, endDate?: string, salesperson?: string) {
     return useQuery({
-        queryKey: ['crm_leads', startDate, endDate],
+        queryKey: ['crm_leads', startDate, endDate, salesperson],
         queryFn: async () => {
             let query = supabase.from('crm_leads').select('*').neq('status', 'EXCLUIDO');
 
+            if (salesperson) query = query.eq('salesperson', salesperson);
             if (startDate) query = query.gte('created_at', `${startDate}T00:00:00.000Z`);
             if (endDate) query = query.lte('created_at', `${endDate}T23:59:59.999Z`);
 
@@ -51,6 +52,7 @@ export function useLeads(startDate?: string, endDate?: string) {
         },
     });
 }
+
 
 export function useUpdateLeadStatus() {
     const queryClient = useQueryClient();

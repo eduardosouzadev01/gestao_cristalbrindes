@@ -88,7 +88,8 @@ const CrmTable: React.FC<CrmTableProps> = ({
                         value={sellerFilter}
                         onChange={e => setSellerFilter(e.target.value)}
                     >
-                        <option value="Todos">Vendedor: Todos</option>
+                        {sellers.length > 1 && <option value="Todos">Vendedor: Todos</option>}
+
                         {sellers.map(s => (
                             <option key={s} value={s}>{s}</option>
                         ))}

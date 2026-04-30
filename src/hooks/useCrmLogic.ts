@@ -19,6 +19,14 @@ export function useCrmLogic() {
     const [sellerFilter, setSellerFilter] = useState('Todos');
     const [periodFilter, setPeriodFilter] = useState('Todos');
 
+    // Initialize seller filter for salespeople
+    useEffect(() => {
+        if (appUser && appUser.role === 'VENDEDOR' && sellerFilter === 'Todos') {
+            setSellerFilter(appUser.salesperson || 'NONE');
+        }
+    }, [appUser, sellerFilter]);
+
+
     // Period Filter Effect
     useEffect(() => {
         const now = new Date();
@@ -78,7 +86,10 @@ export function useCrmLogic() {
     const deleteLeadMutation = useDeleteLead();
 
     // Queries
-    const { data: leads = [], isLoading: isLoadingLeads, refetch: refetchLeads } = useLeads(startDate, endDate);
+    const isSalesperson = appUser?.role === 'VENDEDOR';
+    const fetchSalesperson = isSalesperson ? (appUser?.salesperson || 'NONE') : undefined;
+    const { data: leads = [], isLoading: isLoadingLeads, refetch: refetchLeads } = useLeads(startDate, endDate, fetchSalesperson);
+
     const { data: stats = null } = usePerformanceStats();
 
     // Fetch Transfer Requests
@@ -174,20 +185,22 @@ export function useCrmLogic() {
             'BAIXA': 20
         };
 
-        // Sort: Priority First, then ATENDIMENTO status, then by date desc
+        // Sort: Status 'ATENDIMENTO' First, then Priority, then by date desc
         return [...filtered].sort((a, b) => {
+            const statusA = a.atendimento_status || 'ATENDIMENTO';
+            const statusB = b.atendimento_status || 'ATENDIMENTO';
+            
+            // Absolute first priority: 'ATENDIMENTO' (Em Andamento)
+            if (statusA === 'ATENDIMENTO' && statusB !== 'ATENDIMENTO') return -1;
+            if (statusA !== 'ATENDIMENTO' && statusB === 'ATENDIMENTO') return 1;
+
+            // Second priority: Weight
             const weightA = PRIORITY_WEIGHT[a.priority || 'NORMAL'] || 40;
             const weightB = PRIORITY_WEIGHT[b.priority || 'NORMAL'] || 40;
             
             if (weightA !== weightB) return weightB - weightA;
 
-            const statusA = a.atendimento_status || 'ATENDIMENTO';
-            const statusB = b.atendimento_status || 'ATENDIMENTO';
-            
-            if (statusA === 'ATENDIMENTO' && statusB !== 'ATENDIMENTO') return -1;
-            if (statusA !== 'ATENDIMENTO' && statusB === 'ATENDIMENTO') return 1;
-            
-            // Secondary sort: Proposta Enviada
+            // Third priority: 'PROPOSTA_ENVIADA'
             if (statusA === 'PROPOSTA_ENVIADA' && statusB !== 'PROPOSTA_ENVIADA') return -1;
             if (statusA !== 'PROPOSTA_ENVIADA' && statusB === 'PROPOSTA_ENVIADA') return 1;
 

@@ -18,8 +18,13 @@ export default function OrdersListPage() {
     const [filterVendedor, setFilterVendedor] = useState('TODOS');
     const [filterStatus, setFilterStatus] = useState('TODOS');
 
-    const sellers = ['TODOS', 'VENDAS 01', 'VENDAS 02', 'VENDAS 03', 'VENDAS 04', 'VENDAS 05', 'VENDAS 06'];
+    const SELLERS = ['VENDAS 01', 'VENDAS 02', 'VENDAS 03', 'VENDAS 04', 'VENDAS 05'];
     const statuses = ['TODOS', 'AGUARDANDO PAGAMENTO ENTRADA', 'EM PRODUÇÃO', 'EM TRANSPORTE', 'ENTREGUE', 'FINALIZADO', 'CANCELADO'];
+    useEffect(() => {
+        if (appUser && appUser.role === 'VENDEDOR' && filterVendedor === 'TODOS') {
+            setFilterVendedor(appUser.salesperson || 'NONE');
+        }
+    }, [appUser, filterVendedor]);
 
     useEffect(() => {
         const fetchOrders = async () => {
@@ -102,7 +107,8 @@ export default function OrdersListPage() {
                                 value={filterVendedor}
                                 onChange={e => setFilterVendedor(e.target.value)}
                             >
-                                {sellers.map(s => <option key={s} value={s}>{s}</option>)}
+                                <option value="TODOS">Vendedor: Todos</option>
+                                {SELLERS.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                         </div>
                     )}

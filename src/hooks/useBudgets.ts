@@ -48,19 +48,23 @@ export interface BudgetItem {
     product_image_url?: string;
 }
 
-export function useBudgets() {
+export function useBudgets(salesperson?: string) {
     return useQuery({
-        queryKey: ['budgets'],
+        queryKey: ['budgets', salesperson],
         queryFn: async () => {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('budgets')
-                .select('*, partners(name)')
-                .order('created_at', { ascending: false });
+                .select('*, partners(name)');
+            
+            if (salesperson) query = query.eq('salesperson', salesperson);
+            
+            const { data, error } = await query.order('created_at', { ascending: false });
             if (error) throw error;
             return data;
         }
     });
 }
+
 
 export function useBudget(id: string) {
     return useQuery({

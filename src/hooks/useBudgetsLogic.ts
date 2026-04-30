@@ -58,7 +58,10 @@ export function useBudgetsLogic() {
     }, [periodFilter]);
 
     // Queries
-    const { data: budgets = [], isLoading } = useBudgets();
+    const isSalesperson = appUser?.role === 'VENDEDOR';
+    const fetchSalesperson = isSalesperson ? (appUser?.salesperson || 'NONE') : undefined;
+    const { data: budgets = [], isLoading } = useBudgets(fetchSalesperson);
+
 
     // Filtering Logic
     const filteredBudgets = useMemo(() => {
