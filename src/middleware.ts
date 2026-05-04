@@ -34,6 +34,7 @@ export async function middleware(request: NextRequest) {
   // Todas as rotas da aplicação (exceto login, public, api internas) são protegidas
   const isPublicRoute =
     pathname === '/login' ||
+    pathname === '/manifest.json' ||
     pathname.startsWith('/public/') ||
     pathname.startsWith('/api/') ||
     pathname.startsWith('/_next/')
@@ -78,6 +79,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|public/.*|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|public/.*|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

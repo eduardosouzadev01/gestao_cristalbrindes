@@ -421,8 +421,8 @@ export function useCrmLogic() {
                 .from('client_transfer_requests')
                 .insert([{
                     partner_id: partner.id,
-                    requester_id: appUser?.id,
-                    requesting_salesperson: salespersonCode,
+                    requester_id: appUser?.id || null,
+                    requesting_salesperson: salespersonCode || 'SISTEMA',
                     reason: 'SOLICITAÇÃO DE ACESSO DIRETO VIA CRM',
                     status: 'PENDING'
                 }]);
@@ -512,7 +512,7 @@ export function useCrmLogic() {
                     .insert([{
                         lead_id: isLead ? leadOrPartner.id : null,
                         partner_id: isLead ? (leadOrPartner.client_id || null) : leadOrPartner.id,
-                        requester_id: appUser?.id,
+                        requester_id: appUser?.id || null,
                         target_salesperson_id: targetUser.id,
                         requesting_salesperson: appUser?.salesperson || 'SISTEMA',
                         reason: note || 'TRANSFERÊNCIA DIRETA',
@@ -537,7 +537,7 @@ export function useCrmLogic() {
                     .insert([{
                         lead_id: isLead ? leadOrPartner.id : null,
                         partner_id: isLead ? (leadOrPartner.client_id || null) : leadOrPartner.id,
-                        requester_id: appUser?.id,
+                        requester_id: appUser?.id || null,
                         target_salesperson_id: targetUser.id,
                         requesting_salesperson: appUser?.salesperson || 'SISTEMA',
                         reason: note,
