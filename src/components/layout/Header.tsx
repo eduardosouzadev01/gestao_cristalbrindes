@@ -62,13 +62,12 @@ const Header: React.FC = () => {
       path: '#',
       icon: 'account_balance',
       subItems: [
-        { name: 'Painel Financeiro', path: '/painel-financeiro', permission: 'financeiro.receber', icon: 'dashboard' },
-        { name: 'Pedidos & Recebíveis', path: '/pedidos-recebiveis', permission: 'financeiro.receber', icon: 'payments' },
-        { name: 'Planilha de Controle', path: '/financeiro-controle', permission: 'financeiro.receber', icon: 'table_view' },
+        { name: 'Planilha de Controle', path: '/financeiro', permission: 'financeiro', icon: 'table_view' },
         { name: 'Contas a Pagar', path: '/payables', permission: 'financeiro.pagar', icon: 'credit_card_off' },
         { name: 'Comissões', path: '/comissoes', permission: 'comissoes', icon: 'monetization_on' }
       ]
     },
+
     {
       name: 'Processos',
       permission: 'financeiro',

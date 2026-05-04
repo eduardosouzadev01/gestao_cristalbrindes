@@ -13,11 +13,11 @@ import { ISSUER_INFO } from '@/components/filters/IssuerSelect';
 
 import { formatCurrency } from '@/utils/formatCurrency';
 
-const SENDER_ACCOUNTS: Record<string, { pass: string; name: string }> = {
-    'vendas01@cristalbrindes.com.br': { pass: 'CristalV01*01', name: 'Vendas 01' },
-    'vendas02@cristalbrindes.com.br': { pass: 'CristalV02*02', name: 'Vendas 02' },
-    'vendas03@cristalbrindes.com.br': { pass: 'CristalV03*03', name: 'Vendas 03' },
-    'vendas04@cristalbrindes.com.br': { pass: 'CristalV04*04', name: 'Vendas 04' }
+const SENDER_ACCOUNTS: Record<string, { name: string }> = {
+    'vendas01@cristalbrindes.com.br': { name: 'Vendas 01' },
+    'vendas02@cristalbrindes.com.br': { name: 'Vendas 02' },
+    'vendas03@cristalbrindes.com.br': { name: 'Vendas 03' },
+    'vendas04@cristalbrindes.com.br': { name: 'Vendas 04' }
 };
 
 export default function InternalProposalDetailPage() {
@@ -83,7 +83,6 @@ export default function InternalProposalDetailPage() {
         if (!proposal) return;
         setIsSendingEmail(true);
         const info = ISSUER_INFO[proposal.issuer || 'CRISTAL'] || ISSUER_INFO['CRISTAL'];
-        const account = SENDER_ACCOUNTS[emailForm.senderId];
 
         try {
             const logoSrc = 'https://agjrnmpgudrciorchpog.supabase.co/storage/v1/object/public/catalog-assets/logo-images/logo_proposta_1776133418337.png';
@@ -229,30 +228,28 @@ export default function InternalProposalDetailPage() {
                                 </table>
                             </div>
 
-                            <div style="text-align: center; margin-bottom: 20px;">
-                                <p style="font-size: 14px; color: #64748b; margin-bottom: 12px; font-weight: bold;">Gostaria de ver melhor a proposta?</p>
-                                <a href="${publicLink}" style="display: inline-block; background-color: #2563eb; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px;">Acessar Versão Online Interativa</a>
-                            </div>
                         </div>
                     </div>
                 </body>
                 </html>
             `;
 
-            console.log('Calling Edge Function: send-email');
-            const { data, error } = await supabase.functions.invoke('send-email', {
-                body: {
-                    to: emailForm.to + (emailForm.cc ? `, ${emailForm.cc}` : ''),
+            console.log('Sending email via server API route...');
+            const apiResponse = await fetch('/api/email/send-proposal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    to: emailForm.to,
+                    cc: emailForm.cc,
+                    senderId: emailForm.senderId,
                     subject: subject,
                     html: html,
                     replyTo: emailForm.senderId,
-                    smtpUser: emailForm.senderId,
-                    smtpPass: account.pass
-                }
+                }),
             });
 
-            if (error) throw error;
-            if (data?.error) throw new Error(data.error);
+            const result = await apiResponse.json();
+            if (!apiResponse.ok || result.error) throw new Error(result.error || 'Erro ao enviar email');
 
             toast.success('E-mail enviado!');
             setShowEmailModal(false);

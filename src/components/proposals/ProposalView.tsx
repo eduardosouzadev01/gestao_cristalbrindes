@@ -4,6 +4,9 @@ import React from 'react';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { fixClientName } from '@/utils/textUtils';
 import { ISSUER_INFO } from '@/components/filters/IssuerSelect';
+import DOMPurify from 'dompurify';
+import { useProfiles } from '@/hooks/useCRM';
+
 
 interface ProposalViewProps {
     proposal: any;
@@ -17,16 +20,28 @@ export const ProposalView: React.FC<ProposalViewProps> = ({ proposal }) => {
     // Prioritize snapshot data for historical integrity, fallback to current record
     const clientData = proposal.client_snapshot || proposal.client || {};
 
+    const { data: profiles } = useProfiles();
+    const salespersonProfile = profiles?.find(p => p.salesperson_id === proposal.salesperson);
+
     const getSalespersonEmail = () => {
-        if (!proposal) return info.email;
+        const id = proposal.salesperson || 'VENDAS';
+        const baseEmail = salespersonProfile?.email || (id.match(/\d+/) ? `vendas${id.match(/\d+/)![0].padStart(2, '0')}@cristalbrindes.com.br` : info.email);
+        
         if (proposal.issuer && proposal.issuer !== 'CRISTAL') return info.email;
-        if (!proposal.salesperson) return info.email;
-        const match = proposal.salesperson.match(/(\d+)/);
-        if (match) {
-            const num = match[1].padStart(2, '0');
-            return `vendas${num}@cristalbrindes.com.br`;
-        }
-        return info.email;
+        
+        return `${id} - ${baseEmail}`;
+    };
+
+    const issuerColors: Record<string, { bg: string; text: string; light: string; border: string }> = {
+        'CRISTAL': { bg: 'bg-[#0F6CBD]', text: 'text-[#0F6CBD]', light: 'bg-blue-50/30', border: 'border-blue-100' },
+        'NATUREZA': { bg: 'bg-[#009639]', text: 'text-[#009639]', light: 'bg-emerald-50/30', border: 'border-emerald-100' },
+        'ESPIRITO': { bg: 'bg-[#EAB308]', text: 'text-[#EAB308]', light: 'bg-amber-50/30', border: 'border-amber-100' },
+    };
+
+    const colors = issuerColors[proposal.issuer || 'CRISTAL'] || issuerColors['CRISTAL'];
+
+    const getSalespersonName = () => {
+        return salespersonProfile?.display_name || salespersonProfile?.name || proposal.salesperson || 'EQUIPE CRISTAL BRINDES';
     };
 
     interface GroupedItem {
@@ -64,12 +79,12 @@ export const ProposalView: React.FC<ProposalViewProps> = ({ proposal }) => {
                     <img
                         src={info.logo}
                         alt={info.name}
-                        className="max-h-56 w-auto max-w-full object-contain"
+                        className={`${proposal.issuer === 'NATUREZA' ? 'max-h-48' : 'max-h-36'} w-auto max-w-full object-contain`}
                     />
                 </div>
                 <div className="mt-4 flex flex-col items-center">
                     <div className="flex justify-center gap-8 text-[11px] font-medium bg-[#F9FAFB] border py-2 px-8 rounded-md border-slate-300 uppercase tracking-widest text-slate-600">
-                        <span>Proposta: <span className="text-[#0F6CBD]">#{proposal.proposal_number}</span></span>
+                        <span>Proposta: <span className={colors.text}>#{proposal.proposal_number}</span></span>
                         <span className="text-slate-300">|</span>
                         <span>Data: <span className="text-slate-800">{new Date(proposal.created_at).toLocaleDateString('pt-BR')}</span></span>
                     </div>
@@ -80,39 +95,39 @@ export const ProposalView: React.FC<ProposalViewProps> = ({ proposal }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-6 mb-12">
                 <div className="border border-slate-300 rounded-md p-5 bg-white">
                     <h2 className="text-[10px] font-medium text-slate-700 uppercase mb-3 border-b border-slate-100 pb-2.5 tracking-widest flex items-center gap-2">
-                        <span className="material-icons-outlined text-sm text-[#0F6CBD]">person</span>
+                        <span className={`material-icons-outlined text-sm ${colors.text}`}>person</span>
                         Aos cuidados de
                     </h2>
                     <div className="space-y-2 text-[12px]">
                         <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-24 shrink-0">Empresa</span> <span className="text-slate-800 uppercase break-words">{fixClientName(clientData.name)}</span></p>
                         <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-24 shrink-0">CNPJ/CPF</span> <span className="text-slate-700">{clientData.doc || 'NÃO INFORMADO'}</span></p>
                         <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-24 shrink-0">Contato</span> <span className="text-slate-700">{clientData.contact_name || 'NÃO INFORMADO'}</span></p>
-                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-24 shrink-0">Email</span> <span className="text-[#0F6CBD] break-all">{clientData.email || 'NÃO INFORMADO'}</span></p>
+                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-24 shrink-0">Email</span> <span className={`${colors.text} break-all`}>{clientData.email || 'NÃO INFORMADO'}</span></p>
                         <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-24 shrink-0">Telefone</span> <span className="text-slate-700">{clientData.phone || 'NÃO INFORMADO'}</span></p>
                     </div>
                 </div>
 
                 <div className="border border-slate-300 rounded-md p-5 bg-white">
                     <h2 className="text-[10px] font-medium text-slate-700 uppercase mb-3 border-b border-slate-100 pb-2.5 tracking-widest flex items-center gap-2">
-                        <span className="material-icons-outlined text-sm text-[#0F6CBD]">business_center</span>
+                        <span className={`material-icons-outlined text-sm ${colors.text}`}>business_center</span>
                         Dados do Atendimento
                     </h2>
                     <div className="space-y-2 text-[12px]">
                         <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-28 shrink-0">Fornecedor</span> <span className="text-slate-800 uppercase break-words">EQUIPE {info.name}</span></p>
                         <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-28 shrink-0">CNPJ</span> <span className="text-slate-700">{info.cnpj}</span></p>
-                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-28 shrink-0">Representante</span> <span className="text-[#0F6CBD] uppercase break-words">{proposal.salesperson}</span></p>
-                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-28 shrink-0">Email</span> <span className="text-[#0F6CBD] break-all">{getSalespersonEmail()}</span></p>
+                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-28 shrink-0">Representante</span> <span className={`${colors.text} uppercase break-words`}>{getSalespersonName()}</span></p>
+                        <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-28 shrink-0">Email</span> <span className={`${colors.text} break-all`}>{getSalespersonEmail()}</span></p>
                         <p className="flex items-center"><span className="font-medium text-slate-400 uppercase text-[9px] tracking-widest w-28 shrink-0">Telefone</span> <span className="text-slate-700">{info.phone}</span></p>
                     </div>
                 </div>
             </div>
 
             {/* Items */}
-            <div className="space-y-16 print:space-y-10">
+            <div className="space-y-10 print:space-y-6">
                 {groupedItems.map((group, index) => (
-                    <div key={index} className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${index * 100}ms` }}>
+                    <div key={index} className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${index * 100}ms` }}>
                         <div className="flex items-center gap-4">
-                            <div className="bg-slate-800 text-white h-7 flex items-center px-4 rounded-md text-[10px] font-medium uppercase tracking-[0.2em]">
+                            <div className={`${colors.bg} text-white h-7 flex items-center px-6 rounded-md text-[10px] font-bold uppercase tracking-[0.2em]`}>
                                 ITEM {String(index + 1).padStart(2, '0')}
                             </div>
                             <div className="flex-1 h-px bg-slate-100"></div>
@@ -120,38 +135,28 @@ export const ProposalView: React.FC<ProposalViewProps> = ({ proposal }) => {
 
                         <div className="bg-white rounded-md overflow-hidden border border-slate-300">
                             <div className="flex flex-col md:flex-row print:flex-row gap-8 p-8 print:p-6">
-                                <div className="w-full md:w-[45%] print:w-64 aspect-square bg-white flex items-center justify-center border border-slate-200 rounded-md overflow-hidden shrink-0">
+                                <div className="w-full md:w-[45%] print:w-64 h-[300px] bg-white flex items-center justify-center border border-slate-200 rounded-md overflow-hidden shrink-0">
                                     {group.pImg ? (
                                         <img
                                             src={group.pImg}
                                             alt={group.pName}
-                                            className="w-full h-full object-contain p-8 print:p-4"
+                                            className="max-w-full max-h-full object-contain p-4"
                                             onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0'; }}
                                         />
                                     ) : (
                                         <span className="material-icons-outlined text-slate-200 text-8xl">image</span>
                                     )}
                                 </div>
-                                <div className="flex-1 space-y-6 min-w-0">
-                                    <h3 className="text-2xl font-medium uppercase tracking-tight text-slate-800 border-b border-slate-100 pb-5 leading-tight">{group.pName}</h3>
+                                <div className="flex-1 space-y-4 min-w-0">
+                                    <h3 className="text-xl font-medium uppercase tracking-tight text-slate-800 border-b border-slate-100 pb-4 leading-tight">
+                                        {group.pName} {group.pCode && <span className="text-slate-400 font-medium ml-2 tracking-widest">Ref - {group.pCode}</span>}
+                                    </h3>
                                     <div 
-                                        className="text-[14px] text-slate-500 leading-relaxed font-medium prose prose-slate max-w-none"
-                                        dangerouslySetInnerHTML={{ __html: group.pDesc || 'Descrição detalhada sob consulta.' }}
+                                        className="text-[11px] leading-[1.4] text-slate-600 mb-6 max-h-[162px] overflow-hidden"
+                                        style={{ wordBreak: 'break-word' }}
+                                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(group.pDesc || 'Descrição detalhada sob consulta.') }}
                                     />
-                                    <div className="flex flex-wrap gap-4 mt-6">
-                                        {group.pCode && (
-                                            <div className="px-4 py-2 bg-white rounded-md border border-slate-200">
-                                                <p className="text-[9px] font-medium text-slate-500 uppercase tracking-widest mb-0.5">Referência</p>
-                                                <p className="text-xs font-medium text-slate-800">{group.pCode}</p>
-                                            </div>
-                                        )}
-                                        {group.pColor && (
-                                            <div className="px-4 py-2 bg-white rounded-md border border-slate-200">
-                                                <p className="text-[9px] font-medium text-slate-500 uppercase tracking-widest mb-0.5">Cor Sugerida</p>
-                                                <p className="text-xs font-medium text-slate-800 uppercase">{group.pColor}</p>
-                                            </div>
-                                        )}
-                                    </div>
+                                    {/* Referencia e Cor Sugerida removidos conforme solicitado */}
                                 </div>
                             </div>
 
@@ -160,21 +165,17 @@ export const ProposalView: React.FC<ProposalViewProps> = ({ proposal }) => {
                                     <table className="w-full">
                                         <thead>
                                             <tr className="text-[10px] uppercase font-medium text-slate-600 bg-slate-50 border-b border-slate-200">
-                                                <th className="py-3 px-8 text-left tracking-widest">Título</th>
-                                                <th className="py-5 px-6 text-center tracking-widest">Qtd</th>
-                                                <th className="py-5 px-6 text-center tracking-widest">Unitário</th>
-                                                <th className="py-5 px-10 text-right tracking-widest">Subtotal</th>
+                                                <th className="py-5 px-6 text-center tracking-widest w-1/3">Qtd</th>
+                                                <th className="py-5 px-6 text-center tracking-widest w-1/3">Valor Unitário</th>
+                                                <th className="py-5 px-10 text-right tracking-widest w-1/3">Valor Total</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100/50">
                                             {group.subItems.map((sub: any, subIndex: number) => (
                                                 <tr key={subIndex} className="bg-white/50 hover:bg-white transition-colors">
-                                                    <td className="py-5 px-10 text-left text-sm font-medium text-slate-600 uppercase tracking-tight">
-                                                        {sub.product_name} {sub.product_color ? `(${sub.product_color})` : ''}
-                                                    </td>
-                                                    <td className="py-5 px-6 text-center text-sm font-medium text-slate-700 tabular-nums">{sub.quantity}</td>
-                                                    <td className="py-5 px-6 text-center text-sm font-medium text-slate-700 tabular-nums">{formatCurrency(sub.total_item_value / sub.quantity)}</td>
-                                                    <td className="py-5 px-10 text-right text-sm font-medium text-[#0F6CBD] tabular-nums">{formatCurrency(sub.total_item_value)}</td>
+                                                    <td className="py-5 px-6 text-center text-[15px] font-medium text-slate-700 tabular-nums w-1/3">{sub.quantity}</td>
+                                                    <td className="py-5 px-6 text-center text-[15px] font-medium text-slate-700 tabular-nums w-1/3">{formatCurrency(sub.total_item_value / sub.quantity)}</td>
+                                                    <td className={`py-5 px-10 text-right text-[15px] font-medium ${colors.text} tabular-nums w-1/3`}>{formatCurrency(sub.total_item_value)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -187,12 +188,12 @@ export const ProposalView: React.FC<ProposalViewProps> = ({ proposal }) => {
             </div>
 
             {/* Total Banner */}
-            <div className="mt-16 flex flex-col border-t-2 border-b-2 border-slate-100 py-8 px-4 bg-[#FAFBFC] print:bg-white print:border-slate-300 rounded-md">
+            <div className="mt-12 flex flex-col border-t-2 border-b-2 border-slate-100 py-8 px-4 bg-[#FAFBFC] print:bg-white print:border-slate-300 rounded-md">
                 <div className="flex flex-col md:flex-row print:flex-row justify-between w-full items-center gap-6">
                     <div className="text-center md:text-left print:text-left space-y-1.5">
                         <h4 className="text-[13px] font-medium text-slate-500 uppercase tracking-[0.15em] flex items-center justify-center md:justify-start print:justify-start gap-3">
-                            <span className="w-8 h-[2px] bg-[#0F6CBD] inline-block"></span>
-                            Valor Total da Proposta Comercial
+                            <span className={`w-8 h-[2px] ${colors.bg} inline-block`}></span>
+                            VALOR TOTAL DO INVESTIMENTO
                         </h4>
                         <p className="text-[10px] font-medium text-slate-400 uppercase tracking-[0.1em] md:pl-11 print:pl-11">
                             Válido para as condições descritas abaixo
@@ -243,23 +244,24 @@ export const ProposalView: React.FC<ProposalViewProps> = ({ proposal }) => {
                 </div>
             </div>
 
-            <div className="text-center mt-20 mb-16 px-16">
-                <div className="h-px bg-slate-100 mb-8 w-24 mx-auto"></div>
-                <p className="text-[11px] font-medium text-slate-300 leading-relaxed italic uppercase tracking-[0.2em]">
+            <div className="text-center mt-12 mb-10 px-16">
+                <p className="text-[11px] font-medium text-slate-400 leading-relaxed italic uppercase tracking-[0.2em]">
                     Disponibilidade de estoque sujeita a confirmação na separação. <br/>
                     Garantimos a qualidade e o prazo de entrega especificado.
                 </p>
             </div>
 
+
+
             {/* Footer Contact */}
             <div className="border-t border-slate-100 pt-12 text-center space-y-6">
                 <p className="font-medium text-slate-900 uppercase tracking-[0.5em] text-[12px] opacity-80">EQUIPE {info.name}</p>
                 <div className="flex flex-wrap justify-center gap-12 text-slate-500 font-medium uppercase text-[10px] tracking-widest py-3">
-                    <span className="flex items-center gap-2 hover:text-[#0F6CBD] transition-colors transition-all active:scale-95 cursor-pointer">
-                        <span className="material-icons-outlined text-[#0F6CBD] text-lg">phone</span> {info.phone}
+                    <span className={`flex items-center gap-2 hover:${colors.text} transition-colors transition-all active:scale-95 cursor-pointer`}>
+                        <span className={`material-icons-outlined ${colors.text} text-lg`}>phone</span> {info.phone}
                     </span>
-                    <span className="flex items-center gap-2 hover:text-[#0F6CBD] transition-colors transition-all active:scale-95 cursor-pointer">
-                        <span className="material-icons-outlined text-[#0F6CBD] text-lg">public</span> {info.email}
+                    <span className={`flex items-center gap-2 hover:${colors.text} transition-colors transition-all active:scale-95 cursor-pointer`}>
+                        <span className={`material-icons-outlined ${colors.text} text-lg`}>public</span> {info.email}
                     </span>
                 </div>
                 <div className="inline-block mt-4">
@@ -279,10 +281,12 @@ export const ProposalView: React.FC<ProposalViewProps> = ({ proposal }) => {
                         width: 210mm !important;
                         margin: 0 auto !important;
                         padding: 15mm 15mm !important;
-                        box-shadow-none: none !important;
+                        box-shadow: none !important;
                         border: none !important;
                         background: white !important;
                         border-radius: 0 !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
                     }
                     body {
                         background: white !important;

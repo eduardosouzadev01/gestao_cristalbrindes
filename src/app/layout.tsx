@@ -16,7 +16,17 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   title: "Cristal Brindes - Sistema de Gestão",
   description: "Sistema modernizado de gestão de pedidos e CRM",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/icon-512.png",
+    apple: "/icon-512.png",
+  },
 };
+
+export const viewport = {
+  themeColor: "#0F6CBD",
+};
+
 
 export default function RootLayout({
   children,

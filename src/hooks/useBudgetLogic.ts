@@ -45,6 +45,7 @@ export function useBudgetLogic(id?: string) {
     const [observation, setObservation] = useState('');
     const [lastProposalId, setLastProposalId] = useState<string | null>(null);
     const [proposals, setProposals] = useState<any[]>([]);
+    const [orderId, setOrderId] = useState<string | null>(null);
 
     // Lists
     const { data: suppliersList = [] } = useSuppliers();
@@ -269,6 +270,17 @@ export function useBudgetLogic(id?: string) {
                         if (propData.length > 0) setLastProposalId(propData[0].id);
                     }
                 }
+
+                // Fetch associated order
+                if (budget && budget.id) {
+                    const { data: orderData } = await supabase
+                        .from('orders')
+                        .select('id')
+                        .eq('budget_id', budget.id)
+                        .maybeSingle();
+                    
+                    if (orderData) setOrderId(orderData.id);
+                }
             }
         };
 
@@ -441,6 +453,7 @@ export function useBudgetLogic(id?: string) {
         invalidItemIds,
         lastProposalId,
         proposals,
+        orderId,
         
         // Form States
         budgetNumber, setBudgetNumber,
@@ -478,6 +491,19 @@ export function useBudgetLogic(id?: string) {
         // Global Actions
         handleSearchProducts,
         handleSave,
+        handleDeleteBudget: async () => {
+            const confirmed = window.confirm('TEM CERTEZA QUE DESEJA EXCLUIR ESTE ORÇAMENTO PERMANENTEMENTE? TODOS OS ITENS E PROPOSTAS VINCULADOS SERÃO REMOVIDOS.');
+            if (!confirmed) return;
+            
+            try {
+                const { error } = await supabase.from('budgets').delete().eq('id', id);
+                if (error) throw error;
+                toast.success('Orçamento excluído com sucesso.');
+                router.push('/orcamentos');
+            } catch (err: any) {
+                toast.error('Erro ao excluir: ' + err.message);
+            }
+        },
         handleDuplicate: async () => {
             try {
                 const { data: nextNum, error: rpcErr } = await supabase.rpc('get_next_budget_number');
@@ -708,41 +734,54 @@ export function useBudgetLogic(id?: string) {
                 const saveResult = await handleSave(true);
                 if (!saveResult || !saveResult.activeId) throw new Error('Falha ao salvar orçamento antes de gerar pedido.');
                 const activeId = saveResult.activeId;
+                const finalBudgetNumber = saveResult.finalBudgetNumber;
 
                 // Build order payload
+                const totalOrderAmount = approvedItems.reduce((acc, it) => acc + calculateItemTotal(it), 0);
+                const is5050Pay = commercialData.payment_term.includes('50%');
+                const calculatedEntry = is5050Pay ? (totalOrderAmount / 2) : (commercialData.payment_term.includes('1 vez') ? totalOrderAmount : 0);
+
                 const orderPayload: any = {
                     budget_id: activeId,
-                    order_number: 'AUTO',
+                    order_number: finalBudgetNumber, // Use budget number for the order as requested
                     salesperson,
                     status: 'AGUARDANDO PAGAMENTO ENTRADA',
                     budget_date: budgetDate,
                     order_date: getTodayISO(),
                     client_id: clientData.id || null,
-                    issuer,
+                    issuer: commercialData.issuer,
                     billing_type: commercialData.payment_term,
                     payment_method: paymentMethod,
                     payment_due_date: commercialData.shipping_deadline,
+                    shipping_type: commercialData.shipping_mode,
                     supplier_departure_date: Object.values(commercialData.supplier_departure_dates)[0] || null,
                     invoice_number: commercialData.invoice_number,
-                    total_amount: approvedItems.reduce((acc, it) => acc + calculateItemTotal(it), 0),
-                    entry_amount: 0,
-                    entry_date: commercialData.entry_forecast_date,
+                    total_amount: totalOrderAmount,
+                    entry_amount: calculatedEntry,
+                    entry_forecast_date: commercialData.entry_forecast_date,
                     entry_confirmed: false,
-                    remaining_amount: 0,
-                    remaining_date: commercialData.remaining_forecast_date,
+                    remaining_amount: totalOrderAmount - calculatedEntry,
+                    remaining_forecast_date: commercialData.remaining_forecast_date,
                     remaining_confirmed: false,
+
                     purchase_order: commercialData.purchase_order,
                     layout_info: commercialData.layout_info,
                     observations: observation
                 };
 
                 const itemsPayload = approvedItems.map(item => ({
-                    id: null,
                     product_name: item.productName,
                     product_code: item.productCode || null,
+                    product_reference: item.productCode || null,
+                    product_image_url: item.productImage || null,
                     product_color: item.productColor || null,
                     product_description: item.productDescription || null,
                     supplier_id: item.supplier_id || null,
+                    customization_supplier_id: item.customization_supplier_id || null,
+                    transport_supplier_id: item.transport_supplier_id || null,
+                    client_transport_supplier_id: item.client_transport_supplier_id || null,
+                    layout_supplier_id: item.layout_supplier_id || null,
+                    extra_supplier_id: item.extra_supplier_id || null,
                     quantity: item.quantity,
                     unit_price: item.priceUnit,
                     customization_cost: item.custoPersonalizacao,
@@ -754,23 +793,49 @@ export function useBudgetLogic(id?: string) {
                     bv_pct: item.bvPct,
                     extra_pct: item.extraPct,
                     total_item_value: calculateItemTotal(item),
-                    tax_pct: item.mockNF || 0,
-                    margin_pct: item.mockMargin || 0,
-                    supplier_payment_date: commercialData.supplier_payment_dates[item.supplier_id || ''] || null,
-                    supplier_departure_date: commercialData.supplier_departure_dates[item.supplier_id || ''] || null,
+                    tax_pct: item.tax_pct || 0,
+                    margin_pct: item.margin_pct || 0,
+                    
+                    // Initialize real costs with budget values
+                    real_unit_price: item.priceUnit || 0,
+                    real_customization_cost: item.custoPersonalizacao || 0,
+                    real_supplier_transport_cost: item.transpFornecedor || 0,
+                    real_client_transport_cost: item.transpCliente || 0,
+                    real_extra_expense: item.despesaExtra || 0,
+                    real_layout_cost: item.layoutCost || 0,
+
+                    // Multi-date mapping from modal
+                    supplier_payment_date: commercialData.supplier_payment_dates[`${item.id}-core`] || null,
+                    customization_payment_date: commercialData.supplier_payment_dates[`${item.id}-custom`] || null,
+                    transport_payment_date: commercialData.supplier_payment_dates[`${item.id}-transpFornecedor`] || null,
+                    layout_payment_date: commercialData.supplier_payment_dates[`${item.id}-layout`] || null,
+                    extra_payment_date: commercialData.supplier_payment_dates[`${item.id}-extra`] || null,
+                    supplier_departure_date: commercialData.supplier_departure_dates[`${item.id}-item-departure`] || null,
+                    client_limit_date: commercialData.client_limit_dates[`${item.id}-limit`] || null,
                 }));
+
+                console.log('Order Payload:', orderPayload);
+                console.log('Items Payload:', itemsPayload);
 
                 const { data, error } = await supabase.rpc('save_order', {
                     p_order: orderPayload,
                     p_items: itemsPayload
                 });
 
-                if (error) throw error;
+                if (error) {
+                    console.error('Supabase RPC error (save_order):', JSON.stringify(error));
+                    throw new Error(error?.message || error?.code || 'Erro ao executar save_order no banco');
+                }
+
+                if (!data) {
+                    throw new Error('save_order RPC retornou sem dados e sem erro');
+                }
                 
                 // Update Budget and all associated Proposals statuses
                 await supabase.from('budgets').update({ status: 'ORÇAMENTO APROVADO' }).eq('id', activeId);
                 await supabase.from('proposals').update({ status: 'APROVADA' }).eq('budget_id', activeId);
                 setStatus('ORÇAMENTO APROVADO');
+                setOrderId(data); // data is the order ID from rpc save_order
                 
                 queryClient.invalidateQueries({ queryKey: ['budget', activeId] });
                 toast.success('Pedido gerado com sucesso!');
@@ -778,10 +843,10 @@ export function useBudgetLogic(id?: string) {
                 // Redirecionando para a pagina do pedido gerado
                 router.push(`/pedidos/${data}`);
 
-            } catch (err: any) {
-                console.error('Generate order error:', err);
-                const msg = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
-                toast.error('Erro ao gerar pedido: ' + msg);
+            } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : 'Erro desconhecido ao gerar pedido';
+                console.error('Generate order error:', message, err);
+                toast.error('Erro ao gerar pedido: ' + message);
             } finally {
                 setIsGeneratingOrder(false);
             }

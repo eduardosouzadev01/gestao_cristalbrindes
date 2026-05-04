@@ -11,6 +11,8 @@ import FinalizeLeadModal from '@/components/crm/FinalizeLeadModal';
 import LostLeadModal from '@/components/crm/LostLeadModal';
 import { useCrmLogic } from '@/hooks/useCrmLogic';
 import { Lead } from '@/hooks/useCRM';
+import { SELLERS } from '@/constants/crm';
+
 
 export default function CrmPage() {
     const {
@@ -39,6 +41,7 @@ export default function CrmPage() {
         isLeadModalOpen,
         setIsLeadModalOpen,
         selectedLead,
+        selectedPartnerToTransfer,
         newLead,
         setNewLead,
         partnerSaved,
@@ -57,6 +60,8 @@ export default function CrmPage() {
         isTransferModalOpen,
         setIsTransferModalOpen,
         handleTransfer,
+        handleRequestTransfer,
+        handleRequestAccess,
         confirmTransfer,
         handleRespondToTransfer,
         // Finalize Logic
@@ -90,7 +95,6 @@ export default function CrmPage() {
     };
 
     const canSeeAll = appUser?.role !== 'VENDEDOR';
-    const SELLERS = ['VENDAS 01', 'VENDAS 02', 'VENDAS 03', 'VENDAS 04', 'VENDAS 05'];
     const activeSellers = canSeeAll ? SELLERS : [appUser?.salesperson].filter(Boolean) as string[];
 
     return (
@@ -122,7 +126,7 @@ export default function CrmPage() {
 
                 {activeTab === 'RECORDS' ? (
                     <CrmTable 
-                        leads={leads.filter(l => statusFilter === 'Todos' || (l.atendimento_status || 'ATENDIMENTO') === statusFilter)}
+                        leads={leads.filter(l => statusFilter === 'Todos' || (l.atendimento_status || l.status || 'ATENDIMENTO') === statusFilter)}
                         loading={loading}
                         onTogglePriority={handleTogglePriority}
                         onUpdateStatus={handleUpdateStatus}
@@ -179,15 +183,15 @@ export default function CrmPage() {
                 appUser={appUser}
                 userSalesperson={appUser?.salesperson || ''}
                 isSeller={!canSeeAll}
-                setSelectedClientToTransfer={() => {}} 
-                setIsTransferModalOpen={() => {}} 
+                setSelectedClientToTransfer={handleRequestAccess} 
+                setIsTransferModalOpen={setIsTransferModalOpen} 
                 onDelete={handleDeleteLead}
             />
 
             <TransferModal 
                 isOpen={isTransferModalOpen}
                 onClose={() => setIsTransferModalOpen(false)}
-                lead={selectedLead}
+                lead={selectedLead || selectedPartnerToTransfer}
                 onTransfer={confirmTransfer}
             />
 

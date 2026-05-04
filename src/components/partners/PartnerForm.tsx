@@ -14,15 +14,24 @@ const partnerSchema = z.object({
     company_name: z.string().optional(),
     type: z.enum(['CLIENTE', 'FORNECEDOR']),
     doc: z.string().optional(),
+    ie: z.string().optional(),
     email: z.string().email('Email inválido').optional().or(z.literal('')),
     phone: z.string().optional(),
     zip_code: z.string().optional(),
     address: z.string().optional(),
+    number: z.string().optional(),
+    complement: z.string().optional(),
+    neighborhood: z.string().optional(),
     city: z.string().optional(),
     state: z.string().optional(),
     contact_name: z.string().optional(),
     salesperson: z.string().optional(),
     notes: z.string().optional(),
+    email_fin: z.string().email('Email inválido').optional().or(z.literal('')),
+    segment: z.string().optional(),
+    origin: z.string().optional(),
+    website: z.string().optional(),
+    social_media: z.string().optional(),
 });
 
 type PartnerFormData = z.infer<typeof partnerSchema>;
@@ -61,7 +70,29 @@ export default function PartnerForm({ initialData, defaultType = 'CLIENTE' }: Pa
                     .from('partners')
                     .update(data)
                     .eq('id', initialData.id);
+                
                 if (error) throw error;
+
+                // Bulk transfer if salesperson changed
+                if (data.salesperson && data.salesperson !== initialData.salesperson) {
+                    console.log(`Propagating salesperson change (${initialData.salesperson} -> ${data.salesperson}) to related records`);
+                    
+                    const salespersonCode = data.salesperson;
+                    const partnerId = initialData.id;
+
+                    // Update Leads
+                    await supabase.from('crm_leads').update({ salesperson: salespersonCode }).eq('client_id', partnerId);
+                    
+                    // Update Budgets
+                    await supabase.from('budgets').update({ salesperson: salespersonCode }).eq('client_id', partnerId);
+                    
+                    // Update Proposals
+                    await supabase.from('proposals').update({ salesperson: salespersonCode }).eq('client_id', partnerId);
+                    
+                    // Update Orders
+                    await supabase.from('orders').update({ salesperson: salespersonCode }).eq('client_id', partnerId);
+                }
+
                 toast.success('Cadastro atualizado com sucesso!');
             } else {
                 const { error } = await supabase
@@ -152,9 +183,38 @@ export default function PartnerForm({ initialData, defaultType = 'CLIENTE' }: Pa
                                         <label className="block text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mb-1.5 ml-1">CPF / CNPJ</label>
                                         <input 
                                             {...register('doc')}
-                                            className="w-full h-11 px-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all"
+                                            onChange={(e) => {
+                                                const value = e.target.value.replace(/\D/g, '');
+                                                let masked = '';
+                                                if (value.length <= 11) {
+                                                    masked = value
+                                                        .replace(/(\d{3})(\d)/, '$1.$2')
+                                                        .replace(/(\d{3})(\d)/, '$1.$2')
+                                                        .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+                                                } else {
+                                                    masked = value
+                                                        .replace(/(\d{2})(\d)/, '$1.$2')
+                                                        .replace(/(\d{3})(\d)/, '$1.$2')
+                                                        .replace(/(\d{3})(\d{4})/, '$1/$2')
+                                                        .replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+                                                }
+                                                setValue('doc', masked.substring(0, 18));
+                                            }}
+                                            maxLength={18}
+                                            className="w-full h-11 px-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all tabular-nums"
+                                            placeholder="00.000.000/0001-00"
                                         />
                                     </div>
+                                    <div>
+                                        <label className="block text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mb-1.5 ml-1">Insc. Estadual</label>
+                                        <input 
+                                            {...register('ie')}
+                                            className="w-full h-11 px-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all uppercase"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mb-1.5 ml-1">Nome do Contato</label>
                                         <input 
@@ -162,15 +222,14 @@ export default function PartnerForm({ initialData, defaultType = 'CLIENTE' }: Pa
                                             className="w-full h-11 px-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all uppercase"
                                         />
                                     </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mb-1.5 ml-1">Vendedor Responsável</label>
-                                    <input 
-                                        {...register('salesperson')}
-                                        className="w-full h-11 px-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all uppercase"
-                                        placeholder="Ex: VENDAS 01"
-                                    />
+                                    <div>
+                                        <label className="block text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mb-1.5 ml-1">Vendedor Responsável</label>
+                                        <input 
+                                            {...register('salesperson')}
+                                            className="w-full h-11 px-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all uppercase"
+                                            placeholder="Ex: VENDAS 01"
+                                        />
+                                    </div>
                                 </div>
                         </div>
                     </div>
@@ -185,37 +244,136 @@ export default function PartnerForm({ initialData, defaultType = 'CLIENTE' }: Pa
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mb-1.5 ml-1">Telefone</label>
-                                    <input 
-                                        {...register('phone')}
-                                        className="w-full h-11 px-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all"
-                                        placeholder="(00) 00000-0000"
-                                    />
-                                </div>
-                                <div>
                                     <label className="block text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mb-1.5 ml-1">CEP</label>
                                     <input 
                                         {...register('zip_code')}
-                                        className="w-full h-11 px-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all"
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/\D/g, '');
+                                            if (val.length <= 8) {
+                                                setValue('zip_code', val.replace(/(\d{5})(\d{3})/, '$1-$2'));
+                                            }
+                                        }}
+                                        className="w-full h-11 px-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all tabular-nums"
+                                        placeholder="00000-000"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mb-1.5 ml-1">Telefone / WhatsApp</label>
+                                    <input 
+                                        {...register('phone')}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/\D/g, '');
+                                            if (val.length <= 10) {
+                                                setValue('phone', val.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3'));
+                                            } else {
+                                                setValue('phone', val.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3'));
+                                            }
+                                        }}
+                                        className="w-full h-11 px-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all tabular-nums"
+                                        placeholder="(00) 00000-0000"
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mb-1.5 ml-1">Email</label>
+                                <label className="block text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mb-1.5 ml-1">Segmento / Ramo</label>
                                 <input 
-                                    {...register('email')}
-                                    className={`w-full h-11 px-4 bg-[#F9FAFB] border ${errors.email ? 'border-red-500' : 'border-[#E3E3E4]'} rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all`}
-                                    placeholder="exemplo@email.com"
+                                    {...register('segment')}
+                                    className="w-full h-11 px-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all uppercase"
+                                    placeholder="Ex: TECNOLOGIA, EDUCAÇÃO"
                                 />
                             </div>
 
-                            <div>
-                                <label className="block text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mb-1.5 ml-1">Endereço Completo</label>
-                                <input 
-                                    {...register('address')}
-                                    className="w-full h-11 px-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all uppercase"
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mb-1.5 ml-1">Email Principal</label>
+                                    <input 
+                                        {...register('email')}
+                                        className={`w-full h-11 px-4 bg-[#F9FAFB] border ${errors.email ? 'border-red-500' : 'border-[#E3E3E4]'} rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all`}
+                                        placeholder="exemplo@email.com"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mb-1.5 ml-1">Email Financeiro (Opcional)</label>
+                                    <input 
+                                        {...register('email_fin')}
+                                        className="w-full h-11 px-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all"
+                                        placeholder="financeiro@email.com"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                     <label className="block text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mb-1.5 ml-1">Origem / Como conheceu</label>
+                                     <select 
+                                         {...register('origin')}
+                                         className="w-full h-11 px-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all uppercase font-jakarta"
+                                     >
+                                         <option value="">Selecione uma opção</option>
+                                         <option value="GOOGLE">Google / Pesquisa</option>
+                                         <option value="INSTAGRAM">Instagram</option>
+                                         <option value="INDICACAO">Indicação</option>
+                                         <option value="CLIENTE_ANTIGO">Cliente Antigo</option>
+                                         <option value="OUTROS">Outros</option>
+                                     </select>
+                                 </div>
+                                 <div className="flex flex-col justify-center">
+                                     <p className="text-[9px] text-slate-400 font-medium uppercase tracking-tighter leading-tight px-1">Selecione como o cliente chegou até nós para controle de marketing.</p>
+                                 </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mb-1.5 ml-1">Website</label>
+                                    <input 
+                                        {...register('website')}
+                                        className="w-full h-11 px-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all"
+                                        placeholder="www.empresa.com.br"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mb-1.5 ml-1">Redes Sociais (Instagram/LinkedIn)</label>
+                                    <input 
+                                        {...register('social_media')}
+                                        className="w-full h-11 px-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all"
+                                        placeholder="@empresa ou linkedin.com/in/..."
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-12 gap-4">
+                                <div className="col-span-8">
+                                    <label className="block text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mb-1.5 ml-1">Logradouro (Rua/Av)</label>
+                                    <input 
+                                        {...register('address')}
+                                        className="w-full h-11 px-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all uppercase"
+                                    />
+                                </div>
+                                <div className="col-span-4">
+                                    <label className="block text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mb-1.5 ml-1">Número</label>
+                                    <input 
+                                        {...register('number')}
+                                        className="w-full h-11 px-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all uppercase"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mb-1.5 ml-1">Complemento</label>
+                                    <input 
+                                        {...register('complement')}
+                                        className="w-full h-11 px-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all uppercase"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-medium text-[#6B7280] uppercase tracking-widest mb-1.5 ml-1">Bairro</label>
+                                    <input 
+                                        {...register('neighborhood')}
+                                        className="w-full h-11 px-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-[13px] font-medium text-[#111827] focus:ring-2 focus:ring-[#0F6CBD]/20 outline-none transition-all uppercase"
+                                    />
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">

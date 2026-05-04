@@ -3,7 +3,7 @@ import { calculateItemTotal, calculateItemRealTotal } from '../utils/formulas';
 
 export const useOrderItems = (initialItems: any[] = [], referenceNumber?: string) => {
     const initial = initialItems.length > 0 ? initialItems : [{
-        id: Date.now(),
+        id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         productName: '',
         supplier_id: '',
         quantity: 1,
@@ -26,17 +26,17 @@ export const useOrderItems = (initialItems: any[] = [], referenceNumber?: string
         supplier_transport_supplier_id: '',
         client_transport_supplier_id: '',
         realPriceUnit: 0,
-        realCustoPersonalizacao: 0,
-        realTranspFornecedor: 0,
-        realTranspCliente: 0,
-        realDespesaExtra: 0,
+        realCustomizationCost: 0,
+        realSupplierTransportCost: 0,
+        realClientTransportCost: 0,
+        realExtraExpense: 0,
         realLayoutCost: 0,
-        priceUnitPaid: false,
-        custoPersonalizacaoPaid: false,
-        transpFornecedorPaid: false,
-        transpClientePaid: false,
-        despesaExtraPaid: false,
-        layoutCostPaid: false,
+        unit_price_paid: false,
+        customization_paid: false,
+        supplier_transport_paid: false,
+        client_transport_paid: false,
+        extra_expense_paid: false,
+        layout_paid: false,
         isApproved: false,
         supplier_payment_date: null,
         customization_payment_date: null,
@@ -45,7 +45,11 @@ export const useOrderItems = (initialItems: any[] = [], referenceNumber?: string
         extra_payment_date: null,
         variations: [],
         productImage: '',
-        productCode: ''
+        productCode: '',
+        productRef: '',
+        product_image_url: '',
+        realPriceTotal: 0,
+        useModernRounding: true
     }];
 
     const [items, _setItems] = useState<any[]>(initial);
@@ -134,55 +138,51 @@ export const useOrderItems = (initialItems: any[] = [], referenceNumber?: string
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [undo, redo]);
 
-    const isModern = !referenceNumber || referenceNumber === 'AUTO' || (!isNaN(parseInt(referenceNumber)) && parseInt(referenceNumber) >= 3526);
+    const isModern = !referenceNumber || referenceNumber === 'AUTO' || (!isNaN(parseInt(referenceNumber)) && (parseInt(referenceNumber) >= 3526 || parseInt(referenceNumber) < 1000));
     const itemsWithContext = items.map(it => ({ ...it, useModernRounding: isModern }));
 
     const addItem = () => {
-        setItems(prev => [...prev, {
-            id: Date.now(),
-            productName: '',
-            supplier_id: '',
-            quantity: 1,
-            priceUnit: 0,
-            custoPersonalizacao: 0,
-            transpFornecedor: 0,
-            transpCliente: 0,
-            despesaExtra: 0,
-            layoutCost: 0,
-            fator: 1.29,
-            mockMargin: 15,
-            mockNF: 14,
-            mockPayment: 0,
-            bvPct: 0,
-            extraPct: 0,
-            factorId: '',
-            taxPct: 0,
-            unforeseenPct: 0,
-            marginPct: 0,
-            supplier_transport_supplier_id: '',
-            client_transport_supplier_id: '',
-            realPriceUnit: 0,
-            realCustoPersonalizacao: 0,
-            realTranspFornecedor: 0,
-            realTranspCliente: 0,
-            realDespesaExtra: 0,
-            realLayoutCost: 0,
-            priceUnitPaid: false,
-            custoPersonalizacaoPaid: false,
-            transpFornecedorPaid: false,
-            transpClientePaid: false,
-            despesaExtraPaid: false,
-            layoutCostPaid: false,
-            isApproved: false,
-            supplier_payment_date: null,
-            customization_payment_date: null,
-            transport_payment_date: null,
-            layout_payment_date: null,
-            extra_payment_date: null,
-            variations: [],
-            productImage: '',
-            productCode: ''
-        }]);
+        setItems(prev => [
+            ...prev,
+            {
+                id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                productName: '',
+                supplier_id: '',
+                quantity: 1,
+                priceUnit: 0,
+                custoPersonalizacao: 0,
+                transpFornecedor: 0,
+                transpCliente: 0,
+                despesaExtra: 0,
+                layoutCost: 0,
+                fator: 1.29,
+                mockMargin: 15,
+                mockNF: 14,
+                mockPayment: 0,
+                bvPct: 0,
+                extraPct: 0,
+                isApproved: false,
+                useModernRounding: true,
+                variations: [],
+                productImage: '',
+                productCode: '',
+                productRef: '',
+                product_image_url: '',
+                realPriceTotal: 0,
+                realPriceUnit: 0,
+                realCustomizationCost: 0,
+                realSupplierTransportCost: 0,
+                realClientTransportCost: 0,
+                realExtraExpense: 0,
+                realLayoutCost: 0,
+                unit_price_paid: false,
+                customization_paid: false,
+                supplier_transport_paid: false,
+                client_transport_paid: false,
+                extra_expense_paid: false,
+                layout_paid: false
+            }
+        ]);
     };
 
     const updateItem = (id: string | number, field: string, value: any) => {
@@ -194,7 +194,7 @@ export const useOrderItems = (initialItems: any[] = [], referenceNumber?: string
     };
 
     const duplicateItem = (item: any) => {
-        setItems(prev => [...prev, { ...item, id: Date.now(), isApproved: false }]);
+        setItems(prev => [...prev, { ...item, id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, isApproved: false }]);
     };
 
     const totalRevenue = itemsWithContext.reduce((acc, item) => acc + calculateItemTotal(item), 0);

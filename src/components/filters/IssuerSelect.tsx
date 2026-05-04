@@ -1,9 +1,9 @@
 import React from 'react';
 
 export const ISSUERS = [
-  { id: 'CRISTAL', label: 'CRISTAL', fullName: 'Cristal Brindes', color: 'blue', cnpj: '08.769.700/0001-57', email: 'cristalbrindes@cristalbrindes.com.br', phone: '(27) 99992-0408', address: 'RUA PORTO ALEGRE, 590 - ALTEROSAS - CEP: 29167-036 - SERRA - ES', logo: '/img/logo_proposta.png' },
-  { id: 'ESPIRITO', label: 'ESPÍRITO', fullName: 'ESPIRITO BRINDES LTDA', color: 'orange', cnpj: '57.225.892/0001-46', email: 'vendas@espiritobrindes.com.br', phone: '(27) 99992-0408', address: 'RUA PORTO ALEGRE, 590 - ALTEROSAS - CEP: 29167-036 - SERRA - ES', logo: '/img/logo_proposta.png' },
-  { id: 'NATUREZA', label: 'NATUREZA', fullName: 'Natureza Brindes', color: 'emerald', cnpj: '57.225.892/0001-46', email: 'vendas04@naturezabrindes.com.br', phone: '(27) 9995-47137', address: 'R. Porto Alegre, 590 - casa 02 - Alterosas, Serra - ES, 29167-036', logo: '/img/logo_proposta.png' },
+  { id: 'CRISTAL', label: 'CRISTAL', fullName: 'Cristal Brindes', color: 'blue', cnpj: '08.769.700/0001-57', email: 'cristalbrindes@cristalbrindes.com.br', phone: '(27) 99992-0408', address: 'RUA PORTO ALEGRE, 590 - ALTEROSAS - CEP: 29167-036 - SERRA - ES', logo: '/img/CristalBrindes_logo02.png' },
+  { id: 'ESPIRITO', label: 'ESPÍRITO', fullName: 'ESPIRITO BRINDES LTDA', color: 'orange', cnpj: '57.225.892/0001-46', email: 'vendas@espiritobrindes.com.br', phone: '(27) 99992-0408', address: 'RUA PORTO ALEGRE, 590 - ALTEROSAS - CEP: 29167-036 - SERRA - ES', logo: '/img/logo_espiritobrindes.png' },
+  { id: 'NATUREZA', label: 'NATUREZA', fullName: 'Natureza Brindes', color: 'emerald', cnpj: '57.225.892/0001-46', email: 'vendas04@naturezabrindes.com.br', phone: '(27) 9995-47137', address: 'R. Porto Alegre, 590 - casa 02 - Alterosas, Serra - ES, 29167-036', logo: '/img/logo_naturezabrindes.png' },
 ] as const;
 
 export const ISSUER_INFO = ISSUERS.reduce((acc, issuer) => {

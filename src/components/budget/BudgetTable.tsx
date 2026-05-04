@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
 import { fixClientName } from '@/utils/textUtils';
 
 interface BudgetTableProps {
@@ -11,6 +12,7 @@ interface BudgetTableProps {
 
 export default function BudgetTable({ budgets, loading }: BudgetTableProps) {
     const router = useRouter();
+    const { hasPermission } = useAuth();
 
     if (loading) {
         return (
@@ -75,13 +77,11 @@ export default function BudgetTable({ budgets, loading }: BudgetTableProps) {
                                 <span className="text-[10px] font-medium text-slate-500 uppercase tracking-widest bg-slate-50 px-2 py-1 rounded-md">{b.salesperson}</span>
                             </td>
                             <td className="px-6 py-4 text-center">
-                                <span className={`text-[9px] font-medium px-2.5 py-1 rounded-md uppercase tracking-widest ${
-                                    b.status === 'EM ABERTO' ? 'bg-blue-100 text-blue-700' :
-                                    b.status === 'PROPOSTA ENVIADA' ? 'bg-amber-100 text-amber-700' :
-                                    b.status === 'PROPOSTA ACEITA' ? 'bg-emerald-100 text-emerald-700' :
-                                    b.status === 'APROVADO' ? 'bg-emerald-100 text-emerald-700' :
-                                    b.status === 'PERDIDO' ? 'bg-rose-100 text-rose-700' :
-                                    'bg-slate-100 text-slate-700'
+                                <span className={`text-[9px] font-medium px-2.5 py-1 rounded-md uppercase tracking-widest border ${
+                                    b.status === 'EM ABERTO' || b.status === 'ORÇAMENTO GERADO' || b.status === 'PROPOSTA ENVIADA' ? 'bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]' :
+                                    b.status === 'PROPOSTA ACEITA' || b.status === 'ORÇAMENTO APROVADO' || b.status === 'APROVADO' ? 'bg-[#F0FDF4] text-[#15803D] border-[#BBF7D0]' :
+                                    b.status === 'PERDIDO' ? 'bg-[#FFF7ED] text-[#9A3412] border-[#FED7AA]' :
+                                    'bg-slate-100 text-slate-700 border-slate-200'
                                 }`}>
                                     {b.status}
                                 </span>
@@ -93,9 +93,31 @@ export default function BudgetTable({ budgets, loading }: BudgetTableProps) {
                             </td>
                             <td className="px-6 py-4">
                                 <div className="flex justify-center gap-2">
-                                    <button className="w-8 h-8 flex items-center justify-center bg-slate-100 text-slate-400 rounded-md group-hover:bg-[#0F6CBD] group-hover:text-white transition-all">
+                                    <button 
+                                        className="w-8 h-8 flex items-center justify-center bg-slate-100 text-slate-400 rounded-md hover:bg-[#0F6CBD] hover:text-white transition-all"
+                                        onClick={(e) => { e.stopPropagation(); router.push(`/orcamentos/${b.id}`); }}
+                                    >
                                         <span className="material-icons-outlined text-sm">visibility</span>
                                     </button>
+                                    {hasPermission('adm') && (
+                                        <button 
+                                            className="w-8 h-8 flex items-center justify-center bg-slate-100 text-slate-400 rounded-md hover:bg-red-500 hover:text-white transition-all"
+                                            onClick={async (e) => {
+                                                e.stopPropagation();
+                                                if (!window.confirm('Excluir este orçamento permanentemente?')) return;
+                                                const { supabase } = await import('@/lib/supabase');
+                                                const { error } = await supabase.from('budgets').delete().eq('id', b.id);
+                                                if (error) {
+                                                    import('sonner').then(m => m.toast.error('Erro ao excluir: ' + error.message));
+                                                } else {
+                                                    import('sonner').then(m => m.toast.success('Orçamento excluído.'));
+                                                    window.location.reload(); // Quick refresh
+                                                }
+                                            }}
+                                        >
+                                            <span className="material-icons-outlined text-sm">delete</span>
+                                        </button>
+                                    )}
                                 </div>
                             </td>
                         </tr>

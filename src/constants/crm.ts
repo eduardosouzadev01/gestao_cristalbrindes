@@ -1,4 +1,5 @@
 // CRM Status and Configuration Constants
+export const SELLERS = ['VENDAS 01', 'VENDAS 02', 'VENDAS 03', 'VENDAS 04', 'VENDAS 05'];
 
 export const CRM_STATUS_CONFIG: Record<string, { label: string; colorClass: string; icon: string }> = {
     'ATENDIMENTO': { 

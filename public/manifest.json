@@ -1,0 +1,16 @@
+{
+  "name": "Gestão Cristal Brindes",
+  "short_name": "Cristal CRM",
+  "description": "Sistema de Gestão de Orçamentos e CRM",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0F6CBD",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

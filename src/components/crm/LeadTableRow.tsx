@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useCallback } from 'react';
+import { useAuth } from '@/lib/auth';
 import { Lead } from '../../hooks/useCRM';
 import { CRM_STATUS_CONFIG, getStatusStyle, getSubStatusStyle, SUB_STATUS_CONFIG } from '../../constants/crm';
 import { formatDate } from '../../utils/dateUtils';
@@ -7,8 +8,8 @@ import { fixClientName } from '../../utils/textUtils';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { useUpdateLead, useUpdateLeadField } from '@/hooks/useCRM';
 import { supabase } from '@/lib/supabase';
-import { useUpdateLead } from '@/hooks/useCRM';
 
 interface LeadTableRowProps {
     lead: Lead;
@@ -53,8 +54,9 @@ function getStaleness(lead: Lead): 'recent' | 'medium' | 'far' | null {
 
 function formatElapsed(lead: Lead): string {
     const lastUpdate = new Date(lead.updated_at || lead.created_at).getTime();
-    const elapsed = Date.now() - lastUpdate;
-    const minutes = Math.floor(elapsed / 60000);
+    if (isNaN(lastUpdate)) return '---';
+    const elapsed = Math.max(0, Date.now() - lastUpdate);
+    const minutes = Math.max(0, Math.floor(elapsed / 60000));
     if (minutes < 60) return `${minutes}m atrás`;
     const hours = Math.floor(minutes / 60);
     if (hours < 24) return `${hours}h atrás`;
@@ -83,9 +85,11 @@ const LeadTableRowComponent: React.FC<LeadTableRowProps> = ({
 }) => {
     const router = useRouter();
     const updateLead = useUpdateLead();
+    const updateLeadField = useUpdateLeadField();
+    const { hasPermission } = useAuth();
     const [refreshing, setRefreshing] = useState(false);
 
-    const currentStatus = l.atendimento_status || 'ATENDIMENTO';
+    const currentStatus = l.atendimento_status || l.status || 'ATENDIMENTO';
     const currentSubStatus = l.sub_status || '';
     const statusCfg = getStatusStyle(currentStatus);
     const subStatusCfg = getSubStatusStyle(currentStatus, currentSubStatus);
@@ -228,12 +232,11 @@ const LeadTableRowComponent: React.FC<LeadTableRowProps> = ({
                     className={`px-2 py-0.5 rounded-md text-[9px] font-medium uppercase tracking-widest transition-all active:scale-95 ${
                         l.priority === 'URGENTE' ? 'bg-red-600 text-white border border-red-700' :
                         l.priority === 'ALTA' ? 'bg-red-50 text-red-600 border border-red-100' :
-                        l.priority === 'VIP' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' :
                         'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
                     }`}
                     title="Clique para alterar prioridade"
                 >
-                    {l.priority || 'NORMAL'}
+                    {l.priority === 'VIP' ? 'NORMAL' : (l.priority || 'NORMAL')}
                 </button>
             </td>
 
@@ -244,11 +247,13 @@ const LeadTableRowComponent: React.FC<LeadTableRowProps> = ({
 
             {/* Client */}
             <td className="px-4 py-2">
-                <div className="font-medium text-[#111827] text-[13px] leading-tight uppercase tracking-tight">
-                    {fixClientName(l.client_name)}
-                    {l.client_contact_name && (
-                        <span className="text-[#717171] font-medium ml-1">- {l.client_contact_name}</span>
-                    )}
+                <div className="flex flex-col gap-1">
+                    <div className="font-medium text-[#111827] text-[13px] leading-tight uppercase tracking-tight">
+                        {fixClientName(l.client_name)}
+                        {l.client_contact_name && (
+                            <span className="text-[#717171] font-medium ml-1">- {l.client_contact_name}</span>
+                        )}
+                    </div>
                 </div>
             </td>
 
@@ -266,42 +271,60 @@ const LeadTableRowComponent: React.FC<LeadTableRowProps> = ({
                 )}
             </td>
 
-            {/* Nº Orç. */}
-            <td className="px-4 py-2">
-                <input
-                    type="text"
-                    className="w-[80px] bg-transparent border-0 border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:ring-0 text-[11px] font-medium text-gray-700 uppercase p-0 m-0"
-                    defaultValue={l.budget_number || ''}
-                    placeholder="-"
-                    onBlur={async (e) => {
-                        if (e.target.value !== (l.budget_number || '')) {
-                            const { error } = await supabase.from('crm_leads').update({ budget_number: e.target.value }).eq('id', l.id);
-                            if (error) toast.error('Erro ao salvar Nº Orçamento');
-                            else toast.success('Nº Orçamento salvo!');
-                        }
-                    }}
-                />
-            </td>
 
-            {/* Data Orç. */}
+            {/* Acompanhamento / Checklist Progress */}
             <td className="px-4 py-2">
-                <input
-                    type="date"
-                    className="w-[110px] bg-transparent border-0 border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:ring-0 text-[11px] font-medium text-gray-700 uppercase p-0 m-0"
-                    defaultValue={l.budget_date ? l.budget_date.split('T')[0] : ''}
-                    onBlur={async (e) => {
-                        const newDate = e.target.value || null;
-                        const oldDate = l.budget_date ? l.budget_date.split('T')[0] : null;
-                        if (newDate !== oldDate) {
-                            const { error } = await supabase.from('crm_leads').update({ budget_date: newDate }).eq('id', l.id);
-                            if (error) toast.error('Erro ao salvar Data Orçamento');
-                            else toast.success('Data Orçamento salva!');
-                        }
-                    }}
-                />
-            </td>
+                {(() => {
+                    const checklist = l.closing_metadata?.order_checklist || {};
+                    const keys = [
+                        'enviar_resumo', 'solicitar_logo', 'solicitar_layout', 
+                        'solicitar_aprovacao', 'pagamento_confirmado',
+                        'solicitar_compra', 'solicitar_confirmacao', 'conferencia_expedicao',
+                        'nfe_emitida', 'rastreio_enviado', 'acompanhamento_pedido'
+                    ];
+                    const completed = keys.filter(k => !!checklist[k]).length;
+                    const total = keys.length;
+                    const pct = Math.round((completed / total) * 100);
+                    
+                    const currentStatus = l.atendimento_status || l.status;
+                    if (completed === 0 && !['PEDIDO_ABERTO', 'PEDIDO_ENTREGUE', 'FINALIZADO'].includes(currentStatus)) {
+                        return <span className="text-[10px] text-gray-300 px-2">—</span>;
+                    }
 
-            {/* Salesperson */}
+                    return (
+                        <div className="flex flex-col gap-1.5 min-w-[140px] group/ck relative">
+                            <div className="flex items-center justify-between mb-0.5">
+                                <span className={`text-[10px] font-bold tracking-tight uppercase ${completed === total ? 'text-emerald-600' : 'text-[#0F6CBD]'}`}>
+                                    {pct}% Concluído
+                                </span>
+                                <span className="text-[9px] font-bold text-gray-400 uppercase">{completed}/{total}</span>
+                            </div>
+                            
+                            <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden border border-gray-200/50">
+                                <div 
+                                    className={`h-full transition-all duration-1000 ${completed === total ? 'bg-emerald-500' : 'bg-[#0F6CBD]'}`}
+                                    style={{ width: `${pct}%` }}
+                                />
+                            </div>
+
+                            {/* Hover Details Popover */}
+                            <div className="absolute bottom-full left-0 mb-2 w-48 bg-white border border-gray-200 rounded-lg shadow-xl opacity-0 invisible group-hover/ck:opacity-100 group-hover/ck:visible transition-all z-[110] p-3 space-y-1">
+                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 border-b border-gray-50 pb-1">Etapas Concluídas</div>
+                                {keys.map((k, i) => (
+                                    <div key={k} className="flex items-center gap-2">
+                                        <span className={`material-icons text-[12px] ${checklist[k] ? 'text-emerald-500' : 'text-gray-200'}`}>
+                                            {checklist[k] ? 'check_circle' : 'radio_button_unchecked'}
+                                        </span>
+                                        <span className={`text-[9px] font-medium uppercase truncate ${checklist[k] ? 'text-gray-700' : 'text-gray-300'}`}>
+                                            {k.replace(/_/g, ' ')}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                })()}
+            </td>
             <td className="px-4 py-2">
                 <div className="flex items-center gap-2">
                     <div className="flex items-center justify-center px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-600 font-medium text-[9px] border border-gray-200">
@@ -325,13 +348,23 @@ const LeadTableRowComponent: React.FC<LeadTableRowProps> = ({
                             <span className="material-icons-outlined text-[16px]">shopping_bag</span>
                             Ver Pedidos
                         </Link>
-                        <Link
-                            href={'/orcamentos?clientName=' + encodeURIComponent(l.client_name)}
-                            className="w-full px-4 py-2.5 text-left text-[10px] font-medium text-gray-600 hover:bg-emerald-50 hover:text-emerald-600 transition-colors flex items-center gap-2.5 uppercase tracking-widest"
-                        >
-                            <span className="material-icons-outlined text-[16px]">request_quote</span>
-                            Ver Orçamentos
-                        </Link>
+                        {l.budget_id ? (
+                            <Link
+                                href={'/orcamentos/' + l.budget_id}
+                                className="w-full px-4 py-2.5 text-left text-[10px] font-medium text-gray-600 hover:bg-emerald-50 hover:text-emerald-600 transition-colors flex items-center gap-2.5 uppercase tracking-widest"
+                            >
+                                <span className="material-icons-outlined text-[16px]">request_quote</span>
+                                Ver Orçamento
+                            </Link>
+                        ) : (
+                            <Link
+                                href={'/orcamentos?clientName=' + encodeURIComponent(l.client_name)}
+                                className="w-full px-4 py-2.5 text-left text-[10px] font-medium text-gray-600 hover:bg-emerald-50 hover:text-emerald-600 transition-colors flex items-center gap-2.5 uppercase tracking-widest"
+                            >
+                                <span className="material-icons-outlined text-[16px]">request_quote</span>
+                                Ver Orçamentos
+                            </Link>
+                        )}
                         <div className="h-px w-full bg-gray-100 my-1" />
                         <button
                             onClick={() => onEdit(l)}
@@ -347,17 +380,78 @@ const LeadTableRowComponent: React.FC<LeadTableRowProps> = ({
                             <span className="material-icons-outlined text-[16px]">swap_horiz</span>
                             Transferir Lead
                         </button>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onConvertToBudget(l); }}
-                            className="w-full px-4 py-2.5 text-left text-[10px] font-medium text-gray-600 hover:bg-violet-50 hover:text-violet-600 transition-colors flex items-center gap-2.5 uppercase tracking-widest"
-                        >
-                            <span className="material-icons-outlined text-[16px]">add</span>
-                            Novo Orçamento
-                        </button>
+                        {!l.budget_id && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onConvertToBudget(l); }}
+                                className="w-full px-4 py-2.5 text-left text-[10px] font-medium text-gray-600 hover:bg-violet-50 hover:text-violet-600 transition-colors flex items-center gap-2.5 uppercase tracking-widest"
+                            >
+                                <span className="material-icons-outlined text-[16px]">add</span>
+                                Novo Orçamento
+                            </button>
+                        )}
+                        {hasPermission('adm') && (
+                            <>
+                                <div className="h-px w-full bg-gray-100 my-1" />
+                                <button
+                                    onClick={async (e) => {
+                                        e.stopPropagation();
+                                        if (!window.confirm('Excluir este atendimento permanentemente?')) return;
+                                        const { error } = await supabase.from('leads').delete().eq('id', l.id);
+                                        if (error) toast.error('Erro ao excluir: ' + error.message);
+                                        else {
+                                            toast.success('Atendimento excluído.');
+                                            window.location.reload();
+                                        }
+                                    }}
+                                    className="w-full px-4 py-2.5 text-left text-[10px] font-medium text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-2.5 uppercase tracking-widest"
+                                >
+                                    <span className="material-icons-outlined text-[16px]">delete</span>
+                                    Excluir Atendimento
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
             </td>
         </tr>
+    );
+};
+
+const StatusTimeline: React.FC<{ lead: Lead }> = ({ lead }) => {
+    const timeline = lead.closing_metadata?.timeline || [];
+    
+    if (timeline.length === 0) {
+        return (
+            <div className="flex items-center gap-1 text-[10px] text-gray-400 mt-0.5">
+                <span className="material-icons-outlined text-[12px]">history</span>
+                <span>Sem histórico</span>
+            </div>
+        );
+    }
+
+    return (
+        <div className="relative group/timeline flex items-center gap-1 text-[10px] text-gray-500 mt-0.5 w-max">
+            <span className="material-icons-outlined text-[12px] text-blue-500">history</span>
+            <span className="font-medium">{timeline.length} transições</span>
+            
+            <div className="absolute z-[300] left-0 top-full mt-1 w-64 bg-white border border-gray-200 shadow-lg rounded-md opacity-0 invisible group-hover/timeline:opacity-100 group-hover/timeline:visible transition-all p-2 max-h-48 overflow-y-auto">
+                <div className="text-[10px] font-bold text-gray-700 uppercase tracking-wider mb-2 border-b border-gray-100 pb-1">Linha do Tempo</div>
+                <div className="space-y-2 relative before:absolute before:inset-0 before:ml-1 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-300 before:to-transparent">
+                    {timeline.map((entry: any, i: number) => (
+                        <div key={i} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                            <div className="flex items-center justify-center w-2 h-2 rounded-full border border-white bg-slate-300 text-slate-500 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2"></div>
+                            <div className="w-[calc(100%-1rem)] md:w-[calc(50%-1.5rem)] p-1.5 rounded border border-slate-200 bg-white shadow-sm">
+                                <div className="flex items-center justify-between space-x-2 mb-1">
+                                    <div className="font-bold text-slate-900 text-[9px] uppercase">{entry.user || 'Sistema'}</div>
+                                    <time className="text-[8px] font-medium text-indigo-500">{new Date(entry.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</time>
+                                </div>
+                                <div className="text-slate-500 text-[9px] leading-tight">{entry.action}</div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
     );
 };
 

@@ -167,9 +167,9 @@ export const generateBudgetExcel = (data: ExcelProposalData): void => {
     interface CalcRow {
         label: string;
         values: (number | string)[];
+        itemLabels?: string[];
         style: string;
         isFormula?: boolean;
-        formula?: (itemIdx: number, currentRow: number) => string;
         isSectionHeader?: boolean;
         isPct?: boolean;
     }
@@ -177,85 +177,78 @@ export const generateBudgetExcel = (data: ExcelProposalData): void => {
     // We'll track which row each calc row ends up at
     const calcRows: CalcRow[] = [];
 
-    // Row 0: QUANTIDADE
+    // Row: QUANTIDADE
     calcRows.push({
         label: 'QUANTIDADE',
         values: data.items.map(it => it.quantity),
         style: 'CalcNumber',
     });
     
-    // Row 1: FORNECEDOR
+    // Row: FORNECEDOR
     calcRows.push({
-        label: 'FORNECEDOR',
+        label: 'FORNECEDOR PRODUTO',
         values: data.items.map(it => it.supplierName || '---'),
         style: 'CalcText',
     });
 
-    // Row 1: CUSTO PARCIAL (qty * unit) - FORMULA
+    // Row: CUSTO PARCIAL (qty * unit) - FORMULA
     calcRows.push({
         label: 'CUSTO PARCIAL',
         values: data.items.map(it => it.quantity * it.priceUnit),
         style: 'CalcCurrency',
-        isFormula: true,
-        formula: (i, row) => {
-            const qtyRow = row - 1;
-            const vc = itemValueCol(i) + 1;
-            // product row is 2 rows before qty
-            const productRow = qtyRow - 1;
-            return `=${rc(qtyRow, vc)}*${rc(productRow, vc)}`;
-        },
+        isFormula: true
     });
 
-    // Row 2: CUSTO PERSONALIZAÇÃO
+    // Row: CUSTO PERSONALIZAÇÃO
     calcRows.push({
         label: 'CUSTO PERSONALIZAÇÃO',
         values: data.items.map(it => it.custoPersonalizacao),
+        itemLabels: data.items.map(it => it.customizationSupplierName || '---'),
         style: 'CalcCurrency',
     });
 
-    // Row 3: CUSTO LAYOUT
+    // Row: CUSTO LAYOUT
     calcRows.push({
         label: 'CUSTO LAYOUT',
         values: data.items.map(it => it.layoutCost),
+        itemLabels: data.items.map(it => it.layoutSupplierName || '---'),
         style: 'CalcCurrency',
     });
 
-    // Row 4: CUSTO TOTAL (parcial + personal + layout) - FORMULA
+    // Row: CUSTO TOTAL (parcial + personal + layout) - FORMULA
     calcRows.push({
         label: 'CUSTO TOTAL',
         values: data.items.map(it =>
             it.quantity * it.priceUnit + it.custoPersonalizacao + it.layoutCost
         ),
         style: 'CalcCurrencyBold',
-        isFormula: true,
-        formula: (i, row) => {
-            const vc = itemValueCol(i) + 1;
-            return `=${rc(row - 3, vc)}+${rc(row - 2, vc)}+${rc(row - 1, vc)}`;
-        },
+        isFormula: true
     });
 
-    // Row 5: FRETE FORNECEDOR
+    // Row: FRETE FORNECEDOR
     calcRows.push({
         label: 'FRETE FORNECEDOR',
         values: data.items.map(it => it.transpFornecedor),
+        itemLabels: data.items.map(it => it.transportSupplierName || '---'),
         style: 'CalcCurrency',
     });
 
-    // Row 6: FRETE CLIENTE
+    // Row: FRETE CLIENTE
     calcRows.push({
         label: 'FRETE CLIENTE',
         values: data.items.map(it => it.transpCliente),
+        itemLabels: data.items.map(it => it.clientTransportSupplierName || '---'),
         style: 'CalcCurrency',
     });
 
-    // Row 7: DESPESA EXTRA
+    // Row: DESPESA EXTRA
     calcRows.push({
         label: 'DESPESA EXTRA / RESERVA',
         values: data.items.map(it => it.despesaExtra),
         style: 'CalcCurrency',
     });
 
-    // Row 8: CUSTO TOTAL + FRETES - FORMULA
+    // Row: CUSTO TOTAL + FRETES - FORMULA
     calcRows.push({
         label: 'CUSTO TOTAL + FRETES',
         values: data.items.map(it => {
@@ -263,17 +256,13 @@ export const generateBudgetExcel = (data: ExcelProposalData): void => {
                 it.transpFornecedor + it.transpCliente + it.despesaExtra;
         }),
         style: 'CalcCurrencyHighlight',
-        isFormula: true,
-        formula: (i, row) => {
-            const vc = itemValueCol(i) + 1;
-            return `=${rc(row - 4, vc)}+${rc(row - 3, vc)}+${rc(row - 2, vc)}+${rc(row - 1, vc)}`;
-        },
+        isFormula: true
     });
 
     // Separator
     calcRows.push({ label: '', values: [], style: 'Spacer', isSectionHeader: true });
 
-    // Row 9: MARGEM (%)
+    // Row: MARGEM (%)
     calcRows.push({
         label: 'MARGEM (%)',
         values: data.items.map(it => it.mockMargin),
@@ -281,7 +270,7 @@ export const generateBudgetExcel = (data: ExcelProposalData): void => {
         isPct: true,
     });
 
-    // Row 10: IMPOSTO NF (%)
+    // Row: IMPOSTO NF (%)
     calcRows.push({
         label: 'IMPOSTO NF (%)',
         values: data.items.map(it => it.mockNF),
@@ -289,7 +278,7 @@ export const generateBudgetExcel = (data: ExcelProposalData): void => {
         isPct: true,
     });
 
-    // Row 11: ACRÉSCIMO FATURAMENTO (%)
+    // Row: ACRÉSCIMO FATURAMENTO (%)
     calcRows.push({
         label: 'ACRÉSCIMO FATURAMENTO (%)',
         values: data.items.map(it => it.mockPayment),
@@ -297,19 +286,23 @@ export const generateBudgetExcel = (data: ExcelProposalData): void => {
         isPct: true,
     });
 
-    // Row 12: FATOR (calculated) - FORMULA
+    // Row: FATOR (calculated) - FORMULA
     calcRows.push({
         label: 'FATOR',
         values: data.items.map(it => it.fator),
         style: 'CalcFactor',
-        isFormula: true,
-        formula: (i, row) => {
-            const vc = itemValueCol(i) + 1;
-            return `=1+(${rc(row - 3, vc)}+${rc(row - 2, vc)}+${rc(row - 1, vc)})/100`;
-        },
+        isFormula: true
     });
 
-    // Row 13: BV / AGÊNCIA (%)
+    // PREÇO UNITÁRIO VENDA - FORMULA
+    calcRows.push({
+        label: 'PREÇO UNITÁRIO VENDA',
+        values: data.items.map(it => it.totalVenda / (it.quantity || 1)),
+        style: 'ResultCurrency',
+        isFormula: true
+    });
+
+    // Row: BV / AGÊNCIA (%)
     calcRows.push({
         label: 'COMISSÃO AGÊNCIA - BV (%)',
         values: data.items.map(it => it.bvPct),
@@ -317,7 +310,7 @@ export const generateBudgetExcel = (data: ExcelProposalData): void => {
         isPct: true,
     });
 
-    // Row 14: EXTRA (%)
+    // Row: EXTRA (%)
     calcRows.push({
         label: 'EXTRA (%)',
         values: data.items.map(it => it.extraPct),
@@ -328,7 +321,7 @@ export const generateBudgetExcel = (data: ExcelProposalData): void => {
     // Separator
     calcRows.push({ label: '', values: [], style: 'Spacer', isSectionHeader: true });
 
-    // Row 15: EMPRESA (issuer)
+    // Row: EMPRESA (issuer)
     calcRows.push({
         label: 'IMPOSTOS (EMPRESA)',
         values: data.items.map(() => data.issuer),
@@ -340,46 +333,15 @@ export const generateBudgetExcel = (data: ExcelProposalData): void => {
 
     // --- RESULTS SECTION ---
 
-    // Row: PREÇO S/ IMPOSTOS (= custos / (2 - fator) / (1 - bv - extra)) - this is pre-tax sale price
-    // The system formula: totalVenda = rounded-mdUnit * qty
-    // where rounded-mdUnit = ROUND(rawTotal / qty, 2)
-    // and rawTotal = (sumCosts / (2 - fator)) / (1 - bv/100 - extra/100)
-    // For the Excel, we replicate this exactly.
-
-    // PREÇO TOTAL VENDA - FORMULA (the main result)
-    // This matches calculateItemTotal: ROUND(raw/qty, 2) * qty
+    // PREÇO TOTAL VENDA - FORMULA
     calcRows.push({
         label: 'PREÇO TOTAL VENDA',
         values: data.items.map(it => it.totalVenda),
         style: 'ResultHighlight',
-        isFormula: true,
-        formula: (i, row) => {
-            const vc = itemValueCol(i) + 1;
-            // Need references to:
-            // custoTotalFretes row: row - 11 (approximate, we'll calculate exact)
-            // fator row: row - 7
-            // bv row: row - 6
-            // extra row: row - 5
-            // qty row: row - 19
-
-            // Actually, let's use relative row offsets based on calcRows array.
-            // We'll compute these after we know the actual row indices.
-            // Use a placeholder for now
-            return '__TOTAL_VENDA__';
-        },
+        isFormula: true
     });
 
-    // PREÇO UNITÁRIO VENDA - FORMULA
-    calcRows.push({
-        label: 'PREÇO UNITÁRIO VENDA',
-        values: data.items.map(it => it.totalVenda / (it.quantity || 1)),
-        style: 'ResultCurrency',
-        isFormula: true,
-        formula: (i, row) => {
-            const vc = itemValueCol(i) + 1;
-            return `__UNIT_VENDA__`;
-        },
-    });
+
 
     // Separator
     calcRows.push({ label: '', values: [], style: 'Spacer', isSectionHeader: true });
@@ -389,8 +351,7 @@ export const generateBudgetExcel = (data: ExcelProposalData): void => {
         label: 'VALOR IMPOSTOS (R$)',
         values: data.items.map(it => it.totalVenda * (it.mockNF / 100)),
         style: 'CalcCurrencyRed',
-        isFormula: true,
-        formula: (i, row) => `__IMPOSTO_VAL__`,
+        isFormula: true
     });
 
     // VALOR BV - FORMULA
@@ -398,8 +359,15 @@ export const generateBudgetExcel = (data: ExcelProposalData): void => {
         label: 'VALOR COMISSÃO BV (R$)',
         values: data.items.map(it => it.totalVenda * (it.bvPct / 100)),
         style: 'CalcCurrencyOrange',
-        isFormula: true,
-        formula: (i, row) => `__BV_VAL__`,
+        isFormula: true
+    });
+
+    // COMISSÃO (1%) - FORMULA
+    calcRows.push({
+        label: 'COMISSÃO VENDEDOR (1%)',
+        values: data.items.map(it => it.totalVenda * 0.01),
+        style: 'CalcCurrencyOrange',
+        isFormula: true
     });
 
     // LUCRO ESTIMADO - FORMULA
@@ -410,29 +378,18 @@ export const generateBudgetExcel = (data: ExcelProposalData): void => {
                 it.layoutCost + it.transpFornecedor + it.transpCliente + it.despesaExtra;
             const impostoVal = it.totalVenda * (it.mockNF / 100);
             const bvVal = it.totalVenda * (it.bvPct / 100);
-            return it.totalVenda - custos - impostoVal - bvVal;
+            const comissaoVal = it.totalVenda * 0.01;
+            return it.totalVenda - custos - impostoVal - bvVal - comissaoVal;
         }),
         style: 'ResultGreen',
-        isFormula: true,
-        formula: (i, row) => `__LUCRO__`,
+        isFormula: true
     });
 
-    // Now build the XML rows and compute actual row indices for formulas
-    // Count actual header rows dynamically:
-    // Row 1: Title
-    // Row 2: Spacer
-    // Rows 3-8: 6 info rows
-    // Row 9: Spacer
-    // Rows 10-13: 4 condition rows
-    // Row 14: Observation (if present)
-    // Row 15: Spacer
-    // Row 16: Spacer
-    // Row 17: CalcHeader
-    // Row 18: Product name row
+    // Count actual header rows dynamically
     let headerRowCount = 1 + 1 + 6 + 1 + 4 + (data.observation ? 1 : 0) + 1 + 1 + 1 + 1;
 
     const productNameRowNum = headerRowCount;
-    const qtyRowNum = productNameRowNum + 1; // first calcRow
+    const qtyRowNum = productNameRowNum + 1;
 
     // Map calcRow index -> actual excel row number
     const rowMap: number[] = [];
@@ -442,23 +399,33 @@ export const generateBudgetExcel = (data: ExcelProposalData): void => {
         currentRow++;
     }
 
-    // Now find the row numbers for key references
-    const ROW_QTY = rowMap[0];
-    const ROW_SUPPLIER = rowMap[1];
-    const ROW_CUSTO_PARCIAL = rowMap[2];
-    const ROW_CUSTO_TOTAL_FRETES = rowMap[9]; // index 9 now
-    const ROW_MARGEM = rowMap[11];
-    const ROW_IMPOSTO_PCT = rowMap[12];
-    const ROW_FATOR = rowMap[14]; 
-    const ROW_BV_PCT = rowMap[15];
-    const ROW_EXTRA_PCT = rowMap[16];
+    const findRowByLabel = (lbl: string) => {
+        const idx = calcRows.findIndex(r => r.label === lbl);
+        if (idx === -1) throw new Error("Label not found: " + lbl);
+        return rowMap[idx];
+    };
 
-    // Results rows
-    const ROW_TOTAL_VENDA = rowMap[20];
-    const ROW_UNIT_VENDA = rowMap[21];
-    const ROW_IMPOSTO_VAL = rowMap[23];
-    const ROW_BV_VAL = rowMap[24];
-    const ROW_LUCRO = rowMap[25];
+    // Find row numbers for formulas dynamically
+    const ROW_QTY = findRowByLabel('QUANTIDADE');
+    const ROW_CUSTO_PARCIAL = findRowByLabel('CUSTO PARCIAL');
+    const ROW_CUSTO_PERSONALIZACAO = findRowByLabel('CUSTO PERSONALIZAÇÃO');
+    const ROW_CUSTO_LAYOUT = findRowByLabel('CUSTO LAYOUT');
+    const ROW_CUSTO_TOTAL = findRowByLabel('CUSTO TOTAL');
+    const ROW_FRETE_FORNECEDOR = findRowByLabel('FRETE FORNECEDOR');
+    const ROW_FRETE_CLIENTE = findRowByLabel('FRETE CLIENTE');
+    const ROW_DESPESA_EXTRA = findRowByLabel('DESPESA EXTRA / RESERVA');
+    const ROW_CUSTO_TOTAL_FRETES = findRowByLabel('CUSTO TOTAL + FRETES');
+    const ROW_MARGEM = findRowByLabel('MARGEM (%)');
+    const ROW_IMPOSTO_PCT = findRowByLabel('IMPOSTO NF (%)');
+    const ROW_ACRESCIMO = findRowByLabel('ACRÉSCIMO FATURAMENTO (%)');
+    const ROW_FATOR = findRowByLabel('FATOR');
+    const ROW_BV_PCT = findRowByLabel('COMISSÃO AGÊNCIA - BV (%)');
+    const ROW_EXTRA_PCT = findRowByLabel('EXTRA (%)');
+    
+    const ROW_TOTAL_VENDA = findRowByLabel('PREÇO TOTAL VENDA');
+    const ROW_IMPOSTO_VAL = findRowByLabel('VALOR IMPOSTOS (R$)');
+    const ROW_BV_VAL = findRowByLabel('VALOR COMISSÃO BV (R$)');
+    const ROW_COMISSAO_VENDEDOR = findRowByLabel('COMISSÃO VENDEDOR (1%)');
 
     // Build the calculation data rows
     let calcDataXml = '';
@@ -482,39 +449,34 @@ export const generateBudgetExcel = (data: ExcelProposalData): void => {
             if (i === 0) cells += '<Cell><Data ss:Type="String"></Data></Cell>';
 
             // Label column (repeat the label inside item block)
-            cells += `<Cell ss:StyleID="ItemLabel"><Data ss:Type="String">${esc(cr.label)}</Data></Cell>`;
+            const labelText = cr.itemLabels && cr.itemLabels[i] ? cr.itemLabels[i] : cr.label;
+            cells += `<Cell ss:StyleID="ItemLabel"><Data ss:Type="String">${esc(labelText)}</Data></Cell>`;
 
             // Value column
             if (cr.isFormula) {
                 let formula = '';
-                // Compute the actual formula string
-                if (ci === 2) {
-                    // CUSTO PARCIAL = qty * unitPrice
+                
+                if (cr.label === 'CUSTO PARCIAL') {
                     formula = `=${rc(ROW_QTY, vc)}*${rc(productNameRowNum, vc)}`;
-                } else if (ci === 5) {
-                    // CUSTO TOTAL = parcial + personal + layout
-                    formula = `=${rc(ROW_CUSTO_PARCIAL, vc)}+${rc(rowMap[3], vc)}+${rc(rowMap[4], vc)}`;
-                } else if (ci === 9) {
-                    // CUSTO TOTAL + FRETES = custoTotal + freteForn + freteCliente + extra
-                    formula = `=${rc(rowMap[5], vc)}+${rc(rowMap[6], vc)}+${rc(rowMap[7], vc)}+${rc(rowMap[8], vc)}`;
-                } else if (ci === 14) {
-                    // FATOR = 1 + (margem + imposto + pagamento) / 100
-                    formula = `=1+(${rc(ROW_MARGEM, vc)}+${rc(ROW_IMPOSTO_PCT, vc)}+${rc(rowMap[13], vc)})/100`;
-                } else if (ci === 20) {
-                    // PREÇO TOTAL VENDA
-                    formula = `=ROUND((${rc(ROW_CUSTO_TOTAL_FRETES, vc)}/(2-${rc(ROW_FATOR, vc)}))/(1-${rc(ROW_BV_PCT, vc)}/100-${rc(ROW_EXTRA_PCT, vc)}/100)/${rc(ROW_QTY, vc)},2)*${rc(ROW_QTY, vc)}`;
-                } else if (ci === 21) {
-                    // PREÇO UNITÁRIO
+                } else if (cr.label === 'CUSTO TOTAL') {
+                    formula = `=${rc(ROW_CUSTO_PARCIAL, vc)}+${rc(ROW_CUSTO_PERSONALIZACAO, vc)}+${rc(ROW_CUSTO_LAYOUT, vc)}`;
+                } else if (cr.label === 'CUSTO TOTAL + FRETES') {
+                    formula = `=${rc(ROW_CUSTO_TOTAL, vc)}+${rc(ROW_FRETE_FORNECEDOR, vc)}+${rc(ROW_FRETE_CLIENTE, vc)}+${rc(ROW_DESPESA_EXTRA, vc)}`;
+                } else if (cr.label === 'FATOR') {
+                    formula = `=1+(${rc(ROW_MARGEM, vc)}+${rc(ROW_IMPOSTO_PCT, vc)}+${rc(ROW_ACRESCIMO, vc)})/100`;
+                } else if (cr.label === 'PREÇO TOTAL VENDA') {
+                    // Include -0.01 for the mandatory 1% seller commission in the calculation exactly like the UI formulas
+                    formula = `=ROUND((${rc(ROW_CUSTO_TOTAL_FRETES, vc)}/(2-${rc(ROW_FATOR, vc)}))/(1-${rc(ROW_BV_PCT, vc)}/100-${rc(ROW_EXTRA_PCT, vc)}/100-0.01)/${rc(ROW_QTY, vc)},2)*${rc(ROW_QTY, vc)}`;
+                } else if (cr.label === 'PREÇO UNITÁRIO VENDA') {
                     formula = `=IF(${rc(ROW_QTY, vc)}>0,${rc(ROW_TOTAL_VENDA, vc)}/${rc(ROW_QTY, vc)},0)`;
-                } else if (ci === 23) {
-                    // IMPOSTO VALOR
+                } else if (cr.label === 'VALOR IMPOSTOS (R$)') {
                     formula = `=${rc(ROW_TOTAL_VENDA, vc)}*${rc(ROW_IMPOSTO_PCT, vc)}/100`;
-                } else if (ci === 24) {
-                    // BV VALOR
+                } else if (cr.label === 'VALOR COMISSÃO BV (R$)') {
                     formula = `=${rc(ROW_TOTAL_VENDA, vc)}*${rc(ROW_BV_PCT, vc)}/100`;
-                } else if (ci === 25) {
-                    // LUCRO
-                    formula = `=${rc(ROW_TOTAL_VENDA, vc)}-${rc(ROW_CUSTO_TOTAL_FRETES, vc)}-${rc(ROW_IMPOSTO_VAL, vc)}-${rc(ROW_BV_VAL, vc)}`;
+                } else if (cr.label === 'COMISSÃO VENDEDOR (1%)') {
+                    formula = `=${rc(ROW_TOTAL_VENDA, vc)}*0.01`;
+                } else if (cr.label === 'LUCRO ESTIMADO') {
+                    formula = `=${rc(ROW_TOTAL_VENDA, vc)}-${rc(ROW_CUSTO_TOTAL_FRETES, vc)}-${rc(ROW_IMPOSTO_VAL, vc)}-${rc(ROW_BV_VAL, vc)}-${rc(ROW_COMISSAO_VENDEDOR, vc)}`;
                 }
 
                 if (formula) {
@@ -544,9 +506,9 @@ export const generateBudgetExcel = (data: ExcelProposalData): void => {
 <Row><Cell ss:StyleID="FormulaNote"><Data ss:Type="String">Custo Total = Custo Parcial + Personalização + Layout</Data></Cell></Row>
 <Row><Cell ss:StyleID="FormulaNote"><Data ss:Type="String">Custo Total + Fretes = Custo Total + Frete Fornecedor + Frete Cliente + Despesa Extra</Data></Cell></Row>
 <Row><Cell ss:StyleID="FormulaNote"><Data ss:Type="String">Fator = 1 + (Margem% + Imposto% + Acréscimo Faturamento%) / 100</Data></Cell></Row>
-<Row><Cell ss:StyleID="FormulaNote"><Data ss:Type="String">Preço Total Venda = ARRED( (Custo Total + Fretes) / (2 - Fator) / (1 - BV%/100 - Extra%/100) / Qtd ; 2 ) × Qtd</Data></Cell></Row>
+<Row><Cell ss:StyleID="FormulaNote"><Data ss:Type="String">Preço Total Venda = ARRED( (Custo Total + Fretes) / (2 - Fator) / (1 - BV%/100 - Extra%/100 - 1%) / Qtd ; 2 ) × Qtd</Data></Cell></Row>
 <Row><Cell ss:StyleID="FormulaNote"><Data ss:Type="String">Valor Impostos = Preço Total Venda × (Imposto% / 100)</Data></Cell></Row>
-<Row><Cell ss:StyleID="FormulaNote"><Data ss:Type="String">Lucro Estimado = Preço Total Venda - Custo Total + Fretes - Valor Impostos - Valor BV</Data></Cell></Row>
+<Row><Cell ss:StyleID="FormulaNote"><Data ss:Type="String">Lucro Estimado = Preço Total Venda - Custo Total + Fretes - Valor Impostos - Valor BV - Comissão (1%)</Data></Cell></Row>
 <Row><Cell><Data ss:Type="String"></Data></Cell></Row>
 <Row><Cell ss:StyleID="FormulaNote"><Data ss:Type="String">⚠ Altere qualquer valor nas células editáveis e os cálculos serão recalculados automaticamente pelo Excel.</Data></Cell></Row>`;
 
@@ -619,7 +581,7 @@ export const generateBudgetExcel = (data: ExcelProposalData): void => {
    <Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1" ss:Color="#1A1A1A"/>
    <NumberFormat ss:Format="&quot;R$&quot;#,##0.00"/>
    <Interior ss:Color="#FFF8DC" ss:Pattern="Solid"/>
-   <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
    <Borders>
     <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D4A017"/>
     <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D4A017"/>
@@ -748,7 +710,7 @@ export const generateBudgetExcel = (data: ExcelProposalData): void => {
   <Style ss:ID="ResultCurrency">
    <Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1" ss:Color="#1A1A1A"/>
    <NumberFormat ss:Format="&quot;R$&quot;#,##0.00"/>
-   <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
    <Interior ss:Color="#F0F0FF" ss:Pattern="Solid"/>
    <Borders>
     <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCEE"/>

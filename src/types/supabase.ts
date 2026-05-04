@@ -20,19 +20,29 @@ export type Database = {
                     bv_pct: number | null
                     calculation_factor: number | null
                     client_transport_cost: number | null
+                    client_transport_supplier_id: string | null
                     created_at: string | null
                     customization_cost: number | null
                     customization_supplier_id: string | null
                     extra_expense: number | null
+                    extra_pct: number | null
                     extra_supplier_id: string | null
                     id: string
                     is_approved: boolean | null
                     layout_cost: number | null
                     layout_supplier_id: string | null
+                    margin_pct: number | null
+                    payment_method_label: string | null
+                    payment_tax_pct: number | null
+                    product_code: string | null
+                    product_color: string | null
+                    product_description: string | null
+                    product_image_url: string | null
                     product_name: string
                     quantity: number | null
                     supplier_id: string | null
                     supplier_transport_cost: number | null
+                    tax_pct: number | null
                     total_item_value: number | null
                     transport_supplier_id: string | null
                     unit_price: number | null
@@ -42,19 +52,29 @@ export type Database = {
                     bv_pct?: number | null
                     calculation_factor?: number | null
                     client_transport_cost?: number | null
+                    client_transport_supplier_id?: string | null
                     created_at?: string | null
                     customization_cost?: number | null
                     customization_supplier_id?: string | null
                     extra_expense?: number | null
+                    extra_pct?: number | null
                     extra_supplier_id?: string | null
                     id?: string
                     is_approved?: boolean | null
                     layout_cost?: number | null
                     layout_supplier_id?: string | null
+                    margin_pct?: number | null
+                    payment_method_label?: string | null
+                    payment_tax_pct?: number | null
+                    product_code?: string | null
+                    product_color?: string | null
+                    product_description?: string | null
+                    product_image_url?: string | null
                     product_name: string
                     quantity?: number | null
                     supplier_id?: string | null
                     supplier_transport_cost?: number | null
+                    tax_pct?: number | null
                     total_item_value?: number | null
                     transport_supplier_id?: string | null
                     unit_price?: number | null
@@ -64,19 +84,29 @@ export type Database = {
                     bv_pct?: number | null
                     calculation_factor?: number | null
                     client_transport_cost?: number | null
+                    client_transport_supplier_id?: string | null
                     created_at?: string | null
                     customization_cost?: number | null
                     customization_supplier_id?: string | null
                     extra_expense?: number | null
+                    extra_pct?: number | null
                     extra_supplier_id?: string | null
                     id?: string
                     is_approved?: boolean | null
                     layout_cost?: number | null
                     layout_supplier_id?: string | null
+                    margin_pct?: number | null
+                    payment_method_label?: string | null
+                    payment_tax_pct?: number | null
+                    product_code?: string | null
+                    product_color?: string | null
+                    product_description?: string | null
+                    product_image_url?: string | null
                     product_name?: string
                     quantity?: number | null
                     supplier_id?: string | null
                     supplier_transport_cost?: number | null
+                    tax_pct?: number | null
                     total_item_value?: number | null
                     transport_supplier_id?: string | null
                     unit_price?: number | null
@@ -131,37 +161,49 @@ export type Database = {
                     budget_number: string
                     client_id: string | null
                     created_at: string | null
+                    delivery_deadline: string | null
                     id: string
                     issuer: string | null
                     observation: string | null
+                    payment_method: string | null
                     salesperson: string
+                    shipping: string | null
                     status: string | null
                     total_amount: number | null
                     updated_at: string | null
+                    validity: string | null
                 }
                 Insert: {
                     budget_number: string
                     client_id?: string | null
                     created_at?: string | null
+                    delivery_deadline?: string | null
                     id?: string
                     issuer?: string | null
                     observation?: string | null
+                    payment_method?: string | null
                     salesperson: string
+                    shipping?: string | null
                     status?: string | null
                     total_amount?: number | null
                     updated_at?: string | null
+                    validity?: string | null
                 }
                 Update: {
                     budget_number?: string
                     client_id?: string | null
                     created_at?: string | null
+                    delivery_deadline?: string | null
                     id?: string
                     issuer?: string | null
                     observation?: string | null
+                    payment_method?: string | null
                     salesperson?: string
+                    shipping?: string | null
                     status?: string | null
                     total_amount?: number | null
                     updated_at?: string | null
+                    validity?: string | null
                 }
                 Relationships: [
                     {
@@ -297,6 +339,9 @@ export type Database = {
             }
             crm_leads: {
                 Row: {
+                    budget_date: string | null
+                    budget_id: string | null
+                    budget_number: string | null
                     client_doc: string | null
                     client_email: string | null
                     client_name: string
@@ -316,6 +361,9 @@ export type Database = {
                     updated_at: string
                 }
                 Insert: {
+                    budget_date?: string | null
+                    budget_id?: string | null
+                    budget_number?: string | null
                     client_doc?: string | null
                     client_email?: string | null
                     client_name: string
@@ -335,6 +383,9 @@ export type Database = {
                     updated_at?: string
                 }
                 Update: {
+                    budget_date?: string | null
+                    budget_id?: string | null
+                    budget_number?: string | null
                     client_doc?: string | null
                     client_email?: string | null
                     client_name?: string

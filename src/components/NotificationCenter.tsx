@@ -66,11 +66,11 @@ const NotificationCenter: React.FC = () => {
             .limit(10);
 
         if (data) {
-            // Combine with payment alerts
-            const alerts = await fetchPaymentAlerts();
-            const combined = [...alerts, ...data];
-            setNotifications(combined);
-            setUnreadCount(combined.filter(n => !n.read).length);
+            // Disable dynamic payment alerts (considered 'fake' by user)
+            // const alerts = await fetchPaymentAlerts();
+            // const combined = [...alerts, ...data];
+            setNotifications(data);
+            setUnreadCount(data.filter(n => !n.read).length);
         }
     };
 
@@ -252,14 +252,51 @@ const NotificationCenter: React.FC = () => {
                     <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-none py-0 z-20 border border-gray-100 animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
                         <div className="p-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
                             <h3 className="text-xs font-medium text-gray-900 uppercase tracking-wider">Notificações</h3>
-                            {unreadCount > 0 && (
+                            <div className="flex gap-2">
+                                {unreadCount > 0 && (
+                                    <button
+                                        onClick={markAllRead}
+                                        className="text-[9px] text-blue-600 hover:underline font-bold uppercase tracking-tight"
+                                    >
+                                        Lidas
+                                    </button>
+                                )}
                                 <button
-                                    onClick={markAllRead}
-                                    className="text-[10px] text-blue-600 hover:underline font-medium uppercase"
+                                    onClick={async () => {
+                                        if (confirm('Limpar todas as notificações?')) {
+                                            try {
+                                                // 1. Delete from Supabase
+                                                const { error } = await supabase
+                                                    .from('notifications')
+                                                    .delete()
+                                                    .eq('user_email', appUser?.email);
+                                                
+                                                if (error) throw error;
+
+                                                // 2. Clear from LocalStorage (payment alerts)
+                                                const paymentAlertIds = notifications
+                                                    .filter(n => n.id.startsWith('payment-alert-') || n.id.startsWith('expense-alert-') || n.id.startsWith('cost-alert-'))
+                                                    .map(n => n.id);
+                                                
+                                                if (paymentAlertIds.length > 0) {
+                                                    const existing = JSON.parse(localStorage.getItem('cristal_read_alerts') || '[]');
+                                                    localStorage.setItem('cristal_read_alerts', JSON.stringify([...new Set([...existing, ...paymentAlertIds])]));
+                                                }
+
+                                                setNotifications([]);
+                                                setUnreadCount(0);
+                                                toast.success('Notificações limpas');
+                                            } catch (error) {
+                                                console.error('Error clearing notifications:', error);
+                                                toast.error('Erro ao limpar notificações');
+                                            }
+                                        }
+                                    }}
+                                    className="text-[9px] text-red-500 hover:underline font-bold uppercase tracking-tight"
                                 >
-                                    Marcar todas como lidas
+                                    Limpar
                                 </button>
-                            )}
+                            </div>
                         </div>
                         <div className="max-h-96 overflow-y-auto">
                             {notifications.length === 0 ? (
@@ -273,22 +310,30 @@ const NotificationCenter: React.FC = () => {
                                         key={n.id}
                                         className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer relative ${!n.read ? 'bg-blue-50/30' : ''}`}
                                         onClick={() => {
-                                            if (n.link) window.location.hash = `#${n.link}`;
+                                            if (n.link) window.location.href = n.link;
                                             markAsRead(n.id);
                                             setShowDropdown(false);
                                         }}
                                     >
                                         {!n.read && <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-blue-500 rounded-full"></div>}
                                         <div className="flex justify-between items-start mb-1">
-                                            <p className={`text-xs font-medium ${n.read ? 'text-gray-700' : 'text-blue-900'}`}>{n.title}</p>
-                                            <span className="text-[9px] text-gray-400 whitespace-nowrap ml-2">
+                                            <p className={`text-[11px] font-bold uppercase leading-tight ${n.read ? 'text-gray-700' : 'text-blue-900'}`}>{n.title}</p>
+                                            <span className="text-[9px] text-gray-400 whitespace-nowrap ml-2 tabular-nums">
                                                 {new Date(n.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                             </span>
                                         </div>
-                                        <p className="text-[11px] text-gray-500 leading-relaxed line-clamp-2">{n.message}</p>
+                                        <p className="text-[10px] text-gray-500 leading-tight line-clamp-2 uppercase tracking-tighter">{n.message}</p>
                                     </div>
                                 ))
                             )}
+                        </div>
+                        <div className="p-3 border-t border-gray-50 bg-gray-50/30 text-center">
+                            <a 
+                                href="/notificacoes" 
+                                className="text-[10px] font-bold text-[#0F6CBD] uppercase tracking-widest hover:underline"
+                            >
+                                Ver histórico completo
+                            </a>
                         </div>
                     </div>
                 </>

@@ -5,7 +5,6 @@ import OrderItemCard from './OrderItemCard';
 
 interface OrderItemsListProps {
     items: any[];
-    addItem: () => void;
     updateItem: (id: string | number, field: string, value: any) => void;
     removeItem: (id: string | number) => void;
     duplicateItem: (item: any) => void;
@@ -14,11 +13,11 @@ interface OrderItemsListProps {
     factorsList: any[];
     totalRevenue: number;
     totalProfit: number;
+    addLog: (msg: string) => void;
 }
 
 export default function OrderItemsList({
     items,
-    addItem,
     updateItem,
     removeItem,
     duplicateItem,
@@ -26,7 +25,8 @@ export default function OrderItemsList({
     productsList,
     factorsList,
     totalRevenue,
-    totalProfit
+    totalProfit,
+    addLog
 }: OrderItemsListProps) {
     return (
         <div className="space-y-6">
@@ -40,20 +40,12 @@ export default function OrderItemsList({
                         <p className="text-[10px] font-medium text-slate-400">Gerenciamento de produtos e custos reais</p>
                     </div>
                 </div>
-                
-                <button
-                    onClick={addItem}
-                    className="flex items-center gap-2 px-4 py-2 bg-white text-[#0F6CBD] rounded-md text-[10px] font-medium uppercase tracking-widest border border-[#E3E3E4] hover:bg-[#F0F7FF] hover:border-[#0F6CBD] transition-all"
-                >
-                    <span className="material-icons-outlined text-sm">add</span>
-                    Adicionar Item
-                </button>
             </div>
 
             <div className="space-y-4">
                 {items.map((item, index) => (
                     <OrderItemCard 
-                        key={item.id}
+                        key={`order-item-${item.id || 'new'}-${index}`}
                         item={item}
                         index={index}
                         updateItem={updateItem}
@@ -62,6 +54,7 @@ export default function OrderItemsList({
                         suppliersList={suppliersList}
                         productsList={productsList}
                         factorsList={factorsList}
+                        addLog={addLog}
                     />
                 ))}
             </div>

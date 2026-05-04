@@ -1,9 +1,15 @@
 'use client';
 
-import React from 'react';
-import { Lead } from '@/hooks/useCRM';
+import React, { useState, useEffect } from 'react';
+import { Lead, useReminders, useCreateReminder, useAcknowledgeReminder, useSalespeople, useUpdateLead } from '@/hooks/useCRM';
+import { SELLERS } from '@/constants/crm';
+
 import { fixClientName } from '@/utils/textUtils';
 import { maskPhone, maskCpfCnpj } from '@/utils/maskUtils';
+import { useAuth } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
+import { OrderChecklist } from './OrderChecklist';
 
 export interface LeadModalProps {
     isOpen: boolean;
@@ -28,7 +34,8 @@ export interface LeadModalProps {
     isSeller: boolean;
     setSelectedClientToTransfer: (client: any) => void;
     setIsTransferModalOpen: (open: boolean) => void;
-    onDelete?: (id: string) => void;
+    onTransfer: (lead: Lead) => void;
+    onDelete?: (lead: Lead) => void;
 }
 
 export const LeadModal: React.FC<LeadModalProps> = ({
@@ -56,7 +63,22 @@ export const LeadModal: React.FC<LeadModalProps> = ({
     setIsTransferModalOpen,
     onDelete
 }) => {
-    const [isConfirmingDelete, setIsConfirmingDelete] = React.useState(false);
+    const [itemError, setItemError] = useState(false); // Local validation for required item field
+    const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+
+    
+    const handleInitiate = () => {
+        if (!newLead.closing_metadata?.quoted_item?.trim()) {
+            setItemError(true);
+            toast.error("O preenchimento do item ou produto de interesse é obrigatório.");
+            return;
+        }
+        setItemError(false);
+        saveLead();
+    };
+
+    const createReminder = useCreateReminder();
+    const { data: salespersons = SELLERS } = useSalespeople();
 
     if (!isOpen) return null;
 
@@ -70,8 +92,6 @@ export const LeadModal: React.FC<LeadModalProps> = ({
             setIsConfirmingDelete(false);
         }
     };
-
-    const SALESPERSONS = ['VENDAS 01', 'VENDAS 02', 'VENDAS 03', 'VENDAS 04', 'VENDAS 05'];
 
     return (
         <div className="fixed inset-0 z-50 flex justify-center items-end sm:items-center bg-[#1A1A1A]/40 backdrop-blur-sm p-0 sm:p-4 transition-all animate-in fade-in duration-300">
@@ -90,12 +110,32 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                             {editingLead ? 'Atualize as informações do lead com precisão' : 'Cadastre um novo contato na sua base de oportunidades'}
                         </p>
                     </div>
-                    <button 
-                        onClick={onClose} 
-                        className="w-12 h-12 flex items-center justify-center rounded-md bg-[#F5F5F5] text-[#707070] hover:bg-[#FEE2E2] hover:text-[#DC2626] transition-all active:scale-95 border border-[#E0E0E0]"
-                    >
-                        <span className="material-icons-outlined text-xl">close</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {editingLead && hasPermission('adm') && (
+                            <button 
+                                onClick={async () => {
+                                    if (!window.confirm('Excluir este atendimento permanentemente?')) return;
+                                    const { error } = await supabase.from('crm_leads').delete().eq('id', editingLead.id);
+                                    if (error) toast.error('Erro ao excluir: ' + error.message);
+                                    else {
+                                        toast.success('Atendimento excluído.');
+                                        onClose();
+                                        window.location.reload();
+                                    }
+                                }} 
+                                className="h-12 px-6 flex items-center gap-2 rounded-md bg-white text-red-500 hover:bg-red-50 transition-all border border-red-100 font-medium text-[10px] uppercase tracking-widest"
+                            >
+                                <span className="material-icons-outlined text-lg">delete</span>
+                                Excluir
+                            </button>
+                        )}
+                        <button 
+                            onClick={onClose} 
+                            className="w-12 h-12 flex items-center justify-center rounded-md bg-[#F5F5F5] text-[#707070] hover:bg-[#FEE2E2] hover:text-[#DC2626] transition-all active:scale-95 border border-[#E0E0E0]"
+                        >
+                            <span className="material-icons-outlined text-xl">close</span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Modal Body */}
@@ -126,7 +166,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                                             </svg>
                                         </div>
                                         <input
-                                            className="w-full h-14 pl-14 pr-6 bg-[#F9FAFB] border border-[#D1D1D1] rounded-md text-[14px] font-medium text-[#242424] focus:bg-white focus:ring-4 focus:ring-[#0F6CBD]/10 focus:border-[#0F6CBD] transition-all placeholder:text-[#BDBDBD] font-jakarta uppercase tracking-tight"
+                                            className="w-full h-14 !pl-14 pr-6 bg-[#F9FAFB] border border-[#D1D1D1] rounded-md text-[14px] font-medium text-[#242424] focus:bg-white focus:ring-4 focus:ring-[#0F6CBD]/10 focus:border-[#0F6CBD] transition-all placeholder:text-[#BDBDBD] font-jakarta uppercase tracking-tight"
                                             placeholder="BUSCAR NOME, E-MAIL OU TELEFONE..."
                                             value={clientSearchTerm}
                                             onChange={e => setClientSearchTerm(e.target.value)}
@@ -135,39 +175,60 @@ export const LeadModal: React.FC<LeadModalProps> = ({
 
                                     {clientSearchResults.length > 0 && (
                                         <div className="bg-white border border-[#D1D1D1] rounded-md shadow-none max-h-72 overflow-y-auto divide-y divide-[#E0E0E0] animate-in fade-in slide-in-from-top-4 mt-[-10px]">
-                                            {clientSearchResults.map(client => (
-                                                <div
-                                                    key={client.id}
-                                                    className="p-5 hover:bg-[#EBF3FC] cursor-pointer flex justify-between items-center transition-colors group"
-                                                    onClick={() => {
-                                                        const isManager = appUser?.role === 'ADMIN' || appUser?.role === 'GESTAO' || appUser?.role === 'SUPERVISOR';
-                                                        if (!isManager && client.salesperson && userSalesperson && client.salesperson !== userSalesperson) {
-                                                            setSelectedClientToTransfer(client);
-                                                            setIsTransferModalOpen(true);
-                                                            return;
-                                                        }
-                                                        setNewLead({ ...newLead, client_id: client.id, client_name: client.name, client_contact_name: client.contact_name, client_phone: client.phone, client_email: client.email, client_doc: client.doc, salesperson: userSalesperson || client.salesperson || 'VENDAS 01' });
-                                                        setClientSearchTerm(''); setClientSearchResults([]); setShowClientForm(true); setPartnerSaved(true);
-                                                    }}
-                                                >
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 rounded-md bg-[#F5F5F5] flex items-center justify-center text-[#707070] group-hover:bg-[#0F6CBD] group-hover:text-white transition-all shadow-none">
-                                                            <span className="material-icons-outlined text-lg">person</span>
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-medium text-[#242424] text-[14px] group-hover:text-[#0F6CBD] transition-colors font-jakarta uppercase tracking-tight">{fixClientName(client.name)}</p>
-                                                            <div className="flex flex-wrap items-center gap-2 mt-1 font-jakarta">
-                                                                <span className="text-[10px] font-medium text-[#707070] uppercase tracking-wider">{client.contact_name || 'SEM CONTATO'}</span>
-                                                                <span className="text-[#D1D1D1]">•</span>
-                                                                <span className="text-[10px] font-medium text-[#0F6CBD] lowercase">{client.email || 'SEM E-MAIL'}</span>
-                                                                <span className="text-[#D1D1D1]">•</span>
-                                                                <span className="text-[10px] font-medium text-[#707070] tabular-nums">{client.phone || client.doc || 'S/ DADOS'}</span>
+                                            {clientSearchResults.map(client => {
+                                                const isManager = appUser?.role === 'ADMIN' || appUser?.role === 'GESTAO' || appUser?.role === 'SUPERVISOR';
+                                                const isBlocked = !isManager && client.salesperson && userSalesperson && client.salesperson !== userSalesperson;
+
+                                                return (
+                                                    <div
+                                                        key={client.id}
+                                                        className={`p-5 flex justify-between items-center transition-colors group ${isBlocked ? 'bg-blue-50/30 cursor-default' : 'hover:bg-[#EBF3FC] cursor-pointer'}`}
+                                                        onClick={() => {
+                                                            if (isBlocked) {
+                                                                setSelectedClientToTransfer(client);
+                                                                return;
+                                                            }
+                                                            setNewLead({ ...newLead, client_id: client.id, client_name: client.name, client_contact_name: client.contact_name, client_phone: client.phone, client_email: client.email, client_doc: client.doc, salesperson: userSalesperson || client.salesperson || 'VENDAS 01' });
+                                                            setClientSearchTerm(''); setClientSearchResults([]); setShowClientForm(true); setPartnerSaved(true);
+                                                        }}
+                                                    >
+                                                        <div className="flex items-center gap-4">
+                                                            <div className={`w-10 h-10 rounded-md flex items-center justify-center transition-all shadow-none ${isBlocked ? 'bg-blue-100 text-blue-500' : 'bg-gray-50 text-gray-400 group-hover:bg-[#0F6CBD] group-hover:text-white'}`}>
+                                                                <span className="material-icons-outlined text-lg">{isBlocked ? 'info' : 'person'}</span>
+                                                            </div>
+                                                            <div>
+                                                                <p className={`font-medium text-[14px] transition-colors font-jakarta uppercase tracking-tight ${isBlocked ? 'text-[#4B5563]' : 'text-[#242424] group-hover:text-[#0F6CBD]'}`}>
+                                                                    {fixClientName(client.name)}
+                                                                </p>
+                                                                <div className="flex flex-wrap items-center gap-2 mt-1 font-jakarta">
+                                                                     <span className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider ${isBlocked ? 'text-blue-600' : 'text-[#707070]'}`}>
+                                                                         <span className="material-icons-outlined text-[12px]">{isBlocked ? 'lock_person' : 'person'}</span>
+                                                                         {isBlocked ? `COM ${client.salesperson}` : (client.contact_name || 'SEM CONTATO')}
+                                                                     </span>
+                                                                    <span className="text-[#D1D1D1]">•</span>
+                                                                    <span className="text-[10px] font-medium text-[#0F6CBD] lowercase">{client.email || 'SEM E-MAIL'}</span>
+                                                                    <span className="text-[#D1D1D1]">•</span>
+                                                                    <span className="text-[10px] font-medium text-[#707070] tabular-nums">{client.phone || client.doc || 'S/ DADOS'}</span>
+                                                                </div>
                                                             </div>
                                                         </div>
+                                                        {isBlocked ? (
+                                                             <button 
+                                                                 className="px-4 py-2 bg-[#0F6CBD] text-white text-[9px] font-bold uppercase rounded-md hover:bg-[#115EA3] transition-all flex items-center gap-1 shadow-sm"
+                                                                 onClick={(e) => {
+                                                                     e.stopPropagation();
+                                                                     setSelectedClientToTransfer(client);
+                                                                 }}
+                                                             >
+                                                                 <span className="material-icons-outlined text-[14px]">swap_horiz</span>
+                                                                 SOLICITAR TRANSFERÊNCIA
+                                                             </button>
+                                                        ) : (
+                                                            <span className="material-icons-outlined text-[#D1D1D1] group-hover:text-[#0F6CBD] transition-colors">arrow_forward</span>
+                                                        )}
                                                     </div>
-                                                    <span className="material-icons-outlined text-[#D1D1D1] group-hover:text-[#0F6CBD] transition-colors">arrow_forward</span>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     )}
 
@@ -201,7 +262,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                                     
                                     <div className="grid grid-cols-2 gap-5">
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em] ml-1 font-jakarta">CONTATO/NOME</label>
+                                            <label className="text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em] ml-1 font-jakarta">CONTATO/NOME *</label>
                                             <input
                                                 className="w-full h-12 px-4 bg-[#F9FAFB] border border-[#D1D1D1] rounded-md text-[13px] font-medium text-[#242424] focus:bg-white focus:ring-4 focus:ring-[#0F6CBD]/10 focus:border-[#0F6CBD] transition-all shadow-none font-jakarta uppercase tracking-tight"
                                                 placeholder="PESSOA DE CONTATO"
@@ -210,7 +271,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em] ml-1 font-jakarta">DOCUMENTO (CNPJ/CPF)</label>
+                                            <label className="text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em] ml-1 font-jakarta">DOCUMENTO (CNPJ/CPF) *</label>
                                             <input
                                                 className="w-full h-12 px-4 bg-[#F9FAFB] border border-[#D1D1D1] rounded-md text-[13px] font-medium text-[#242424] focus:bg-white focus:ring-4 focus:ring-[#0F6CBD]/10 focus:border-[#0F6CBD] transition-all shadow-none font-jakarta tabular-nums"
                                                 placeholder="00.000.000/0001-00"
@@ -219,7 +280,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em] ml-1 font-jakarta">WHATSAPP</label>
+                                            <label className="text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em] ml-1 font-jakarta">WHATSAPP *</label>
                                             <input
                                                 className="w-full h-12 px-4 bg-[#F9FAFB] border border-[#D1D1D1] rounded-md text-[13px] font-medium text-[#242424] focus:bg-white focus:ring-4 focus:ring-[#0F6CBD]/10 focus:border-[#0F6CBD] transition-all shadow-none font-jakarta tabular-nums"
                                                 placeholder="(00) 00000-0000"
@@ -228,7 +289,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em] ml-1 font-jakarta">E-MAIL</label>
+                                            <label className="text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em] ml-1 font-jakarta">E-MAIL *</label>
                                             <input
                                                 type="email"
                                                 className="w-full h-12 px-4 bg-[#F9FAFB] border border-[#D1D1D1] rounded-md text-[13px] font-medium text-[#242424] focus:bg-white focus:ring-4 focus:ring-[#0F6CBD]/10 focus:border-[#0F6CBD] transition-all shadow-none font-jakarta"
@@ -282,7 +343,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                                             disabled={isSeller}
                                         >
                                             <option value="" disabled>ESCOLHA UM VENDEDOR</option>
-                                            {SALESPERSONS.map(v => (
+                                            {salespersons.map((v: string) => (
                                                 <option key={v} value={v}>{v}</option>
                                             ))}
                                         </select>
@@ -293,10 +354,13 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em] ml-1 font-jakarta">PRODUTO / SERVIÇO DE INTERESSE *</label>
                                     <input
-                                        className="w-full h-12 px-4 bg-white border border-[#D1D1D1] rounded-md text-[13px] font-medium text-[#242424] focus:ring-4 focus:ring-[#0F6CBD]/10 focus:border-[#0F6CBD] transition-all shadow-none font-jakarta uppercase tracking-tight"
+                                        className={`w-full h-12 px-4 bg-white border ${itemError ? 'border-red-500 ring-4 ring-red-500/10' : 'border-[#D1D1D1]'} rounded-md text-[13px] font-medium text-[#242424] focus:ring-4 focus:ring-[#0F6CBD]/10 focus:border-[#0F6CBD] transition-all shadow-none font-jakarta uppercase tracking-tight`}
                                         placeholder="EX: 500 CANETAS PERSONALIZADAS"
                                         value={newLead.closing_metadata?.quoted_item || ''}
-                                        onChange={e => setNewLead({ ...newLead, closing_metadata: { ...(newLead.closing_metadata || {}), quoted_item: e.target.value } })}
+                                        onChange={e => {
+                                            setNewLead({ ...newLead, closing_metadata: { ...(newLead.closing_metadata || {}), quoted_item: e.target.value } });
+                                            if (e.target.value.trim()) setItemError(false);
+                                        }}
                                     />
                                     <div className="flex flex-wrap gap-2 pt-1">
                                         {['Caneta', 'Ecobag', 'Caderneta', 'Copo', 'Garrafa', 'Bolsa Térmica'].map(item => (
@@ -311,8 +375,6 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                                         ))}
                                     </div>
                                 </div>
-
-                                 <div className="grid grid-cols-2 gap-5">
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em] ml-1 font-jakarta">Nº DO ORÇAMENTO</label>
                                         <input
@@ -322,16 +384,6 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                                             onChange={e => setNewLead({ ...newLead, budget_number: e.target.value })}
                                         />
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em] ml-1 font-jakarta">DATA DO ORÇAMENTO</label>
-                                        <input
-                                            type="date"
-                                            className="w-full h-12 px-4 bg-white border border-[#D1D1D1] rounded-md text-[13px] font-medium text-[#242424] focus:ring-4 focus:ring-[#0F6CBD]/10 focus:border-[#0F6CBD] transition-all shadow-none font-jakarta"
-                                            value={newLead.budget_date || ''}
-                                            onChange={e => setNewLead({ ...newLead, budget_date: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
 
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em] ml-1 font-jakarta">ANOTAÇÕES DO ATENDIMENTO</label>
@@ -382,38 +434,33 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                                                 />
                                             </div>
                                             <button
-                                                onClick={async () => {
+                                                onClick={() => {
                                                     const dateVal = (document.getElementById('reminder_at') as HTMLInputElement).value;
                                                     const titleVal = (document.getElementById('reminder_title') as HTMLInputElement).value;
                                                     const msgVal = (document.getElementById('reminder_message') as HTMLInputElement).value;
 
                                                     if (!dateVal || !titleVal) {
-                                                        import('sonner').then(({ toast }) => toast.error('Data e Título são obrigatórios.'));
+                                                        toast.error('Data e Título são obrigatórios.');
                                                         return;
                                                     }
 
-                                                    try {
-                                                        const { error } = await import('@/lib/supabase').then(({ supabase }) => 
-                                                            supabase.from('crm_reminders').insert([{
-                                                                lead_id: editingLead.id,
-                                                                user_email: appUser.email,
-                                                                title: titleVal,
-                                                                message: msgVal,
-                                                                scheduled_at: new Date(dateVal).toISOString()
-                                                            }])
-                                                        );
-
-                                                        if (error) throw error;
-                                                        
-                                                        import('sonner').then(({ toast }) => toast.success('Aviso agendado com sucesso!'));
-                                                        
-                                                        // Clear inputs
-                                                        (document.getElementById('reminder_at') as HTMLInputElement).value = '';
-                                                        (document.getElementById('reminder_title') as HTMLInputElement).value = '';
-                                                        (document.getElementById('reminder_message') as HTMLInputElement).value = '';
-                                                    } catch (err: any) {
-                                                        import('sonner').then(({ toast }) => toast.error('Erro ao agendar: ' + err.message));
-                                                    }
+                                                    createReminder.mutate({
+                                                        lead_id: editingLead!.id,
+                                                        user_email: appUser.email,
+                                                        title: titleVal,
+                                                        message: msgVal,
+                                                        scheduled_at: new Date(dateVal).toISOString()
+                                                    }, {
+                                                        onSuccess: () => {
+                                                            toast.success('Aviso agendado com sucesso!');
+                                                            (document.getElementById('reminder_at') as HTMLInputElement).value = '';
+                                                            (document.getElementById('reminder_title') as HTMLInputElement).value = '';
+                                                            (document.getElementById('reminder_message') as HTMLInputElement).value = '';
+                                                        },
+                                                        onError: (err: any) => {
+                                                            toast.error('Erro ao agendar: ' + err.message);
+                                                        }
+                                                    });
                                                 }}
                                                 className="w-full py-3 bg-[#242424] text-white text-[10px] font-bold uppercase tracking-widest rounded-md hover:bg-black transition-all flex items-center justify-center gap-2 font-jakarta shadow-md"
                                             >
@@ -424,11 +471,36 @@ export const LeadModal: React.FC<LeadModalProps> = ({
 
                                         {/* List of Pending Reminders */}
                                         <ReminderList leadId={editingLead.id} />
+                                        
+                                        {/* Discreet Timeline */}
+                                        <TimelineList lead={editingLead} />
+
+
                                     </div>
                                 )}
                             </div>
                         </div>
+
+
                     </div>
+
+                    {/* Checklist / Workflow Section at the bottom for maximum visibility */}
+                    {editingLead && (
+                        <div className="p-10 bg-[#F8FAFC] border-t border-[#E0E0E0]">
+                            <div className="max-w-4xl mx-auto">
+                                <OrderChecklist 
+                                    lead={newLead as Lead} 
+                                    onChange={(checklist) => setNewLead({
+                                        ...newLead,
+                                        closing_metadata: {
+                                            ...(newLead.closing_metadata || {}),
+                                            order_checklist: checklist
+                                        }
+                                    })}
+                                />
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Modal Footer */}
@@ -471,7 +543,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                             FECHAR
                         </button>
                         <button
-                            onClick={saveLead}
+                            onClick={handleInitiate}
                             disabled={!partnerSaved}
                             className={`flex-1 sm:flex-initial px-10 py-4 rounded-md text-[11px] font-medium uppercase tracking-[0.04em] flex items-center justify-center gap-3 transition-all shadow-none font-jakarta ${partnerSaved ? 'bg-[#0F6CBD] text-white hover:bg-[#115EA3] active:scale-95 shadow-none-[#0F6CBD]/30' : 'bg-[#E0E0E0] text-[#BDBDBD] cursor-not-allowed shadow-none'}`}
                         >
@@ -486,34 +558,11 @@ export const LeadModal: React.FC<LeadModalProps> = ({
     );
 };
 
+
+
 const ReminderList: React.FC<{ leadId: string }> = ({ leadId }) => {
-    const [reminders, setReminders] = React.useState<any[]>([]);
-    const [loading, setLoading] = React.useState(true);
-
-    const fetchReminders = React.useCallback(async () => {
-        try {
-            const { data, error } = await import('@/lib/supabase').then(({ supabase }) => 
-                supabase
-                    .from('crm_reminders')
-                    .select('*')
-                    .eq('lead_id', leadId)
-                    .is('acknowledged_at', null)
-                    .order('scheduled_at', { ascending: true })
-            );
-
-            if (!error && data) {
-                setReminders(data);
-            }
-        } catch (err) {
-            console.error('Error fetching reminders:', err);
-        } finally {
-            setLoading(false);
-        }
-    }, [leadId]);
-
-    React.useEffect(() => {
-        fetchReminders();
-    }, [fetchReminders]);
+    const { data: reminders = [], isLoading: loading } = useReminders(leadId);
+    const acknowledgeReminder = useAcknowledgeReminder();
 
     if (loading) return null;
     if (reminders.length === 0) return null;
@@ -536,19 +585,7 @@ const ReminderList: React.FC<{ leadId: string }> = ({ leadId }) => {
                             </div>
                         </div>
                         <button 
-                            onClick={async () => {
-                                try {
-                                    const { error } = await import('@/lib/supabase').then(({ supabase }) => 
-                                        supabase
-                                            .from('crm_reminders')
-                                            .update({ acknowledged_at: new Date().toISOString() })
-                                            .eq('id', r.id)
-                                    );
-                                    if (!error) fetchReminders();
-                                } catch (err) {
-                                    console.error('Error acknowledging reminder:', err);
-                                }
-                            }}
+                            onClick={() => acknowledgeReminder.mutate(r.id)}
                             className="text-[10px] font-bold text-[#DC2626] hover:underline uppercase tracking-widest font-jakarta"
                         >
                             Remover
@@ -559,3 +596,33 @@ const ReminderList: React.FC<{ leadId: string }> = ({ leadId }) => {
         </div>
     );
 };
+
+const TimelineList: React.FC<{ lead: Lead }> = ({ lead }) => {
+    const timeline = lead.closing_metadata?.timeline || [];
+    if (timeline.length === 0) return null;
+
+    return (
+        <div className="space-y-4 mt-8 p-6 bg-white rounded-md border border-[#E3E3E4] shadow-sm">
+            <h5 className="text-[12px] font-bold text-[#111827] uppercase tracking-widest font-jakarta flex items-center gap-2">
+                <span className="material-icons-outlined text-[#0F6CBD]">history</span>
+                Histórico de Transições
+            </h5>
+            <div className="space-y-3 max-h-80 overflow-y-auto custom-scrollbar pr-3">
+                {timeline.map((t: any, idx: number) => (
+                    <div key={idx} className="flex items-start gap-4 p-4 bg-[#F9FAFB] rounded-lg border border-[#E0E0E0] hover:border-[#0F6CBD]/30 transition-colors group">
+                        <div className="w-10 h-10 mt-0.5 rounded-full bg-[#EBF3FC] flex items-center justify-center text-[#0F6CBD] group-hover:scale-110 transition-transform">
+                            <span className="material-icons-outlined text-[18px]">swap_horiz</span>
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-[14px] font-medium text-[#242424] font-jakarta">{t.action}</p>
+                            <p className="text-[11px] text-[#707070] font-jakarta uppercase mt-1">
+                                {new Date(t.date).toLocaleString('pt-BR')} • <span className="font-bold text-[#0F6CBD]">{t.user || 'SISTEMA'}</span>
+                            </p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+

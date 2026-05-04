@@ -43,14 +43,20 @@ export default function OrdersListPage() {
 
                 if (filterStatus !== 'TODOS') {
                     query = query.eq('status', filterStatus);
+                    // Filter out budgets and proposals from the main orders view
+                    query = query.not('status', 'eq', 'ORCAMENTO')
+                                 .not('status', 'eq', 'PROPOSTA_ENVIADA');
                 }
 
                 const { data, error } = await query;
-                if (error) throw error;
+                if (error) {
+                    console.error('Supabase error fetching orders:', error);
+                    throw error;
+                }
                 setOrders(data || []);
-            } catch (err) {
-                console.error('Error fetching orders:', err);
-                toast.error('Erro ao carregar pedidos.');
+            } catch (err: any) {
+                console.error('Error fetching orders:', err.message || err);
+                toast.error(`Erro ao carregar pedidos: ${err.message || 'Erro desconhecido'}`);
             } finally {
                 setLoading(false);
             }

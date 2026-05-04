@@ -21,7 +21,7 @@ const getSalespersonInitials = (name?: string) => {
     return name.substring(0, 2).toUpperCase();
 };
 
-export default function TransferModal({ isOpen, onClose, lead, onTransfer, isTransferring = false }: TransferModalProps) {
+export default function TransferModal({ isOpen, onClose, lead, onTransfer, isTransferring = false }: any) {
     const [targetSalesperson, setTargetSalesperson] = useState('');
     const [transferNote, setTransferNote] = useState('');
 
@@ -32,6 +32,8 @@ export default function TransferModal({ isOpen, onClose, lead, onTransfer, isTra
         onTransfer(lead, targetSalesperson, transferNote);
     };
 
+    const displayName = lead.client_name || lead.name || 'Cliente';
+
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
             <div className="bg-white rounded-md w-full max-w-2xl shadow-none-[0_32px_100px_-20px_rgba(0,0,0,0.2)] overflow-hidden animate-in zoom-in-95 duration-200 border-t border-slate-100">
@@ -41,10 +43,10 @@ export default function TransferModal({ isOpen, onClose, lead, onTransfer, isTra
                         <span className="material-icons-outlined text-3xl">swap_horiz</span>
                     </div>
                     <div className="text-center md:text-left flex-1">
-                        <h3 className="text-2xl font-medium text-slate-800 uppercase tracking-tighter leading-none mb-2">Transferir Lead</h3>
+                        <h3 className="text-2xl font-medium text-slate-800 uppercase tracking-tighter leading-none mb-2">Solicitar Transferência</h3>
                         <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50/50 rounded-full border border-blue-100">
                             <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                            <span className="text-[10px] text-blue-600 font-medium uppercase tracking-widest">{lead.client_name}</span>
+                            <span className="text-[10px] text-blue-600 font-medium uppercase tracking-widest">{displayName}</span>
                         </div>
                     </div>
                     <div className="hidden md:block">

@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
 
 interface BudgetHeaderProps {
     budgetNumber: string;
@@ -13,11 +14,13 @@ interface BudgetHeaderProps {
     onGenerateProposal: () => void;
     onViewProposal?: () => void;
     onDeleteProposal?: (id: string) => void;
+    onDeleteBudget?: () => void;
     onExportExcel?: () => void;
     isViewOnly?: boolean;
     isSaving?: boolean;
     proposalId?: string | null;
     proposals?: any[];
+    orderId?: string | null;
 }
 
 export default function BudgetHeader({ 
@@ -29,22 +32,27 @@ export default function BudgetHeader({
     onGenerateProposal,
     onViewProposal,
     onDeleteProposal,
+    onDeleteBudget,
     onExportExcel,
     isSaving,
     proposalId,
-    proposals = []
+    proposals = [],
+    orderId
 }: BudgetHeaderProps) {
     const router = useRouter();
+    const { hasPermission } = useAuth();
     const [showProposals, setShowProposals] = React.useState(false);
 
     const getStatusColor = (s: string) => {
         switch (s) {
-            case 'EM ABERTO': return 'bg-blue-100 text-blue-700';
+            case 'EM ABERTO':
+            case 'ORÇAMENTO GERADO':
             case 'PROPOSTA GERADA':
-            case 'PROPOSTA ENVIADA': return 'bg-amber-100 text-amber-700';
-            case 'PROPOSTA ACEITA': return 'bg-emerald-100 text-emerald-700';
-            case 'PERDIDO': return 'bg-rose-100 text-rose-700';
-            default: return 'bg-slate-100 text-slate-700';
+            case 'PROPOSTA ENVIADA': return 'bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]';
+            case 'PROPOSTA ACEITA':
+            case 'ORÇAMENTO APROVADO': return 'bg-[#F0FDF4] text-[#15803D] border-[#BBF7D0]';
+            case 'PERDIDO': return 'bg-[#FFF7ED] text-[#9A3412] border-[#FED7AA]';
+            default: return 'bg-slate-50 text-slate-500 border-slate-200';
         }
     };
 
@@ -97,6 +105,16 @@ export default function BudgetHeader({
                     <span className="material-icons-outlined text-sm">table_chart</span>
                     Excel Base
                 </button>
+                
+                {hasPermission('adm') && (
+                    <button 
+                        onClick={onDeleteBudget}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-md border border-red-200 text-red-500 text-[10px] font-medium uppercase tracking-widest hover:bg-red-50 transition-all active:scale-95 shadow-none"
+                    >
+                        <span className="material-icons-outlined text-sm">delete</span>
+                        Excluir
+                    </button>
+                )}
 
                 <div className="relative">
                     <button 
@@ -157,13 +175,23 @@ export default function BudgetHeader({
                     )}
                 </div>
 
-                <button 
-                    onClick={onGenerateOrder}
-                    className="flex items-center gap-2 px-6 py-2.5 rounded-md bg-[#0F6CBD] text-white text-[10px] font-medium uppercase tracking-widest hover:bg-[#115EA3] transition-all active:scale-95"
-                >
-                    <span className="material-icons-outlined text-sm">rocket_launch</span>
-                    Gerar Pedido
-                </button>
+                {orderId ? (
+                    <Link 
+                        href={`/pedidos/${orderId}`}
+                        className="flex items-center gap-2 px-6 py-2.5 rounded-md bg-[#10B981] text-white text-[10px] font-medium uppercase tracking-widest hover:bg-[#059669] transition-all active:scale-95"
+                    >
+                        <span className="material-icons-outlined text-sm">visibility</span>
+                        Ver Pedido
+                    </Link>
+                ) : (
+                    <button 
+                        onClick={onGenerateOrder}
+                        className="flex items-center gap-2 px-6 py-2.5 rounded-md bg-[#0F6CBD] text-white text-[10px] font-medium uppercase tracking-widest hover:bg-[#115EA3] transition-all active:scale-95"
+                    >
+                        <span className="material-icons-outlined text-sm">rocket_launch</span>
+                        Gerar Pedido
+                    </button>
+                )}
             </div>
         </div>
     );

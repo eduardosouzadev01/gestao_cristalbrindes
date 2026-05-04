@@ -106,29 +106,41 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                     ref={editorRef}
                     contentEditable={!disabled}
                     onInput={handleInput}
-                    className={`p-4 text-[13px] outline-none overflow-y-auto bg-white custom-scrollbar leading-relaxed ${isExpanded ? 'flex-1' : 'min-h-[60px] max-h-[150px] text-[11px]'}`}
+                    className={`p-4 text-[11px] outline-none overflow-y-auto bg-white custom-scrollbar leading-[1.4] ${isExpanded ? 'flex-1' : 'min-h-[162px] max-h-[162px]'} ${value && editorRef.current && editorRef.current.scrollHeight > 162 ? 'border-2 border-red-300 bg-red-50/10' : ''}`}
                     style={{ 
                         wordBreak: 'break-word',
-                        height: isExpanded ? '100%' : 'auto'
+                        height: isExpanded ? '100%' : '162px'
                     }}
                 />
                 
-                {/* Placeholder shim (ContentEditable doesn't support placeholder natively well) */}
+                {/* Character Count & Limit Warning */}
+                <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border-t border-slate-100 flex-shrink-0">
+                    <div className="flex items-center gap-4">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider ${editorRef.current && editorRef.current.scrollHeight > 162 ? 'text-red-500' : 'text-slate-400'}`}>
+                            {value.replace(/<[^>]*>?/gm, '').length} Chars | {editorRef.current && Math.round(editorRef.current.scrollHeight / 15.4)} Linhas aprox.
+                        </span>
+                        {(editorRef.current && editorRef.current.scrollHeight > 162) && (
+                            <span className="text-[10px] font-bold text-red-500 uppercase animate-pulse">
+                                Conteúdo excede o limite da proposta!
+                            </span>
+                        )}
+                    </div>
+                    {isExpanded ? (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); setIsExpanded(false); }}
+                            className="px-4 py-1 bg-blue-600 text-white rounded-md font-medium text-[10px] uppercase shadow-none hover:bg-blue-700 transition-colors"
+                        >
+                            Concluir
+                        </button>
+                    ) : (
+                        <span className="text-[9px] text-gray-300 uppercase tracking-widest font-medium">Limite Ideal: 800</span>
+                    )}
+                </div>
+
+                {/* Placeholder shim */}
                 {(!value || value === '<br>') && !isExpanded && (
                     <div className="absolute top-9 left-3 text-gray-400 pointer-events-none text-[10px] italic">
                         {placeholder}
-                    </div>
-                )}
-
-                {isExpanded && (
-                    <div className="bg-gray-50 border-t px-4 py-2 flex justify-between items-center shrink-0">
-                        <span className="text-[10px] text-gray-400 font-medium">Modo de Edição Ampliado</span>
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); setIsExpanded(false); }}
-                            className="px-4 py-1.5 bg-blue-600 text-white rounded-md font-medium text-xs uppercase shadow-none hover:bg-blue-700 transition-colors"
-                        >
-                            Concluir e Voltar
-                        </button>
                     </div>
                 )}
             </div>

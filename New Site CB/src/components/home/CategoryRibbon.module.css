@@ -1,0 +1,94 @@
+.ribbon {
+  padding: 3rem 0;
+  margin: 4rem 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2rem;
+}
+
+.title {
+  font-size: 2.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  font-size: 1.125rem;
+  opacity: 0.9;
+  margin-top: 0.5rem;
+}
+
+.cta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 700;
+  font-size: 1.125rem;
+  padding: 1rem 2rem;
+  border-radius: var(--radius-lg);
+  transition: all 0.3s ease;
+}
+
+/* Themes */
+.primary {
+  background-color: var(--primary);
+  color: white;
+}
+
+.primary .cta {
+  background-color: white;
+  color: var(--primary);
+}
+
+.secondary {
+  background-color: var(--secondary);
+  color: white;
+}
+
+.secondary .cta {
+  background-color: white;
+  color: var(--secondary);
+}
+
+.dark {
+  background-color: #1A1A1A;
+  color: white;
+}
+
+.dark .cta {
+  background-color: var(--secondary);
+  color: white;
+}
+
+.light {
+  background-color: var(--surface);
+  color: var(--text-main);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.light .cta {
+  background-color: var(--primary);
+  color: white;
+}
+
+.cta:hover {
+  transform: translateX(10px);
+}
+
+@media (max-width: 768px) {
+  .content {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .title {
+    font-size: 1.75rem;
+  }
+}

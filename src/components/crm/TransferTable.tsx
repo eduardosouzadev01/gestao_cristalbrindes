@@ -36,64 +36,76 @@ const TransferTable: React.FC<TransferTableProps> = ({ requests, loading, onResp
             <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="bg-[#F9FAFB] border-b border-[#E0E0E0]">
-                        <th className="px-6 py-4 text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em]">Data Solicitação</th>
+                        <th className="px-6 py-4 text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em]">Data</th>
                         <th className="px-6 py-4 text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em]">Cliente</th>
-                        <th className="px-6 py-4 text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em]">De (Solicitante)</th>
-                        <th className="px-6 py-4 text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em]">Para (Destino)</th>
+                        <th className="px-6 py-4 text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em]">Vendedor Atual</th>
+                        <th className="px-6 py-4 text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em]">Novo Vendedor</th>
+                        <th className="px-6 py-4 text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em]">Solicitante</th>
                         <th className="px-6 py-4 text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em]">Motivo</th>
                         <th className="px-6 py-4 text-[10px] font-medium text-[#707070] uppercase tracking-[0.04em] text-right">Ações</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E0E0E0]">
-                    {requests.map((req) => (
-                        <tr key={req.id} className="hover:bg-[#F9FAFB] transition-all">
-                            <td className="px-6 py-5 text-[13px] font-medium text-[#616161]">
-                                {formatDate(req.created_at)}
-                            </td>
-                            <td className="px-6 py-5">
-                                <span className="font-medium text-[#242424] text-[13px] uppercase">
-                                    {req.lead?.client_name || 'N/A'}
-                                </span>
-                            </td>
-                            <td className="px-6 py-5">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-medium text-slate-500">
-                                        {req.requester?.name?.[0] || 'S'}
+                    {requests.map((req) => {
+                        const currentSalesperson = req.lead?.salesperson || req.partner?.salesperson || '---';
+                        const isPush = !!req.target_salesperson_id;
+                        const newSalesperson = isPush 
+                            ? (req.target?.salesperson_id || req.target?.name || '---')
+                            : (req.requester?.salesperson_id || req.requester?.name || '---');
+
+                        return (
+                            <tr key={req.id} className="hover:bg-[#F9FAFB] transition-all">
+                                <td className="px-6 py-5 text-[12px] font-medium text-[#616161]">
+                                    {formatDate(req.created_at)}
+                                </td>
+                                <td className="px-6 py-5">
+                                    <span className="font-medium text-[#242424] text-[13px] uppercase">
+                                        {req.lead?.client_name || req.partner?.name || '---'}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-5">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-medium text-slate-400 uppercase">
+                                            {currentSalesperson[0] || 'V'}
+                                        </div>
+                                        <span className="text-[12px] font-medium text-slate-600 uppercase">{currentSalesperson}</span>
                                     </div>
-                                    <span className="text-[12px] font-medium text-[#424242]">{req.requester?.name || 'Solicitante'}</span>
-                                </div>
-                            </td>
-                            <td className="px-6 py-5">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-full bg-[#EBF3FC] flex items-center justify-center text-[10px] font-medium text-[#0F6CBD]">
-                                        {req.target?.name?.[0] || 'D'}
+                                </td>
+                                <td className="px-6 py-5">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center text-[10px] font-medium text-blue-600 uppercase">
+                                            {newSalesperson[0] || 'V'}
+                                        </div>
+                                        <span className="text-[12px] font-bold text-blue-600 uppercase">{newSalesperson}</span>
                                     </div>
-                                    <span className="text-[12px] font-medium text-[#0F6CBD] font-jakarta">{req.target?.name || 'Destino'}</span>
-                                </div>
-                            </td>
-                            <td className="px-6 py-5 max-w-xs">
-                                <p className="text-[12px] text-[#707070] italic truncate">"{req.reason || 'Sem motivo informado'}"</p>
-                            </td>
-                            <td className="px-6 py-5 text-right">
-                                <div className="flex items-center justify-end gap-2">
-                                    <button 
-                                        onClick={() => onRespond(req.id, true)}
-                                        className="flex items-center gap-2 bg-[#F0F7FF] hover:bg-[#D1E9FF] text-[#0F6CBD] px-4 py-2 rounded-md font-medium text-[10px] transition-all uppercase tracking-wider border border-[#D1E9FF]"
-                                    >
-                                        <span className="material-icons-outlined text-sm">check</span>
-                                        Aprovar
-                                    </button>
-                                    <button 
-                                        onClick={() => onRespond(req.id, false)}
-                                        className="flex items-center gap-2 bg-[#FFF1F2] hover:bg-[#FECDD3] text-[#BC2F32] px-4 py-2 rounded-md font-medium text-[10px] transition-all uppercase tracking-wider border border-[#F6A2A5]"
-                                    >
-                                        <span className="material-icons-outlined text-sm">close</span>
-                                        Rejeitar
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    ))}
+                                </td>
+                                <td className="px-6 py-5">
+                                    <span className="text-[11px] font-medium text-slate-500 uppercase">{req.requester?.name || '---'}</span>
+                                </td>
+                                <td className="px-6 py-5 max-w-[150px]">
+                                    <p className="text-[11px] text-[#707070] italic truncate" title={req.reason}>"{req.reason || 'Sem motivo informado'}"</p>
+                                </td>
+                                <td className="px-6 py-5 text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                        <button 
+                                            onClick={() => onRespond(req.id, true)}
+                                            className="flex items-center gap-2 bg-[#F0F7FF] hover:bg-[#D1E9FF] text-[#0F6CBD] px-3 py-1.5 rounded-md font-medium text-[10px] transition-all uppercase tracking-wider border border-[#D1E9FF]"
+                                        >
+                                            <span className="material-icons-outlined text-sm">check</span>
+                                            Aprovar
+                                        </button>
+                                        <button 
+                                            onClick={() => onRespond(req.id, false)}
+                                            className="flex items-center gap-2 bg-[#FFF1F2] hover:bg-[#FECDD3] text-[#BC2F32] px-3 py-1.5 rounded-md font-medium text-[10px] transition-all uppercase tracking-wider border border-[#F6A2A5]"
+                                        >
+                                            <span className="material-icons-outlined text-sm">close</span>
+                                            Rejeitar
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        );
+                    })}
                 </tbody>
             </table>
         </div>

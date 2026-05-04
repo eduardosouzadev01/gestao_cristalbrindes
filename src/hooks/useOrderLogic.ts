@@ -28,8 +28,11 @@ export function useOrderLogic(id?: string) {
     const [recebimentoRestante, setRecebimentoRestante] = useState('R$ 0,00');
     const [dataEntrada, setDataEntrada] = useState('');
     const [dataRestante, setDataRestante] = useState('');
+    const [entryForecastDate, setEntryForecastDate] = useState('');
+    const [remainingForecastDate, setRemainingForecastDate] = useState('');
     const [entradaConfirmed, setEntradaConfirmed] = useState(false);
     const [restanteConfirmed, setRestanteConfirmed] = useState(false);
+    const [shippingType, setShippingType] = useState('');
     const [purchaseOrder, setPurchaseOrder] = useState('');
     const [layout, setLayout] = useState('');
     const [invoiceNumber, setInvoiceNumber] = useState('');
@@ -38,6 +41,7 @@ export function useOrderLogic(id?: string) {
     // History and Logs
     const [logs, setLogs] = useState<{ user: string, msg: string, time: string }[]>([]);
     const [isSaving, setIsSaving] = useState(false);
+    const [relatedLead, setRelatedLead] = useState<any>(null);
 
     // Lists
     const [clientsList, setClientsList] = useState<any[]>([]);
@@ -80,6 +84,10 @@ export function useOrderLogic(id?: string) {
         }
     }, []);
 
+    const [managementApproved, setManagementApproved] = useState(false);
+    const [deliveryDateExpected, setDeliveryDateExpected] = useState('');
+    const [deliveryDateActual, setDeliveryDateActual] = useState('');
+
     // Load Order
     const loadOrder = useCallback(async (orderId: string) => {
         try {
@@ -99,13 +107,19 @@ export function useOrderLogic(id?: string) {
             setObservacoes(order.observations || '');
             setRecebimentoEntrada(formatCurrency(order.entry_amount || 0));
             setDataEntrada(order.entry_date || '');
+            setEntryForecastDate(order.entry_forecast_date || '');
             setEntradaConfirmed(order.entry_confirmed || false);
             setRecebimentoRestante(formatCurrency(order.remaining_amount || 0));
             setDataRestante(order.remaining_date || '');
+            setRemainingForecastDate(order.remaining_forecast_date || '');
             setRestanteConfirmed(order.remaining_confirmed || false);
+            setShippingType(order.shipping_type || '');
             setPurchaseOrder(order.purchase_order || '');
             setLayout(order.layout_info || '');
             setInvoiceNumber(order.invoice_number || '');
+            setManagementApproved(order.management_approved || false);
+            setDeliveryDateExpected(order.delivery_date_expected || '');
+            setDeliveryDateActual(order.delivery_date_actual || '');
 
             if (order.client_id) {
                 const { data: client } = await supabase.from('partners').select('*').eq('id', order.client_id).single();
@@ -124,9 +138,17 @@ export function useOrderLogic(id?: string) {
                     id: it.id,
                     productName: it.product_name,
                     productCode: it.product_code || '',
+                    productRef: it.product_reference || it.product_code || '',
+                    productImage: it.product_image_url || '',
+                    realPriceTotal: it.real_total_price || 0,
                     productColor: it.product_color || '',
                     productDescription: it.product_description || '',
                     supplier_id: it.supplier_id || '',
+                    customization_supplier_id: it.customization_supplier_id || '',
+                    transport_supplier_id: it.transport_supplier_id || '',
+                    client_transport_supplier_id: it.client_transport_supplier_id || '',
+                    layout_supplier_id: it.layout_supplier_id || '',
+                    extra_supplier_id: it.extra_supplier_id || '',
                     quantity: it.quantity,
                     priceUnit: it.unit_price,
                     custoPersonalizacao: it.customization_cost,
@@ -140,24 +162,24 @@ export function useOrderLogic(id?: string) {
                     taxPct: it.tax_pct,
                     unforeseenPct: it.unforeseen_pct,
                     marginPct: it.margin_pct,
-                    realPriceUnit: it.real_unit_price,
-                    realCustoPersonalizacao: it.real_customization_cost,
-                    realTranspFornecedor: it.real_supplier_transport_cost,
-                    realTranspCliente: it.real_client_transport_cost,
-                    realDespesaExtra: it.real_extra_expense,
-                    realLayoutCost: it.real_layout_cost,
-                    priceUnitPaid: it.unit_price_paid,
-                    custoPersonalizacaoPaid: it.customization_paid,
-                    transpFornecedorPaid: it.supplier_transport_paid,
-                    transpClientePaid: it.client_transport_paid,
-                    despesaExtraPaid: it.extra_expense_paid,
-                    layoutCostPaid: it.layout_paid,
-                    supplier_payment_date: it.supplier_payment_date,
-                    customization_payment_date: it.customization_payment_date,
-                    transport_payment_date: it.transport_payment_date,
-                    layout_payment_date: it.layout_payment_date,
-                    extra_payment_date: it.extra_payment_date,
-                    supplier_departure_date: it.supplier_departure_date,
+                    realPriceUnit: it.real_unit_price || it.unit_price || 0,
+                    realCustomizationCost: it.real_customization_cost || it.customization_cost || 0,
+                    realSupplierTransportCost: it.real_supplier_transport_cost || it.supplier_transport_cost || 0,
+                    realClientTransportCost: it.real_client_transport_cost || it.client_transport_cost || 0,
+                    realExtraExpense: it.real_extra_expense || it.extra_expense || 0,
+                    realLayoutCost: it.real_layout_cost || it.layout_cost || 0,
+                    unit_price_paid: it.unit_price_paid || false,
+                    customization_paid: it.customization_paid || false,
+                    supplier_transport_paid: it.supplier_transport_paid || false,
+                    client_transport_paid: it.client_transport_paid || false,
+                    extra_expense_paid: it.extra_expense_paid || false,
+                    layout_paid: it.layout_paid || false,
+                    supplier_payment_date: it.supplier_payment_date || null,
+                    customization_payment_date: it.customization_payment_date || null,
+                    transport_payment_date: it.transport_payment_date || null,
+                    layout_payment_date: it.layout_payment_date || null,
+                    extra_payment_date: it.extra_payment_date || null,
+                    supplier_departure_date: it.supplier_departure_date || null,
                     customization_supplier_id: it.customization_supplier_id || '',
                     transport_supplier_id: it.transport_supplier_id || '',
                     client_transport_supplier_id: it.client_transport_supplier_id || '',
@@ -175,6 +197,20 @@ export function useOrderLogic(id?: string) {
                     msg: l.message,
                     time: new Date(l.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
                 })));
+            }
+
+            // Fetch Related Lead for Checklist
+            if (order.order_number) {
+                const { data: lead } = await supabase
+                    .from('crm_leads')
+                    .select('*')
+                    .eq('budget_number', order.order_number)
+                    .neq('status', 'EXCLUIDO')
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+                
+                if (lead) setRelatedLead(lead);
             }
 
         } catch (err: any) {
@@ -224,13 +260,19 @@ export function useOrderLogic(id?: string) {
                 total_amount: totalRevenue,
                 entry_amount: parseCurrencyToNumber(recebimentoEntrada),
                 entry_date: dataEntrada || null,
+                entry_forecast_date: entryForecastDate || null,
                 entry_confirmed: entradaConfirmed,
                 remaining_amount: parseCurrencyToNumber(recebimentoRestante),
                 remaining_date: dataRestante || null,
+                remaining_forecast_date: remainingForecastDate || null,
                 remaining_confirmed: restanteConfirmed,
+                shipping_type: shippingType || null,
                 purchase_order: purchaseOrder || null,
                 layout_info: layout || null,
-                observations: observacoes || null
+                observations: observacoes || null,
+                management_approved: managementApproved,
+                delivery_date_expected: deliveryDateExpected || null,
+                delivery_date_actual: deliveryDateActual || null
             };
 
             const itemsPayload = items.map(item => ({
@@ -238,6 +280,9 @@ export function useOrderLogic(id?: string) {
                 product_name: item.productName,
                 product_code: item.productCode || null,
                 product_color: item.productColor || null,
+                product_reference: item.productRef || item.productCode || null,
+                product_image_url: item.productImage || null,
+                real_total_price: item.realPriceTotal || 0,
                 product_description: item.productDescription || null,
                 supplier_id: item.supplier_id || null,
                 quantity: item.quantity,
@@ -254,18 +299,18 @@ export function useOrderLogic(id?: string) {
                 tax_pct: item.taxPct,
                 unforeseen_pct: item.unforeseenPct,
                 margin_pct: item.marginPct,
-                real_unit_price: item.realPriceUnit,
-                real_customization_cost: item.realCustoPersonalizacao,
-                real_supplier_transport_cost: item.realTranspFornecedor,
-                real_client_transport_cost: item.realTranspCliente,
-                real_extra_expense: item.realDespesaExtra,
-                real_layout_cost: item.realLayoutCost,
-                unit_price_paid: item.priceUnitPaid,
-                customization_paid: item.custoPersonalizacaoPaid,
-                supplier_transport_paid: item.transpFornecedorPaid,
-                client_transport_paid: item.transpClientePaid,
-                extra_expense_paid: item.despesaExtraPaid,
-                layout_paid: item.layoutCostPaid,
+                real_unit_price: item.realPriceUnit || 0,
+                real_customization_cost: item.realCustomizationCost || 0,
+                real_supplier_transport_cost: item.realSupplierTransportCost || 0,
+                real_client_transport_cost: item.realClientTransportCost || 0,
+                real_extra_expense: item.realExtraExpense || 0,
+                real_layout_cost: item.realLayoutCost || 0,
+                unit_price_paid: item.unit_price_paid || false,
+                customization_paid: item.customization_paid || false,
+                supplier_transport_paid: item.supplier_transport_paid || false,
+                client_transport_paid: item.client_transport_paid || false,
+                extra_expense_paid: item.extra_expense_paid || false,
+                layout_paid: item.layout_paid || false,
                 supplier_payment_date: item.supplier_payment_date || null,
                 customization_payment_date: item.customization_payment_date || null,
                 transport_payment_date: item.transport_payment_date || null,
@@ -309,6 +354,37 @@ export function useOrderLogic(id?: string) {
         }
     };
 
+    const handleConfirmPayment = async (type: 'entrada' | 'restante') => {
+        if (!id || id === 'novo') return;
+        try {
+            const isEntrada = type === 'entrada';
+            const currentConfirmed = isEntrada ? entradaConfirmed : restanteConfirmed;
+            const newConfirmed = !currentConfirmed;
+            const date = getTodayISO();
+
+            const updateData: any = isEntrada 
+                ? { entry_confirmed: newConfirmed, entry_date: newConfirmed ? date : null }
+                : { remaining_confirmed: newConfirmed, remaining_date: newConfirmed ? date : null };
+
+            const { error } = await supabase.from('orders').update(updateData).eq('id', id);
+            if (error) throw error;
+
+            if (isEntrada) {
+                setEntradaConfirmed(newConfirmed);
+                setDataEntrada(newConfirmed ? date : '');
+            } else {
+                setRestanteConfirmed(newConfirmed);
+                setDataRestante(newConfirmed ? date : '');
+            }
+
+            const msg = `${isEntrada ? 'Pagamento Entrada' : 'Pagamento Restante'} ${newConfirmed ? 'Confirmado' : 'Estornado'}`;
+            toast.success(msg);
+            addLog(msg);
+        } catch (err: any) {
+            toast.error('Erro ao confirmar pagamento: ' + err.message);
+        }
+    };
+
     return {
         // States
         orderNumber, setOrderNumber,
@@ -326,12 +402,18 @@ export function useOrderLogic(id?: string) {
         recebimentoRestante, setRecebimentoRestante,
         dataEntrada, setDataEntrada,
         dataRestante, setDataRestante,
+        entryForecastDate, setEntryForecastDate,
+        remainingForecastDate, setRemainingForecastDate,
         entradaConfirmed, setEntradaConfirmed,
         restanteConfirmed, setRestanteConfirmed,
+        shippingType, setShippingType,
         purchaseOrder, setPurchaseOrder,
         layout, setLayout,
         invoiceNumber, setInvoiceNumber,
         clientData, setClientData,
+        managementApproved, setManagementApproved,
+        deliveryDateExpected, setDeliveryDateExpected,
+        deliveryDateActual, setDeliveryDateActual,
         
         // Items
         items,
@@ -356,10 +438,12 @@ export function useOrderLogic(id?: string) {
         isSaving,
         canEditGlobal,
         isSeller,
+        relatedLead,
         
         // Actions
         handleSave,
         handleAtomicStatusUpdate,
+        handleConfirmPayment,
         addLog
     };
 }

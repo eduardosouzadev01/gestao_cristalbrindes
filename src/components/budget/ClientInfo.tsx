@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import React, { useState } from 'react';
+import { useSearchPartners, useUpdatePartner } from '@/hooks/useCRM';
 import { fixClientName } from '@/utils/textUtils';
+import { toast } from 'sonner';
 
 interface ClientInfoProps {
     clientData: any;
@@ -12,30 +13,9 @@ interface ClientInfoProps {
 
 export default function ClientInfo({ clientData, setClientData, isLocked }: ClientInfoProps) {
     const [searchTerm, setSearchTerm] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [results, setResults] = useState<any[]>([]);
     const [isEditingMode, setIsEditingMode] = useState(false);
-
-    useEffect(() => {
-        const timer = setTimeout(async () => {
-            if (searchTerm.length < 2) {
-                setResults([]);
-                return;
-            }
-            
-            setIsLoading(true);
-            const { data } = await supabase
-                .from('partners')
-                .select('*')
-                .or(`name.ilike.%${searchTerm}%, doc.ilike.%${searchTerm}%`)
-                .eq('type', 'CLIENTE')
-                .limit(5);
-            
-            if (data) setResults(data);
-            setIsLoading(false);
-        }, 400);
-        return () => clearTimeout(timer);
-    }, [searchTerm]);
+    const { data: results = [], isLoading } = useSearchPartners(searchTerm, 'CLIENTE');
+    const updatePartner = useUpdatePartner();
 
     return (
         <div className="bg-white p-6 rounded-md border border-slate-300 shadow-none space-y-4 font-sans h-full">
@@ -76,7 +56,6 @@ export default function ClientInfo({ clientData, setClientData, isLocked }: Clie
                                                     email: partner.email || '',
                                                     emailFin: partner.financial_email || ''
                                                 });
-                                                setResults([]);
                                                 setSearchTerm('');
                                             }}
                                             className="w-full px-4 py-3 text-left hover:bg-[#F9FAFB] flex flex-col gap-0.5 border-b border-[#F5F5F8] last:border-0 group transition-all"
@@ -104,19 +83,21 @@ export default function ClientInfo({ clientData, setClientData, isLocked }: Clie
                         onClick={async () => {
                             if (!clientData.id) return;
                             try {
-                                const { error } = await supabase.from('partners').update({
-                                    name: clientData.name,
-                                    contact_name: clientData.contactName,
-                                    doc: clientData.doc,
-                                    phone: clientData.phone,
-                                    email: clientData.email,
-                                    financial_email: clientData.emailFin
-                                }).eq('id', clientData.id);
-                                if (error) throw error;
-                                alert('Os dados deste cliente foram atualizados com sucesso em todo o sistema!');
+                                await updatePartner.mutateAsync({
+                                    id: clientData.id,
+                                    updates: {
+                                        name: clientData.name,
+                                        contact_name: clientData.contactName,
+                                        doc: clientData.doc,
+                                        phone: clientData.phone,
+                                        email: clientData.email,
+                                        financial_email: clientData.emailFin
+                                    }
+                                });
+                                toast.success('Os dados deste cliente foram atualizados com sucesso em todo o sistema!');
                                 setIsEditingMode(false);
-                            } catch (e) {
-                                alert('Erro ao atualizar dados do cliente.');
+                            } catch {
+                                toast.error('Erro ao atualizar dados do cliente.');
                             }
                         }}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[9px] font-medium text-white bg-[#059669] hover:bg-[#047857] shadow-sm uppercase tracking-wider transition-all active:scale-95"

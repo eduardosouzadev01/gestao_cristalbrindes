@@ -16,6 +16,8 @@ interface CommercialTermsProps {
     isLocked?: boolean;
 }
 
+import { EditableSelect } from '../common/EditableSelect';
+
 export default function CommercialTerms({
     validity, setValidity,
     shipping, setShipping,
@@ -33,71 +35,70 @@ export default function CommercialTerms({
                 </div>
             </div>
 
-            <div className="grid grid-cols-12 gap-3">
+            <div className="grid grid-cols-12 gap-4">
                 <div className="col-span-12 md:col-span-3">
-                    <label className="block text-[9px] font-medium text-[#717171] uppercase mb-1 ml-1 tracking-wider">Validade</label>
-                    <select
+                    <EditableSelect
+                        label="Validade"
+                        value={validity}
+                        onChange={setValidity}
                         disabled={isLocked}
-                        className="w-full h-11 px-3 bg-white border border-slate-300 rounded-md text-[12px] font-medium text-slate-800 outline-none focus:bg-white focus:ring-1 focus:ring-slate-800 focus:border-slate-800 transition-all cursor-pointer"
-                        value={validity || '7 dias'}
-                        onChange={(e) => setValidity(e.target.value)}
-                    >
-                        <option value="1 dia">1 dia</option>
-                        <option value="2 dias">2 dias</option>
-                        <option value="3 dias">3 dias</option>
-                        <option value="7 dias">7 dias</option>
-                        <option value="10 dias">10 dias</option>
-                    </select>
+                        placeholder="Ex: 15 dias"
+                        options={['1 dia', '2 dias', '3 dias', '7 dias', '10 dias', '15 dias']}
+                    />
                 </div>
 
                 <div className="col-span-12 md:col-span-6">
-                    <label className="block text-[9px] font-medium text-[#717171] uppercase mb-1 ml-1 tracking-wider">Frete</label>
-                    <select
+                    <EditableSelect
+                        label="Frete"
+                        value={shipping}
+                        onChange={setShipping}
                         disabled={isLocked}
-                        className="w-full h-11 px-3 bg-white border border-slate-300 rounded-md text-[12px] font-medium text-slate-800 outline-none focus:bg-white focus:ring-1 focus:ring-slate-800 focus:border-slate-800 transition-all cursor-pointer"
-                        value={shipping || 'Frete incluso para Grande Vitória, exceto Guarapari.'}
-                        onChange={(e) => setShipping(e.target.value)}
-                    >
-                        <option value="Frete incluso para Grande Vitória, exceto Guarapari.">Frete incluso para GV (exceto Guarapari)</option>
-                        <option value="Cliente retira.">Cliente retira.</option>
-                        <option value="Frete incluso.">Frete incluso.</option>
-                        <option value="Frete por conta do cliente.">Frete por conta do cliente.</option>
-                    </select>
+                        placeholder="Condições de frete..."
+                        options={[
+                            'Frete incluso para Grande Vitória, exceto Guarapari.',
+                            'Cliente retira.',
+                            'Frete incluso.',
+                            'Frete por conta do cliente.'
+                        ]}
+                    />
                 </div>
 
                 <div className="col-span-12 md:col-span-3">
-                    <label className="block text-[9px] font-medium text-[#717171] uppercase mb-1 ml-1 tracking-wider">Prazo Entrega</label>
-                    <select
+                    <EditableSelect
+                        label="Prazo Entrega"
+                        value={deadline}
+                        onChange={setDeadline}
                         disabled={isLocked}
-                        className="w-full h-11 px-3 bg-white border border-slate-300 rounded-md text-[12px] font-medium text-slate-800 outline-none focus:bg-white focus:ring-1 focus:ring-slate-800 focus:border-slate-800 transition-all cursor-pointer"
-                        value={deadline || '15/20 dias úteis'}
-                        onChange={(e) => setDeadline(e.target.value)}
-                    >
-                        <option value="3 dias úteis.">3 dias úteis.</option>
-                        <option value="7 dias úteis.">7 dias úteis.</option>
-                        <option value="10 dias úteis">10 dias úteis</option>
-                        <option value="14 dias úteis">14 dias úteis</option>
-                        <option value="15 dias úteis.">15 dias úteis.</option>
-                        <option value="15/20 dias úteis">15/20 dias úteis</option>
-                    </select>
+                        placeholder="Prazo de entrega..."
+                        options={[
+                            '3 dias úteis.',
+                            '7 dias úteis.',
+                            '10 dias úteis',
+                            '14 dias úteis',
+                            '15 dias úteis.',
+                            '15 / 20 dias úteis'
+                        ]}
+                    />
                 </div>
 
                 <div className="col-span-12 md:col-span-6">
-                    <label className="block text-[9px] font-medium text-[#717171] uppercase mb-1 ml-1 tracking-wider">Pagamento</label>
-                    <select
+                    <EditableSelect
+                        label="Pagamento"
+                        value={payment}
+                        onChange={setPayment}
                         disabled={isLocked}
-                        className="w-full h-11 px-3 bg-white border border-slate-300 rounded-md text-[12px] font-medium text-slate-800 outline-none focus:bg-white focus:ring-1 focus:ring-slate-800 focus:border-slate-800 transition-all cursor-pointer"
-                        value={payment || '50% no pedido e 50% no pedido pronto.'}
-                        onChange={(e) => setPayment(e.target.value)}
-                    >
-                        <option value="50% no pedido e 50% no pedido pronto.">50% no pedido e 50% no pedido pronto.</option>
-                        <option value="1 vez no cartão de crédito.">1 vez no cartão de crédito.</option>
-                        <option value="7 dias faturamento">7 dias faturamento</option>
-                        <option value="10 dias faturamento">10 dias faturamento</option>
-                        <option value="14 dias faturamento">14 dias faturamento</option>
-                        <option value="21 dias faturamento">21 dias faturamento</option>
-                        <option value="30 dias faturamento">30 dias faturamento</option>
-                    </select>
+                        placeholder="Condições de pagamento..."
+                        options={[
+                            '50% no pedido e 50% no pedido pronto.',
+                            '50% no pedido + 50% 30 Dias (Acrescimo 5%)',
+                            '1 vez no cartão de crédito.',
+                            '7 dias faturamento',
+                            '10 dias faturamento',
+                            '14 dias faturamento',
+                            '21 dias faturamento',
+                            '30 dias faturamento'
+                        ]}
+                    />
                 </div>
 
                 <div className="col-span-12 md:col-span-6">

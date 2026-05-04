@@ -42,6 +42,7 @@ export interface BudgetItem {
     tax_pct: number;
     margin_pct: number;
     payment_tax_pct: number;
+    payment_method_label?: string;
     product_description?: string;
     product_color?: string;
     product_code?: string;

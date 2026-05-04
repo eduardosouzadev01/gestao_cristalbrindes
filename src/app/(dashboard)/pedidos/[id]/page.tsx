@@ -10,6 +10,8 @@ import OrderClientInfo from '@/components/orders/OrderClientInfo';
 import OrderItemsList from '@/components/orders/OrderItemsList';
 import OrderFinanceInfo from '@/components/orders/OrderFinanceInfo';
 import OrderLogs from '@/components/orders/OrderLogs';
+import { OrderChecklist } from '@/components/crm/OrderChecklist';
+import ExtratoConsolidado from '@/components/orders/ExtratoConsolidado';
 
 export default function OrderDetailPage() {
     const { id } = useParams();
@@ -62,7 +64,6 @@ export default function OrderDetailPage() {
 
                         <OrderItemsList 
                             items={logic.items}
-                            addItem={logic.addItem}
                             updateItem={logic.updateItem}
                             removeItem={logic.removeItem}
                             duplicateItem={logic.duplicateItem}
@@ -71,6 +72,7 @@ export default function OrderDetailPage() {
                             factorsList={logic.factorsList}
                             totalRevenue={logic.totalRevenue}
                             totalProfit={logic.totalProfit}
+                            addLog={logic.addLog}
                         />
                     </div>
 
@@ -87,25 +89,38 @@ export default function OrderDetailPage() {
                             recebimentoRestante={logic.recebimentoRestante}
                             setRecebimentoRestante={logic.setRecebimentoRestante}
                             dataEntrada={logic.dataEntrada}
-                            setDataEntrada={logic.setDataEntrada}
                             dataRestante={logic.dataRestante}
-                            setDataRestante={logic.setDataRestante}
+                            entryForecastDate={logic.entryForecastDate}
+                            setEntryForecastDate={logic.setEntryForecastDate}
+                            remainingForecastDate={logic.remainingForecastDate}
+                            setRemainingForecastDate={logic.setRemainingForecastDate}
                             entradaConfirmed={logic.entradaConfirmed}
-                            setEntradaConfirmed={logic.setEntradaConfirmed}
                             restanteConfirmed={logic.restanteConfirmed}
-                            setRestanteConfirmed={logic.setRestanteConfirmed}
                             purchaseOrder={logic.purchaseOrder}
                             setPurchaseOrder={logic.setPurchaseOrder}
                             invoiceNumber={logic.invoiceNumber}
                             setInvoiceNumber={logic.setInvoiceNumber}
                             totalPedido={logic.totalRevenue}
                             totalCostsReal={logic.totalCostsReal}
+                            managementApproved={logic.managementApproved}
+                            setManagementApproved={logic.setManagementApproved}
+                            deliveryDateExpected={logic.deliveryDateExpected}
+                            setDeliveryDateExpected={logic.setDeliveryDateExpected}
+                            deliveryDateActual={logic.deliveryDateActual}
+                            setDeliveryDateActual={logic.setDeliveryDateActual}
+                            shippingType={logic.shippingType}
+                            setShippingType={logic.setShippingType}
+                            handleConfirmPayment={logic.handleConfirmPayment}
+                            logs={logic.logs}
+                            items={logic.items}
                         />
 
-                        <div className="bg-white rounded-md border border-[#E3E3E4] p-6 space-y-4">
-                            <div className="flex items-center gap-2 text-[#242424]">
-                                <span className="material-icons-outlined text-[#0F6CBD] text-sm">sticky_note_2</span>
-                                <h4 className="text-[11px] font-medium uppercase tracking-tight">Observações Internas</h4>
+                        <div className="bg-white rounded-md border border-[#E3E3E4] p-8 space-y-6">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-md bg-[#F0F7FF] text-[#0F6CBD] flex items-center justify-center">
+                                    <span className="material-icons-outlined text-sm">sticky_note_2</span>
+                                </div>
+                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Observações</h4>
                             </div>
                             <textarea
                                 className="w-full p-4 bg-[#F9FAFB] border border-[#E3E3E4] rounded-md text-xs font-medium text-slate-700 focus:ring-4 focus:ring-[#0F6CBD]/5 focus:border-[#0F6CBD] transition-all min-h-[120px] resize-none outline-none"
@@ -115,7 +130,16 @@ export default function OrderDetailPage() {
                             />
                         </div>
 
-                        <OrderLogs logs={logic.logs} />
+
+                        <OrderLogs logs={logic.logs} addLog={logic.addLog} />
+
+                        {logic.relatedLead && (
+                            <div className="mt-6">
+                                <OrderChecklist lead={logic.relatedLead} />
+                            </div>
+                        )}
+
+                        <ExtratoConsolidado items={logic.items} totalPedido={logic.totalRevenue} />
                     </div>
                 </div>
             </div>

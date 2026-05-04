@@ -116,14 +116,13 @@ export default function ProposalListPage() {
                                 <th className="px-8 py-5 text-center text-[10px] font-medium text-slate-400 uppercase tracking-widest">Data</th>
                                 <th className="px-8 py-5 text-center text-[10px] font-medium text-slate-400 uppercase tracking-widest">Vendedor</th>
                                 <th className="px-8 py-5 text-right text-[10px] font-medium text-slate-400 uppercase tracking-widest">Valor Total</th>
-                                <th className="px-8 py-5 text-center text-[10px] font-medium text-slate-400 uppercase tracking-widest">Status</th>
                                 <th className="px-8 py-5 text-right text-[10px] font-medium text-slate-400 uppercase tracking-widest">Ações</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#E3E3E4]">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={7} className="px-8 py-20 text-center">
+                                    <td colSpan={6} className="px-8 py-20 text-center">
                                         <div className="flex flex-col items-center gap-4">
                                             <div className="w-10 h-10 border-4 border-slate-200 border-t-[#0F6CBD] rounded-full animate-spin"></div>
                                             <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">Carregando Propostas...</p>
@@ -155,15 +154,6 @@ export default function ProposalListPage() {
                                         <td className="px-8 py-4 text-right whitespace-nowrap">
                                             <span className="text-sm font-medium text-[#111827]">{formatCurrency(item.total_amount)}</span>
                                         </td>
-                                        <td className="px-8 py-4 text-center whitespace-nowrap">
-                                            <span className={`px-3 py-1.5 rounded-md text-[10px] font-medium uppercase shadow-none ${
-                                                item.status === 'GERADA' ? 'bg-[#0F6CBD] text-white' :
-                                                item.status === 'ENVIADA' ? 'bg-[#F59E0B] text-white' :
-                                                'bg-[#10B981] text-white'
-                                            }`}>
-                                                {item.status}
-                                            </span>
-                                        </td>
                                         <td className="px-8 py-4 text-right whitespace-nowrap">
                                             <div className="flex justify-end gap-2">
                                                 <Link
@@ -186,7 +176,7 @@ export default function ProposalListPage() {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={7} className="px-8 py-20 text-center">
+                                    <td colSpan={6} className="px-8 py-20 text-center">
                                         <span className="material-icons-outlined text-slate-200 text-6xl mb-4">description</span>
                                         <p className="text-[12px] font-medium text-slate-400 uppercase tracking-widest">Nenhuma proposta encontrada</p>
                                     </td>

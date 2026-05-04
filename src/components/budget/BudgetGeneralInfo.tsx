@@ -61,7 +61,6 @@ export default function BudgetGeneralInfo({
                         }`}
                     >
                         <option value="">Selecione</option>
-                        <option value="EDUARDO SOUZA">EDUARDO SOUZA</option>
                         <option value="VENDAS 01">VENDAS 01</option>
                         <option value="VENDAS 02">VENDAS 02</option>
                         <option value="VENDAS 03">VENDAS 03</option>
@@ -70,7 +69,7 @@ export default function BudgetGeneralInfo({
                     </select>
                 </div>
 
-                <div className="col-span-1">
+                <div className="col-span-2">
                     <label className="block text-[9px] font-medium text-[#717171] uppercase mb-1 tracking-wider ml-1">Status</label>
                     <div className="relative">
                         <select
@@ -78,20 +77,16 @@ export default function BudgetGeneralInfo({
                             value={status}
                             onChange={(e) => setStatus(e.target.value)}
                             className={`w-full h-11 px-3 border rounded-md text-[12px] font-medium outline-none focus:ring-4 transition-all cursor-pointer appearance-none ${
-                                status === 'EM ABERTO' ? 'bg-blue-50 border-blue-100 text-blue-700 focus:ring-blue-100/50' :
-                                status === 'EM ANDAMENTO' ? 'bg-[#EFF6FF] border-[#DBEAFE] text-[#1D4ED8] focus:ring-[#DBEAFE]/50' :
-                                status === 'PROPOSTA ENVIADA' ? 'bg-amber-50 border-amber-100 text-amber-700 focus:ring-amber-100/50' :
-                                status === 'PROPOSTA ACEITA' ? 'bg-emerald-50 border-emerald-100 text-emerald-700 focus:ring-emerald-100/50' :
-                                status === 'PEDIDO GERADO' ? 'bg-emerald-50 border-emerald-100 text-emerald-700 focus:ring-emerald-100/50' :
-                                status === 'CANCELADO' ? 'bg-rose-50 border-rose-100 text-rose-700 focus:ring-rose-100/50' :
+                                (status === 'EM ABERTO' || status === 'ORÇAMENTO GERADO' || status === 'PROPOSTA ENVIADA') ? 'bg-[#FFFBEB] border-[#FDE68A] text-[#B45309] focus:ring-amber-100/50' :
+                                (status === 'PROPOSTA ACEITA' || status === 'ORÇAMENTO APROVADO' || status === 'APROVADO') ? 'bg-[#F0FDF4] border-[#BBF7D0] text-[#15803D] focus:ring-emerald-100/50' :
+                                status === 'CANCELADO' || status === 'PERDIDO' ? 'bg-[#FFF7ED] border-[#FED7AA] text-[#9A3412] focus:ring-rose-100/50' :
                                 'bg-[#F9FAFB] border-[#E3E3E4] text-[#111827] focus:ring-[#0F6CBD]/10'
                             }`}
                         >
                             <option value="EM ABERTO">EM ABERTO</option>
-                            <option value="EM ANDAMENTO">EM ANDAMENTO</option>
+                            <option value="ORÇAMENTO GERADO">ORÇAMENTO GERADO</option>
                             <option value="PROPOSTA ENVIADA">PROPOSTA ENVIADA</option>
-                            <option value="PROPOSTA ACEITA">PROPOSTA ACEITA</option>
-                            <option value="PEDIDO GERADO">PEDIDO GERADO</option>
+                            <option value="ORÇAMENTO APROVADO">ORÇAMENTO APROVADO</option>
                             <option value="CANCELADO">CANCELADO</option>
                             <option value="PERDIDO">PERDIDO</option>
                         </select>
@@ -99,17 +94,7 @@ export default function BudgetGeneralInfo({
                     </div>
                 </div>
 
-                <div className="col-span-1">
-                    <label className="block text-[9px] font-medium text-[#717171] uppercase mb-1 tracking-wider ml-1">Data de Criação</label>
-                    <div className="relative">
-                        <input 
-                            type="date"
-                            value={budgetDate}
-                            onChange={(e) => setBudgetDate(e.target.value)}
-                            className="w-full h-11 px-3 bg-white border border-slate-300 rounded-md text-[12px] font-medium text-[#111827] outline-none focus:bg-white transition-all cursor-pointer"
-                        />
-                    </div>
-                </div>
+
 
                 <div className="col-span-2">
                     <label className="block text-[9px] font-medium text-[#717171] uppercase mb-1.5 tracking-wider ml-1">CNPJ / Emitente</label>
