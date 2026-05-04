@@ -339,11 +339,25 @@ export function useBudgetLogic(id?: string) {
                 let finalBudgetNumber = budgetNumber;
                 if (!finalBudgetNumber || finalBudgetNumber.trim().toUpperCase() === 'AUTO' || finalBudgetNumber.startsWith('AUTO-')) {
                     const { data: nextNum, error: rpcErr } = await supabase.rpc('get_next_budget_number');
-                    if (!rpcErr && nextNum) {
-                        finalBudgetNumber = nextNum;
-                    } else {
-                        finalBudgetNumber = 'AUTO-' + Math.floor(Math.random() * 1000000);
+                    let candidate = nextNum;
+                    
+                    const numericCandidate = parseInt(String(candidate || '0'));
+                    if (rpcErr || !candidate || isNaN(numericCandidate) || numericCandidate < 7500) {
+                        // Se a sequence do banco ainda for baixa, buscamos o maior número >= 7500
+                        const { data: existing } = await supabase
+                            .from('budgets')
+                            .select('budget_number')
+                            .order('created_at', { ascending: false })
+                            .limit(50);
+                        
+                        const numbers = (existing || [])
+                            .map(b => parseInt(b.budget_number))
+                            .filter(n => !isNaN(n) && n >= 7500);
+                        
+                        candidate = numbers.length > 0 ? String(Math.max(...numbers) + 1) : '7500';
                     }
+                    
+                    finalBudgetNumber = candidate;
                     setBudgetNumber(finalBudgetNumber);
                 }
 
@@ -507,7 +521,22 @@ export function useBudgetLogic(id?: string) {
         handleDuplicate: async () => {
             try {
                 const { data: nextNum, error: rpcErr } = await supabase.rpc('get_next_budget_number');
-                const finalNum = (!rpcErr && nextNum) ? nextNum : ('AUTO-' + Math.floor(Math.random() * 1000000));
+                let finalNum = nextNum;
+                
+                const numericNum = parseInt(String(finalNum || '0'));
+                if (rpcErr || !finalNum || isNaN(numericNum) || numericNum < 7500) {
+                    const { data: existing } = await supabase
+                        .from('budgets')
+                        .select('budget_number')
+                        .order('created_at', { ascending: false })
+                        .limit(50);
+                    
+                    const numbers = (existing || [])
+                        .map(b => parseInt(b.budget_number))
+                        .filter(n => !isNaN(n) && n >= 7500);
+                    
+                    finalNum = numbers.length > 0 ? String(Math.max(...numbers) + 1) : '7500';
+                }
                 const payload = {
                     budget_number: finalNum,
                     salesperson,
